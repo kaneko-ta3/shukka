@@ -27,6 +27,19 @@
 *{box-sizing:border-box}
 /* hidden 属性を確実に効かせる（クラス側の display 指定に負けないようにする） */
 [hidden]{display:none !important;}
+
+/* 製造＝緑、出荷＝茶 で見分ける */
+:root{--ship:#8A4B1F; --ship-ink:#FFFFFF; --ship-soft:#F6E6D8;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--ship:#E0A46B; --ship-ink:#2A1607; --ship-soft:#3A2716;}
+}
+.kind{display:inline-block; font-size:.62em; font-weight:700; padding:2px 7px; border-radius:4px;
+  margin-right:8px; vertical-align:middle;
+  background:var(--accent-soft); color:var(--accent);}
+.kind.k-s{background:var(--ship-soft); color:var(--ship);}
+.task.k-s .task-card{border-left:3px solid var(--ship);}
+.task.k-m .task-card{border-left:3px solid var(--accent);}
+.c-item.k-s{background:var(--ship-soft);}
 body{
   margin:0; background:var(--ground); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
@@ -190,45 +203,46 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .err-box{margin-top:12px; padding:10px 14px; border-radius:6px; background:var(--danger-soft);
   color:var(--danger); font-size:13px;}
 
+/* スマホ・タブレット：文字をおよそ1.5倍にする */
 @media (max-width:1000px){
-  body{font-size:17px}
-  .wrap{padding:10px 8px 44px}
+  body{font-size:22px}
+  .wrap{padding:10px 8px 48px}
 
   /* 月表示 */
-  .cell{min-height:92px; padding:6px 5px;}
-  .c-num{font-size:17px}
-  .c-count{font-size:12px; padding:2px 8px;}
-  .c-item{font-size:13px; padding:3px 5px; line-height:1.35;}
-  .c-more{font-size:12px}
-  .dow div{font-size:13.5px}
-  .nav .label{font-size:19px; min-width:132px}
-  .bar-top h1{font-size:22px}
-  .bar-top h1 small{font-size:12.5px}
-  .state{font-size:12.5px}
+  .cell{min-height:140px; padding:7px 6px;}
+  .c-num{font-size:22px}
+  .c-count{font-size:16px; padding:2px 10px;}
+  .c-item{font-size:17px; padding:4px 7px; line-height:1.35;}
+  .c-more{font-size:16px}
+  .dow div{font-size:17px; padding:8px 4px;}
+  .nav .label{font-size:27px; min-width:184px}
+  .bar-top h1{font-size:28px}
+  .bar-top h1 small{font-size:16px}
+  .state{font-size:17px}
 
   /* 日表示 */
-  .day-head .d{font-size:28px}
-  .day-head .w{font-size:16px}
-  .counts{font-size:16px}
-  .counts b{font-size:19px}
-  .hint{font-size:14.5px}
-  .section-label{font-size:12.5px}
-  .t-name{font-size:20px; line-height:1.4;}
-  .t-sub{font-size:15.5px}
-  .t-meta{font-size:14.5px; gap:6px 12px;}
-  .t-time{font-size:14.5px; padding:4px 10px;}
-  .task-card{padding:15px 16px; gap:7px;}
-  .task-bg{font-size:18px}
+  .day-head .d{font-size:39px}
+  .day-head .w{font-size:21px}
+  .counts{font-size:19px}
+  .counts b{font-size:22px}
+  .hint{font-size:19px; padding:11px 14px;}
+  .section-label{font-size:16px}
+  .t-name{font-size:24px; line-height:1.4;}
+  .t-sub{font-size:19px}
+  .t-meta{font-size:18px; gap:8px 16px;}
+  .t-time{font-size:18px; padding:5px 12px;}
+  .task-card{padding:18px 18px; gap:8px;}
+  .task-bg{font-size:22px}
 
   /* 押しやすさ */
-  button{font-size:16.5px; min-height:48px; padding:10px 16px;}
-  button.icon{font-size:20px; min-width:48px;}
-  .t-actions button{font-size:15.5px; min-height:44px;}
-  .empty-msg{font-size:16px}
-  .gate h2{font-size:21px}
-  .gate p{font-size:15px}
-  .gate input{font-size:18px; padding:14px 15px;}
-  .gate button{font-size:17px; min-height:52px;}
+  button{font-size:21px; min-height:60px; padding:12px 20px;}
+  button.icon{font-size:26px; min-width:60px;}
+  .t-actions button{font-size:19px; min-height:52px;}
+  .empty-msg{font-size:21px}
+  .gate h2{font-size:28px}
+  .gate p{font-size:20px}
+  .gate input{font-size:25px; padding:16px 16px;}
+  .gate button{font-size:24px; min-height:64px;}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
@@ -255,7 +269,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v6";
+const BUILD = "v8";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -314,11 +328,11 @@ const diff = (a,b) => Math.round((p(b) - p(a)) / 86400000);
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
 const WD = ["日","月","火","水","木","金","土"];
 
-let jobs = [];
+let jobs = [];   /* サーバーからは tasks で来ます（製造・出荷の2種類） */
 let TODAY = null;
 let view = null;          /* Date: 表示中の月 */
 let openDate = null;      /* 'yyyy-MM-dd' or null（null なら月表示） */
-let doneLabel = "出荷";
+let doneLabel = "完了";
 let pending = 0;
 let booted = false;
 
@@ -336,9 +350,9 @@ function load(silent){
   call("work", {ym: view ? ym(view) : null})
     .then(function(b){
       loading = false;
-      jobs = b.jobs;
+      jobs = b.tasks || [];
       TODAY = b.today;
-      doneLabel = b.doneLabel || "出荷";
+      doneLabel = "完了";
       if (!view) view = p(TODAY);
       saveKey(KEY);
       booted = true;
@@ -415,7 +429,11 @@ function jobsOn(date){
     if (!j.start) return false;
     const end = add(j.start, j.days - 1);
     return j.start <= date && date <= end;
-  }).sort((a,b) => (a.done === b.done) ? (a.row - b.row) : (a.done ? 1 : -1));
+  }).sort((a,b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;      // 未完了が先
+    if (a.kind !== b.kind) return a.kind === 'm' ? -1 : 1;  // 製造 → 出荷
+    return a.row - b.row;
+  });
 }
 
 /* ---------- 描画 ---------- */
@@ -494,8 +512,8 @@ function renderMonth(){
     cell.innerHTML = html;
 
     list.slice(0, 3).forEach(j => {
-      const it = el('div', 'c-item' + (j.done ? ' done' : ''));
-      it.textContent = j.name;
+      const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
+      it.textContent = (j.kind === 's' ? '出 ' : '製 ') + j.name;
       cell.appendChild(it);
     });
     if (list.length > 3){
@@ -577,8 +595,9 @@ function renderDay(){
 }
 
 function taskEl(j){
-  const t = el('div', 'task' + (j.done ? ' done' : ''));
+  const t = el('div', 'task k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
   t.dataset.row = j.row;
+  t.dataset.id = j.id;
 
   const bg = el('div', 'task-bg');
   bg.innerHTML = '<span>✓ 完了</span>';
@@ -599,7 +618,9 @@ function taskEl(j){
     + '</div>'
     + '<div class="t-actions"><button type="button" class="act"></button></div>';
 
-  card.querySelector('.t-name').textContent = j.name;
+  card.querySelector('.t-name').innerHTML =
+    '<span class="kind k-' + (j.kind || 'm') + '">' + (j.kind === 's' ? '出荷' : '製造') + '</span>';
+  card.querySelector('.t-name').appendChild(document.createTextNode(j.name));
   if (j.time) card.querySelector('.t-time').textContent = j.time;
   card.querySelector('.t-sub').textContent = [j.cust, j.to].filter(Boolean).join(' → ');
   if (j.due) card.querySelector('.due').textContent = '納品 ' + md(j.due) + '　'
@@ -674,7 +695,7 @@ function commit(j, done){
   pending++;
   setState("保存中…", "busy");
 
-  call("setDone", {row:j.row, done: done ? 1 : 0})
+  call("setDone", {row:j.row, kind:j.kind, done: done ? 1 : 0})
     .then(function(res){
       pending--;
       j.done = res.done;
