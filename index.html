@@ -42,7 +42,7 @@
 .kind.k-s{background:var(--ship-soft); color:var(--ship);}
 .task.k-s .task-card{border-left:3px solid var(--ship);}
 .task.k-m .task-card{border-left:3px solid var(--accent);}
-.c-item.k-s{background:var(--ship-soft);}
+.c-item.k-s{background:var(--ship-soft); border-left-color:var(--ship);}
 html,body{height:100%;}
 @supports (height: 100dvh){ html,body{height:100dvh;} }
 body{
@@ -126,7 +126,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .c-list{display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden;}
 .c-item{
   flex:none;
-  font-size:11.5px; line-height:1.35; padding:2px 5px; border-radius:3px;
+  font-size:11.5px; line-height:1.35; padding:2px 4px; border-radius:3px;
+  border-left:3px solid var(--accent);
   background:var(--accent-soft); color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
@@ -274,6 +275,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 }
 /* スマホ縦持ち：幅が狭いので、枠まわりをもう一段小さくします */
 @media (max-width:560px){
+  .c-item{font-size:10.5px; padding:2px 3px; border-left-width:2px;}
+  .c-more{font-size:10px}
   .c-num{font-size:14px}
   .c-count{font-size:10.5px; padding:1px 6px;}
   .cell{padding:5px 4px; justify-content:flex-start;}
@@ -314,7 +317,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v17";
+const BUILD = "v18";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -641,7 +644,10 @@ function renderMonth(){
     const box = el('div', 'c-list');
     list.slice(0, MAXI).forEach(j => {
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
-      it.textContent = (j.kind === 's' ? '出 ' : '製 ') + j.name;
+      /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
+         代わりに背景色と左の線で見分けます */
+      it.textContent = j.name;
+      it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name;
       box.appendChild(it);
     });
     if (list.length > MAXI){
