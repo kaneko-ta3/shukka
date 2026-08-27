@@ -12,6 +12,7 @@
   --line:#D7DDDA; --line-strong:#B6C0BC; --ink:#131A18; --muted:#5D6A66;
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
+  --off-ink:#8E2B22;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 8px 20px rgba(19,26,24,.07);
   --radius:8px;
 }
@@ -21,6 +22,7 @@
     --line:#2A3431; --line-strong:#3D4A46; --ink:#E7EDEA; --muted:#8E9C97;
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+    --off-ink:#F08279;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.35);
   }
 }
@@ -102,7 +104,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .c-head{display:flex; align-items:center; justify-content:space-between; gap:4px;}
 .c-num{font-size:15px; font-weight:600;}
 .cell.today .c-num{color:var(--accent)}
-.cell.off .c-num{color:var(--muted)}
+.cell.off .c-num{color:var(--off-ink); font-weight:700;}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
   background:var(--accent); color:var(--accent-ink);}
 .c-count.all-done{background:var(--surface-2); color:var(--muted);}
@@ -269,7 +271,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v11";
+const BUILD = "v13";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -346,6 +348,12 @@ const diff = (a,b) => Math.round((p(b) - p(a)) / 86400000);
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
 const WD = ["日","月","火","水","木","金","土"];
 
+/* 休みの日。会社の休日カレンダーが読めていればそれを使います */
+let HOLIDAYS = {};
+let USE_HOLIDAY_CAL = false;
+const isOff = s => USE_HOLIDAY_CAL ? !!HOLIDAYS[s]
+                                   : (function(){ const w = p(s).getDay(); return w === 0 || w === 6; })();
+
 let jobs = [];   /* サーバーからは tasks で来ます（製造・出荷の2種類） */
 let TODAY = null;
 let view = null;          /* Date: 表示中の月 */
@@ -369,6 +377,9 @@ function load(silent){
     .then(function(b){
       loading = false;
       jobs = b.tasks || [];
+      HOLIDAYS = {};
+      (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
+      USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
       TODAY = b.today;
       doneLabel = "完了";
       if (!view) view = p(TODAY);
@@ -504,7 +515,7 @@ function renderMonth(){
     /* 当月以外（前月の末尾・翌月の頭）は空欄にする */
     if (dt.getMonth() !== view.getMonth()){
       const blank = document.createElement('div');
-      blank.className = 'cell blank' + ((w === 0 || w === 6) ? ' off' : '');
+      blank.className = 'cell blank' + (isOff(date) ? ' off' : '');
       grid.appendChild(blank);
       continue;
     }
@@ -515,7 +526,7 @@ function renderMonth(){
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'cell'
-      + ((w === 0 || w === 6) ? ' off' : '')
+      + (isOff(date) ? ' off' : '')
       + (date === TODAY ? ' today' : '')
       + (list.length ? '' : ' empty');
     cell.dataset.date = date;

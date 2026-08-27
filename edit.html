@@ -13,6 +13,7 @@
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --ship:#8A4B1F; --ship-ink:#FFFFFF; --ship-soft:#F6E6D8;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
+  --off-ink:#8E2B22;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 6px 16px rgba(19,26,24,.06);
   --radius:6px;
 }
@@ -23,6 +24,7 @@
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --ship:#E0A46B; --ship-ink:#2A1607; --ship-soft:#3A2716;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+    --off-ink:#F08279;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
   }
 }
@@ -95,7 +97,8 @@ button:disabled:hover{background:var(--surface); border-color:var(--line);}
 .day.drop-hint{background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent);}
 .day-head{display:flex; align-items:center; justify-content:space-between; gap:4px; height:20px;}
 .dnum{font-size:12.5px; font-weight:500;}
-.day.off .dnum{color:var(--muted)}
+/* 休みの日は数字を暗い赤にして見分けやすくする */
+.day.off .dnum{color:var(--off-ink); font-weight:700;}
 .day.today .dnum{color:var(--accent); font-weight:700;}
 .load{font-size:10px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);}
 .load.lv2{background:var(--accent-soft); color:var(--accent); font-weight:500;}
@@ -308,7 +311,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v11";
+const BUILD = "v13";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -369,7 +372,13 @@ const p = s => { const a = s.split("-").map(Number); return new Date(a[0], a[1]-
 const iso = dt => dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
 const add = (s,n) => { const t = p(s); t.setDate(t.getDate()+n); return iso(t); };
 const diff = (a,b) => Math.round((p(b) - p(a)) / 86400000);
-const isOff = s => { const w = p(s).getDay(); return w === 0 || w === 6; };
+/* 休みの日の判定。
+   会社の休日カレンダーが読めていればそれを使い、
+   読めていない場合だけ土日を休みとみなします。 */
+let HOLIDAYS = {};
+let USE_HOLIDAY_CAL = false;
+const isOff = s => USE_HOLIDAY_CAL ? !!HOLIDAYS[s]
+                                   : (function(){ const w = p(s).getDay(); return w === 0 || w === 6; })();
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
 const remainText = n => n === null ? ""
   : (n < 0 ? Math.abs(n) + "日 遅れ" : (n === 0 ? "本日まで" : "あと" + n + "日"));
@@ -441,6 +450,9 @@ function load(first){
       loading = false;
       tasks = b.tasks || [];
       TODAY = b.today;
+      HOLIDAYS = {};
+      (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
+      USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
       if (!anchor) anchor = homeAnchor();
       document.getElementById("gate").hidden = true;
       document.getElementById("boot").hidden = true;
@@ -953,8 +965,8 @@ document.getElementById("auto").onclick = () => {
   const past = plan.filter(x => x.date < TODAY).length;
 
   const msg = "出荷タスク " + pool.length + "件に出荷日を入れます。\n\n"
-    + "納品日から輸送日数を引いた日にします\n"
-    + "（関東〜兵庫は1日前、それより西・東北・北海道は2日前。土日は避けます）\n\n"
+    + "実際に届く日の1日前になるように、納品日からさかのぼります\n"
+    + "（関東〜兵庫は2稼働日前、それより西・東北・北海道は3稼働日前。土日祝は数えません）\n\n"
     + (past ? "※ うち " + past + "件は計算上すでに過去の日付になります\n\n" : "")
     + "製造タスクは対象外です。よろしいですか？";
   if (!confirm(msg)) return;
@@ -969,6 +981,7 @@ document.getElementById("auto").onclick = () => {
   });
   render();
 
+  log("出荷日 自動配置：" + items.length + "件を書き込み中…（カレンダーの予定を作るので少し待ちます）", "");
   busy(true);
   call("batch", {kind:"s", items: items.join(",")})
     .then(r => { busy(false); log("出荷日 自動配置：" + r.message, "完了"); load(false); })
