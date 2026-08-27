@@ -3,6 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -13,7 +14,7 @@
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --ship:#8A4B1F; --ship-ink:#FFFFFF; --ship-soft:#F6E6D8;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
-  --off-ink:#8C443C;
+  --off-ink:#8C443C; --ago-ink:#3C6C86; --ago-soft:#DCE9F0;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 6px 16px rgba(19,26,24,.06);
   --radius:6px;
 }
@@ -24,7 +25,7 @@
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --ship:#E0A46B; --ship-ink:#2A1607; --ship-soft:#3A2716;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
-    --off-ink:#A85F57;
+    --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
   }
 }
@@ -34,19 +35,19 @@ html,body{height:100%; overflow:hidden;}
 body{
   margin:0; background:var(--ground); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
-  font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
 }
 .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums;}
 .wrap{max-width:1900px; margin:0 auto; padding:10px 12px 12px;
   height:100%; display:flex; flex-direction:column; min-height:0;}
 
-h1{font-size:15px; font-weight:700; margin:0 6px 0 2px; white-space:nowrap;}
-h1 .sub{display:block; font-size:10px; font-weight:500; letter-spacing:.14em; color:var(--muted);}
+h1{font-size:16px; font-weight:700; margin:0 6px 0 2px; white-space:nowrap;}
+h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; color:var(--muted);}
 .summary{display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; background:var(--ground);}
 .stat{padding:2px 11px; border-right:1px solid var(--line); min-width:74px;}
 .stat:last-child{border-right:0}
 .stat .k{font-size:9.5px; letter-spacing:.06em; color:var(--muted); display:block; white-space:nowrap;}
-.stat .v{font-size:15px; font-weight:600; line-height:1.15; display:flex; align-items:baseline; gap:2px;}
+.stat .v{font-size:16px; font-weight:600; line-height:1.15; display:flex; align-items:baseline; gap:2px;}
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
 
@@ -56,16 +57,16 @@ h1 .sub{display:block; font-size:10px; font-weight:500; letter-spacing:.14em; co
 .tb-left{display:flex; align-items:center; gap:10px; min-width:0;}
 .tb-right{display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap;}
 .month{display:flex; align-items:center; gap:3px;}
-.month .label{font-size:14px; font-weight:700; min-width:148px; text-align:center; white-space:nowrap;}
-.state{font-size:11.5px; color:var(--muted);}
+.month .label{font-size:15px; font-weight:700; min-width:158px; text-align:center; white-space:nowrap;}
+.state{font-size:12.5px; color:var(--muted);}
 .state.busy{color:var(--accent); font-weight:500;}
 .state.err{color:var(--danger); font-weight:500;}
-button{font-family:inherit; font-size:12.5px; color:var(--ink); background:var(--surface);
+button{font-family:inherit; font-size:13.5px; color:var(--ink); background:var(--surface);
   border:1px solid var(--line); border-radius:4px; padding:5px 11px; cursor:pointer; line-height:1.5;
   transition:background .12s,border-color .12s;}
 button:hover{background:var(--surface-2); border-color:var(--line-strong);}
 button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
-button.icon{padding:4px 9px; font-size:14px; line-height:1.3;}
+button.icon{padding:4px 9px; font-size:15px; line-height:1.3;}
 button:disabled{opacity:.42; cursor:default;}
 button:disabled:hover{background:var(--surface); border-color:var(--line);}
 
@@ -73,7 +74,7 @@ button:disabled:hover{background:var(--surface); border-color:var(--line);}
 body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 
 .app{display:grid; gap:9px; align-items:stretch; flex:1 1 auto; min-height:0;
-  grid-template-columns:224px 224px minmax(0,1fr) 240px 196px;
+  grid-template-columns:238px 238px minmax(0,1fr) 254px 206px;
   grid-template-areas:"pm ps cal done log";}
 #pool-m{grid-area:pm} #pool-s{grid-area:ps}
 .cal{grid-area:cal} #done{grid-area:done} .log{grid-area:log}
@@ -83,7 +84,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 #weeks{flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
 .dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-bottom:1px solid var(--line);
   background:var(--surface-2); position:sticky; top:0; z-index:3;}
-.dow div{padding:5px 8px; font-size:11px; font-weight:500; letter-spacing:.1em; color:var(--muted); border-right:1px solid var(--line);}
+.dow div{padding:5px 8px; font-size:12px; font-weight:500; letter-spacing:.1em; color:var(--muted); border-right:1px solid var(--line);}
 .dow div:last-child{border-right:0}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
 
@@ -99,11 +100,11 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .day.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .day.drop-hint{background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent);}
 .day-head{display:flex; align-items:center; justify-content:space-between; gap:4px; height:20px;}
-.dnum{font-size:12.5px; font-weight:500;}
+.dnum{font-size:13.5px; font-weight:500;}
 /* 休みの日は数字を暗い赤にして見分けやすくする */
 .day.off .dnum{color:var(--off-ink); font-weight:700;}
 .day.today .dnum{color:var(--accent); font-weight:700;}
-.load{font-size:10px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);}
+.load{font-size:11px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);}
 .load.lv2{background:var(--accent-soft); color:var(--accent); font-weight:500;}
 .load.lv3{background:var(--accent); color:var(--accent-ink); font-weight:600;}
 
@@ -113,7 +114,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
   top:calc(28px + var(--lane) * 25px); height:22px;
   display:flex; align-items:center; gap:5px; padding:0 6px;
   background:var(--accent-soft); border:1px solid var(--accent); border-left:3px solid var(--accent);
-  border-radius:3px; font-size:11px; white-space:nowrap; overflow:hidden;
+  border-radius:3px; font-size:12px; white-space:nowrap; overflow:hidden;
   cursor:grab; user-select:none; touch-action:none;}
 .bar.k-s{background:var(--ship-soft); border-color:var(--ship); border-left-color:var(--ship);}
 .bar:hover{filter:brightness(.98); box-shadow:var(--shadow);}
@@ -121,12 +122,12 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .bar.late{background:var(--danger-soft); border-color:var(--danger); border-left-color:var(--danger);}
 .bar.sel{box-shadow:0 0 0 2px var(--accent);}
 .bar.pending{opacity:.55}
-.bar .tag{flex:none; font-size:9.5px; font-weight:700; padding:0 4px; border-radius:2px;
+.bar .tag{flex:none; font-size:10.5px; font-weight:700; padding:0 4px; border-radius:2px;
   background:var(--accent); color:var(--accent-ink);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
 .bar.late .tag{background:var(--danger); color:#fff;}
 .bar .nm{overflow:hidden; text-overflow:ellipsis; font-weight:500;}
-.bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.7; font-size:10px;}
+.bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.7; font-size:11px;}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
 .bar.cont-r{border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed;}
 .grip{position:absolute; right:0; top:0; width:9px; height:100%; cursor:col-resize;}
@@ -162,27 +163,31 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
 .chip.sel{border-color:var(--accent); background:var(--accent-soft);}
 .chip.pending{opacity:.55}
-.chip .nm{font-size:12.5px; font-weight:500; line-height:1.4;}
-.chip .sub{font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.chip .nm{font-size:13.5px; font-weight:500; line-height:1.4;}
+.chip .sub{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .chip .lim{display:flex; flex-wrap:wrap; gap:3px 6px; margin-top:2px;}
-.chip .lim span{font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600;
+.chip .lim span{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
   padding:1px 5px; border-radius:3px; background:var(--surface-2); color:var(--muted); white-space:nowrap;}
 .chip .lim span.near{background:var(--warn-soft); color:var(--warn);}
 .chip .lim span.over{background:var(--danger); color:#fff;}
+/* 完了したものは「遅れ」を出さないので、期限は控えめな表示にします */
+.chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
+.chip .ago{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
+  padding:0 5px; border-radius:2px; background:var(--ago-soft); color:var(--ago-ink);}
 .chip .foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:1px;}
-.chip .code{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--muted);}
+.chip .code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted);}
 .chip.is-done{border-left-color:var(--line-strong); background:var(--surface-2);}
 .chip.is-done .nm{color:var(--muted); text-decoration:line-through; font-weight:500;}
-.chip .done-on{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--accent); font-weight:600;}
+.chip .done-on{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accent); font-weight:600;}
 .chip.k-s .done-on{color:var(--ship)}
-.empty{padding:18px 10px; text-align:center; color:var(--muted); font-size:11.5px;}
+.empty{padding:18px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
 
 .log{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   padding:8px 9px; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
-.log h3{margin:0 0 6px; font-size:10px; letter-spacing:.12em; font-weight:600; color:var(--muted); flex:none;}
+.log h3{margin:0 0 6px; font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--muted); flex:none;}
 .log ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
   flex:1 1 auto; min-height:0; overflow-y:auto;}
-.log li{font-size:10.5px; color:var(--muted); display:grid; gap:1px; font-family:"IBM Plex Mono",monospace;
+.log li{font-size:11.5px; color:var(--muted); display:grid; gap:1px; font-family:"IBM Plex Mono",monospace;
   padding-bottom:6px; border-bottom:1px solid var(--line);}
 .log li:last-child{border-bottom:0}
 .log li .t{color:var(--line-strong);}
@@ -314,7 +319,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v14";
+const BUILD = "v15";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -390,6 +395,11 @@ let USE_HOLIDAY_CAL = false;
 const isOff = s => USE_HOLIDAY_CAL ? !!HOLIDAYS[s]
                                    : (function(){ const w = p(s).getDay(); return w === 0 || w === 6; })();
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
+/* 完了したものに出す「何日前」。赤い「遅れ」とは別の色で表示します */
+const agoText = s => {
+  const n = diff(s, TODAY);
+  return n <= 0 ? (n === 0 ? "本日" : Math.abs(n) + "日後") : n + "日前";
+};
 const remainText = n => n === null ? ""
   : (n < 0 ? Math.abs(n) + "日 遅れ" : (n === 0 ? "本日まで" : "あと" + n + "日"));
 
@@ -689,7 +699,7 @@ function chipEl(t, done){
 
   el.innerHTML = '<div class="nm"></div><div class="sub"></div>'
     + '<div class="lim"></div>'
-    + '<div class="foot"><span class="done-on"></span><span class="code"></span></div>';
+    + '<div class="foot"><span class="done-on"></span><span class="ago"></span><span class="code"></span></div>';
 
   el.querySelector(".nm").textContent = (t.kind === "m" ? "［製造］" : "［出荷］") + t.name;
   el.querySelector(".sub").textContent = [t.cust, t.qty, t.who].filter(Boolean).join("　");
@@ -697,12 +707,14 @@ function chipEl(t, done){
   const lim = el.querySelector(".lim");
   limitChips(t).forEach(function(c){
     const s = document.createElement("span");
-    s.textContent = c.label + (c.left === null ? "" : "　" + remainText(c.left));
-    if (c.left !== null) s.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
+    /* 完了したものに「遅れ」は出しません（もう終わっているため） */
+    s.textContent = c.label + ((done || c.left === null) ? "" : "　" + remainText(c.left));
+    if (!done && c.left !== null) s.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
     lim.appendChild(s);
   });
 
   el.querySelector(".done-on").textContent = done ? (t.start ? "✓ " + md(t.start) : "✓ 完了") : "";
+  el.querySelector(".ago").textContent = (done && t.start) ? agoText(t.start) : "";
   el.querySelector(".code").textContent = t.code;
   return el;
 }

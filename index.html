@@ -3,6 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -12,7 +13,7 @@
   --line:#D7DDDA; --line-strong:#B6C0BC; --ink:#131A18; --muted:#5D6A66;
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
-  --off-ink:#8C443C;
+  --off-ink:#8C443C; --ago-ink:#3C6C86;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 8px 20px rgba(19,26,24,.07);
   --radius:8px;
 }
@@ -22,7 +23,7 @@
     --line:#2A3431; --line-strong:#3D4A46; --ink:#E7EDEA; --muted:#8E9C97;
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
-    --off-ink:#A85F57;
+    --off-ink:#A85F57; --ago-ink:#8CBBD4;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.35);
   }
 }
@@ -42,20 +43,30 @@
 .task.k-s .task-card{border-left:3px solid var(--ship);}
 .task.k-m .task-card{border-left:3px solid var(--accent);}
 .c-item.k-s{background:var(--ship-soft);}
+html,body{height:100%;}
+@supports (height: 100dvh){ html,body{height:100dvh;} }
 body{
   margin:0; background:var(--ground); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
   font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
   -webkit-tap-highlight-color:transparent;
+  overflow:hidden;                /* 画面の外にはみ出させない */
 }
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums;}
-.wrap{max-width:1100px; margin:0 auto; padding:14px 14px 40px;}
+.wrap{max-width:1100px; margin:0 auto; padding:12px 12px 10px;
+  height:100%; display:flex; flex-direction:column; min-height:0;}
+
+/* 月表示は画面ぴったり。日表示だけ中身をスクロールさせます */
+#app{flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
+#app.view-month{overflow:hidden;}
+#app.view-day{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+#boot{flex:none}
 
 /* 前回の内容を表示している間は、触れないようにして誤操作を防ぎます */
 body.stale #app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 
 /* ---- 共通バー ---- */
-.bar-top{display:flex; align-items:center; gap:10px; margin-bottom:12px; min-height:40px;}
+.bar-top{display:flex; align-items:center; gap:10px; margin-bottom:10px; min-height:36px; flex:none;}
 .bar-top h1{font-size:19px; font-weight:700; margin:0; flex:1;}
 .bar-top h1 small{display:block; font-size:11px; font-weight:500; letter-spacing:.12em; color:var(--muted);}
 .state{font-size:11.5px; color:var(--muted); white-space:nowrap;}
@@ -71,21 +82,21 @@ button.icon{padding:8px 12px; font-size:17px; min-width:42px;}
 button.ghost{background:transparent; border-color:transparent; color:var(--accent); font-weight:500;}
 
 /* ---- 月表示 ---- */
-.nav{display:flex; align-items:center; gap:6px; margin-bottom:10px;}
+.nav{display:flex; align-items:center; gap:6px; margin-bottom:8px; flex:none;}
 .nav .label{font-size:18px; font-weight:700; min-width:132px; text-align:center;}
 .nav .sp{flex:1}
 
-.cal{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+.cal{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;
+  flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
 
 /* 土日は幅を狭める（作業がほぼ入らないため） */
 .dow, .grid{display:grid; grid-template-columns:0.62fr repeat(5, 1fr) 0.62fr;}
-.dow{background:var(--surface-2); border-bottom:1px solid var(--line);}
+.dow{background:var(--surface-2); border-bottom:1px solid var(--line); flex:none;}
 .dow div{padding:6px 4px; font-size:11.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-align:center; min-width:0;}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
 
-/* 画面の高さいっぱいに広げて、下に余白を残さない */
-.grid{grid-auto-rows:minmax(84px, 1fr); min-height:calc(100vh - 214px);}
-@supports (height: 100dvh){ .grid{min-height:calc(100dvh - 214px);} }
+/* 残りの高さを行数で割り切る。スクロールは出しません */
+.grid{flex:1 1 auto; min-height:0; grid-auto-rows:minmax(0, 1fr);}
 
 .cell{
   border-right:1px solid var(--line); border-bottom:1px solid var(--line);
@@ -97,9 +108,10 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .cell:nth-child(7n){border-right:0}
 .cell:hover{background:var(--accent-soft)}
 .cell.off{background:var(--weekend)}
-/* 当月以外は空欄にする */
-.cell.blank{background:var(--ground); cursor:default;}
-.cell.blank:hover{background:var(--ground)}
+/* 当月以外（同じ行に入る前月末・翌月頭）は薄く見せる */
+.cell.other{background:var(--ground);}
+.cell.other .c-num{opacity:.5}
+.cell.other .c-item{opacity:.75}
 .cell.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .cell.empty{cursor:default}
 .cell.empty:hover{background:var(--surface)}
@@ -111,7 +123,9 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
   background:var(--accent); color:var(--accent-ink);}
 .c-count.all-done{background:var(--surface-2); color:var(--muted);}
+.c-list{display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden;}
 .c-item{
+  flex:none;
   font-size:11.5px; line-height:1.35; padding:2px 5px; border-radius:3px;
   background:var(--accent-soft); color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -170,6 +184,9 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-meta .due{font-family:"IBM Plex Mono",monospace; font-weight:600;}
 .t-meta .due.near{color:var(--warn)}
 .t-meta .due.over{color:var(--danger)}
+/* 完了したものは「遅れ」ではなく、別の色で「何日前」を出します */
+.t-meta .due.ago{color:var(--ago-ink); font-weight:700;}
+.task.done .t-meta .due.ago{color:var(--ago-ink)}
 .t-meta .code{font-family:"IBM Plex Mono",monospace;}
 .t-actions{display:flex; justify-content:flex-end; margin-top:4px;}
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
@@ -211,19 +228,23 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 /* スマホ・タブレット：文字をおよそ1.5倍にする */
 @media (max-width:1000px){
   body{font-size:22px}
-  .wrap{padding:10px 8px 48px}
+  .wrap{padding:10px 8px 10px}
 
   /* 月表示 */
-  .cell{min-height:140px; padding:7px 6px;}
+  .cell{min-height:0; padding:7px 6px;}
   .c-num{font-size:22px}
   .c-count{font-size:16px; padding:2px 10px;}
   .c-item{font-size:17px; padding:4px 7px; line-height:1.35;}
   .c-more{font-size:16px}
   .dow div{font-size:17px; padding:8px 4px;}
-  .nav .label{font-size:27px; min-width:184px}
-  .bar-top h1{font-size:28px}
-  .bar-top h1 small{font-size:16px}
-  .state{font-size:17px}
+  .bar-top{min-height:0; margin-bottom:6px;}
+  .bar-top h1{font-size:26px}
+  .bar-top h1 small{font-size:15px}
+  .state{font-size:16px}
+  .nav{margin-bottom:6px}
+  .nav .label{font-size:25px; min-width:0; flex:1 1 auto; text-align:center;}
+  .nav button{font-size:18px; min-height:48px; padding:8px 14px;}
+  .nav button.icon{font-size:24px; min-width:48px; padding:8px 10px;}
 
   /* 日表示 */
   .day-head .d{font-size:39px}
@@ -249,6 +270,26 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
   .gate input{font-size:25px; padding:16px 16px;}
   .gate button{font-size:24px; min-height:64px;}
 }
+/* スマホ縦持ち：7列に案件名を入れても読めないので、日付と件数だけにします。
+   日付をタップすればその日の一覧が出ます */
+@media (max-width:560px){
+  .c-item, .c-more{display:none}
+  .c-head{flex-direction:column; align-items:flex-start; gap:4px;}
+  .c-num{font-size:20px}
+  .c-count{font-size:15px; padding:2px 9px;}
+  .cell{padding:6px 5px; justify-content:flex-start;}
+
+  /* 月の切り替えを1行に収める */
+  .nav{gap:4px}
+  .nav .label{font-size:20px; white-space:nowrap;}
+  .nav button{font-size:15px; min-height:42px; padding:6px 10px;}
+  .nav button.icon{font-size:20px; min-width:38px; padding:6px 8px;}
+  .bar-top h1{font-size:22px}
+  .bar-top h1 small{font-size:13px}
+  .state{font-size:14px}
+  .dow div{font-size:14px; padding:6px 2px;}
+}
+
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
 </head>
@@ -274,7 +315,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v14";
+const BUILD = "v15";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -355,6 +396,13 @@ const add = (s,n) => { const t = p(s); t.setDate(t.getDate()+n); return iso(t); 
 const diff = (a,b) => Math.round((p(b) - p(a)) / 86400000);
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
 const WD = ["日","月","火","水","木","金","土"];
+
+/* 完了したものに出す「何日前」。赤い「遅れ」とは別の色で表示します */
+const agoText = d => {
+  if (!d) return "完了";
+  const n = diff(d, TODAY);
+  return n <= 0 ? (n === 0 ? "本日" : Math.abs(n) + "日後") : n + "日前";
+};
 
 /* 休みの日。会社の休日カレンダーが読めていればそれを使います */
 let HOLIDAYS = {};
@@ -517,10 +565,11 @@ function jobsOn(date){
 
 /* ---------- 描画 ---------- */
 function render(){
-  const y = window.scrollY;
+  const y = app.scrollTop;
   app.innerHTML = "";
+  app.className = openDate ? "view-day" : "view-month";
   if (openDate) renderDay(); else renderMonth();
-  window.scrollTo(0, y);
+  app.scrollTop = openDate ? y : 0;
 }
 
 function renderMonth(){
@@ -555,20 +604,18 @@ function renderMonth(){
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const gridStart = iso(new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay()));
   const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
-  const ROWS = 6;                       /* 月が変わっても行数を揃える */
+  /* 1日の曜日と日数から、必要な行数だけ出します（余分な行を作らない） */
+  const ROWS = Math.ceil((first.getDay() + daysInMonth) / 7);
+  /* 文字が大きい端末では、1マスに入る件数を減らします。
+     件数は右上のバッジで分かるので、スマホでは「ほか○件」は省きます */
+  const NARROW = (window.innerWidth <= 1000);
+  const MAXI = NARROW ? 2 : 3;
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
     const dt = p(date);
     const w = dt.getDay();
-
-    /* 当月以外（前月の末尾・翌月の頭）は空欄にする */
-    if (dt.getMonth() !== view.getMonth()){
-      const blank = document.createElement('div');
-      blank.className = 'cell blank' + (isOff(date) ? ' off' : '');
-      grid.appendChild(blank);
-      continue;
-    }
+    const other = (dt.getMonth() !== view.getMonth());
 
     const list = jobsOn(date);
     const undone = list.filter(j => !j.done).length;
@@ -577,12 +624,14 @@ function renderMonth(){
     cell.type = 'button';
     cell.className = 'cell'
       + (isOff(date) ? ' off' : '')
+      + (other ? ' other' : '')
       + (date === TODAY ? ' today' : '')
       + (list.length ? '' : ' empty');
     cell.dataset.date = date;
     if (!list.length) cell.disabled = true;
 
-    let html = '<div class="c-head"><span class="c-num mono">' + dt.getDate() + '</span>';
+    let html = '<div class="c-head"><span class="c-num mono">'
+             + (dt.getDate() === 1 ? (dt.getMonth()+1) + '/1' : dt.getDate()) + '</span>';
     if (list.length){
       html += '<span class="c-count' + (undone ? '' : ' all-done') + '">'
             + (undone ? undone + '件' : '済') + '</span>';
@@ -590,16 +639,18 @@ function renderMonth(){
     html += '</div>';
     cell.innerHTML = html;
 
-    list.slice(0, 3).forEach(j => {
+    const box = el('div', 'c-list');
+    list.slice(0, MAXI).forEach(j => {
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
       it.textContent = (j.kind === 's' ? '出 ' : '製 ') + j.name;
-      cell.appendChild(it);
+      box.appendChild(it);
     });
-    if (list.length > 3){
+    if (list.length > MAXI && !NARROW){
       const m = el('div', 'c-more');
-      m.textContent = "ほか" + (list.length - 3) + "件";
-      cell.appendChild(m);
+      m.textContent = "ほか" + (list.length - MAXI) + "件";
+      box.appendChild(m);
     }
+    cell.appendChild(box);
     cell.onclick = () => { openDate = date; render(); };
     grid.appendChild(cell);
   }
@@ -684,7 +735,9 @@ function taskEl(j){
 
   const card = el('div', 'task-card');
   const left = j.due ? diff(TODAY, j.due) : null;
-  const dueCls = left === null ? "" : (left < 0 ? " over" : (left <= 2 ? " near" : ""));
+  /* 完了したものに「遅れ」は出しません。代わりに「何日前」を別の色で出します */
+  const dueCls = j.done ? " ago"
+    : (left === null ? "" : (left < 0 ? " over" : (left <= 2 ? " near" : "")));
 
   card.innerHTML =
     '<div class="t-row1"><span class="t-name"></span>' + (j.time ? '<span class="t-time"></span>' : '') + '</div>'
@@ -702,8 +755,10 @@ function taskEl(j){
   card.querySelector('.t-name').appendChild(document.createTextNode(j.name));
   if (j.time) card.querySelector('.t-time').textContent = j.time;
   card.querySelector('.t-sub').textContent = [j.cust, j.to].filter(Boolean).join(' → ');
-  if (j.due) card.querySelector('.due').textContent = '納品 ' + md(j.due) + '　'
-      + (left < 0 ? Math.abs(left) + '日 遅れ' : (left === 0 ? '本日まで' : 'あと' + left + '日'));
+  if (j.due) card.querySelector('.due').textContent = j.done
+    ? ('納品 ' + md(j.due) + '　' + agoText(j.start))
+    : ('納品 ' + md(j.due) + '　'
+       + (left < 0 ? Math.abs(left) + '日 遅れ' : (left === 0 ? '本日まで' : 'あと' + left + '日')));
   if (j.qty) card.querySelector('.qty').textContent = j.qty;
   if (j.boxes) card.querySelector('.boxes').textContent = j.boxes + '個口';
   if (j.code) card.querySelector('.code').textContent = j.code;
