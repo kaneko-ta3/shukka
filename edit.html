@@ -176,6 +176,24 @@ body.resizing{cursor:col-resize; user-select:none;}
 .log li.none{color:var(--muted); font-family:"Zen Kaku Gothic New",sans-serif;}
 
 .boot{padding:60px 20px; text-align:center; color:var(--muted); flex:none;}
+
+/* ---- パスワード入力 ---- */
+.gate{flex:1 1 auto; display:flex; align-items:center; justify-content:center; padding:20px;}
+.gate form{
+  width:100%; max-width:340px; background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:24px 20px; display:flex; flex-direction:column; gap:11px; box-shadow:var(--shadow);
+}
+.gate h2{margin:0; font-size:17px; font-weight:700;}
+.gate p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.6;}
+.gate input{font-family:inherit; font-size:15px; padding:11px 12px;
+  border:1px solid var(--line-strong); border-radius:5px;
+  background:var(--ground); color:var(--ink); width:100%;}
+.gate input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+.gate button{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+  font-weight:700; font-size:14px; min-height:42px;}
+.gate button:hover{background:var(--accent); filter:brightness(1.08);}
+.gate-err{font-size:12.5px; color:var(--danger); min-height:1em;}
 @media (max-width:1560px){
   .app{grid-template-columns:250px minmax(0,1fr) 272px; grid-template-rows:1fr auto;
        grid-template-areas:"pool cal done" "pool cal log";}
@@ -223,6 +241,16 @@ body.resizing{cursor:col-resize; user-select:none;}
     </div>
   </div>
 
+  <div id="gate" class="gate" hidden>
+    <form id="gate-form" autocomplete="on">
+      <h2>作業日の割り付け</h2>
+      <p>合言葉を入力してください。<br>一度入力すると、次回からは自動で開きます。</p>
+      <input type="password" id="gate-input" autocomplete="current-password" placeholder="合言葉">
+      <button type="submit">開く</button>
+      <div class="gate-err" id="gate-err"></div>
+    </form>
+  </div>
+
   <div id="boot" class="boot">スプレッドシートを読み込んでいます…</div>
 
   <div class="app" id="app" hidden>
@@ -262,11 +290,30 @@ body.resizing{cursor:col-resize; user-select:none;}
 "use strict";
 
 /* ================= 接続先 ================= */
-/* 接続先URLは config.js に書いてあります。変更するときはそちらだけ直してください */
+/* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
+      デプロイし直してURLが変わったら、ここも直します。 */
 const API = window.SHUKKA_API || "";
 
-/* 合言葉はURLの ?k=... から読みます。このファイルには書きません */
-const KEY = new URLSearchParams(location.search).get("k") || "";
+/* パスワードは端末に保存します。このファイルには書きません。
+   URLに ?k=... が付いていればそれを使い、成功したらURLから消します。 */
+const STORE = "shukka_edit_key";
+
+function loadKey(){
+  const q = new URLSearchParams(location.search).get("k");
+  if (q) return q;
+  try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
+}
+function saveKey(k){
+  try { localStorage.setItem(STORE, k); } catch(e){}
+  if (location.search.indexOf("k=") >= 0){
+    try { history.replaceState(null, "", location.pathname); } catch(e){}
+  }
+}
+function forgetKey(){
+  try { localStorage.removeItem(STORE); } catch(e){}
+}
+
+let KEY = loadKey();
 
 function call(api, params){
   const u = new URL(API);
@@ -360,6 +407,8 @@ function load(first){
       TODAY = b.today;
       doneLabel = b.doneLabel || "完了";
       if (!anchor) anchor = homeAnchor();
+      saveKey(KEY);
+      document.getElementById("gate").hidden = true;
       document.getElementById("boot").hidden = true;
       document.getElementById("app").hidden = false;
       document.getElementById("done-title").textContent = doneLabel + "済み";
@@ -369,10 +418,44 @@ function load(first){
       if (first) log("読み込み完了：" + jobs.length + "件（未配置 " + jobs.filter(j=>!j.start).length + "件）", "");
     })
     .catch(function(e){
+      if (/合言葉|権限/.test(e.message)){
+        forgetKey();
+        showGate("合言葉が違います");
+        return;
+      }
       setState("読み込み失敗", "err");
+      document.getElementById("boot").hidden = false;
       document.getElementById("boot").textContent = "読み込みに失敗しました：" + e.message;
       log("読み込み失敗：" + e.message, "", true);
     });
+}
+
+/* ---------- パスワード入力 ---------- */
+function showGate(msg){
+  document.getElementById("boot").hidden = true;
+  document.getElementById("app").hidden = true;
+  const g = document.getElementById("gate");
+  g.hidden = false;
+  document.getElementById("gate-err").textContent = msg || "";
+  const inp = document.getElementById("gate-input");
+  inp.value = "";
+  setTimeout(function(){ inp.focus(); }, 50);
+}
+
+document.getElementById("gate-form").addEventListener("submit", function(e){
+  e.preventDefault();
+  const v = document.getElementById("gate-input").value.trim();
+  if (!v) return;
+  KEY = v;
+  document.getElementById("gate").hidden = true;
+  document.getElementById("boot").hidden = false;
+  document.getElementById("boot").textContent = "スプレッドシートを読み込んでいます…";
+  load(true);
+});
+
+function start(){
+  if (!KEY){ showGate(); return; }
+  load(true);
 }
 
 /* ---------- 表示 ---------- */
@@ -819,11 +902,12 @@ document.getElementById("auto").onclick = () => {
 /* ---------- 自動更新（操作していないときだけ） ---------- */
 setInterval(function(){
   if (drag || rz || pending || selected) return;
-  if (document.hidden) return;
+  if (document.hidden || !KEY) return;
+  if (document.getElementById("app").hidden) return;
   load(false);
 }, 60000);
 
-load(true);
+start();
 })();
 </script>
 </body>

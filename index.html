@@ -56,13 +56,20 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .nav .sp{flex:1}
 
 .cal{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
-.dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); background:var(--surface-2); border-bottom:1px solid var(--line);}
+
+/* 土日は幅を狭める（作業がほぼ入らないため） */
+.dow, .grid{display:grid; grid-template-columns:0.62fr repeat(5, 1fr) 0.62fr;}
+.dow{background:var(--surface-2); border-bottom:1px solid var(--line);}
 .dow div{padding:6px 4px; font-size:11.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-align:center; min-width:0;}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
-.grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr));}
+
+/* 画面の高さいっぱいに広げて、下に余白を残さない */
+.grid{grid-auto-rows:minmax(84px, 1fr); min-height:calc(100vh - 214px);}
+@supports (height: 100dvh){ .grid{min-height:calc(100dvh - 214px);} }
+
 .cell{
   border-right:1px solid var(--line); border-bottom:1px solid var(--line);
-  min-height:104px; padding:6px 5px; text-align:left;
+  padding:6px 5px; text-align:left;
   background:var(--surface); font:inherit; color:inherit; cursor:pointer;
   display:flex; flex-direction:column; gap:3px; align-items:stretch;
   min-width:0; overflow:hidden;
@@ -70,7 +77,9 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .cell:nth-child(7n){border-right:0}
 .cell:hover{background:var(--accent-soft)}
 .cell.off{background:var(--weekend)}
-.cell.out{opacity:.4}
+/* 当月以外は空欄にする */
+.cell.blank{background:var(--ground); cursor:default;}
+.cell.blank:hover{background:var(--ground)}
 .cell.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .cell.empty{cursor:default}
 .cell.empty:hover{background:var(--surface)}
@@ -153,22 +162,79 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .empty-msg{padding:40px 16px; text-align:center; color:var(--muted); font-size:14px;
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);}
 .boot{padding:70px 20px; text-align:center; color:var(--muted);}
+
+/* ---- パスワード入力 ---- */
+.gate{padding:56px 16px; display:flex; justify-content:center;}
+.gate form{
+  width:100%; max-width:360px; background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px 22px; display:flex; flex-direction:column; gap:12px;
+  box-shadow:var(--shadow);
+}
+.gate h2{margin:0; font-size:19px; font-weight:700;}
+.gate p{margin:0; font-size:13.5px; color:var(--muted); line-height:1.6;}
+.gate input{
+  font-family:inherit; font-size:17px; padding:13px 14px;
+  border:1px solid var(--line-strong); border-radius:6px;
+  background:var(--ground); color:var(--ink); width:100%;
+}
+.gate input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+.gate button{
+  background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+  font-weight:700; font-size:16px; min-height:48px;
+}
+.gate button:hover{background:var(--accent); filter:brightness(1.08);}
+.gate-err{font-size:13px; color:var(--danger); min-height:1em;}
 .err-box{margin-top:12px; padding:10px 14px; border-radius:6px; background:var(--danger-soft);
   color:var(--danger); font-size:13px;}
 
 @media (max-width:700px){
-  .wrap{padding:10px 10px 40px}
-  .cell{min-height:74px; padding:4px 3px;}
-  .c-item{font-size:10px; padding:1px 3px;}
-  .c-num{font-size:13px}
-  .nav .label{font-size:16px; min-width:112px}
-  .day-head .d{font-size:22px}
+  body{font-size:16px}
+  .wrap{padding:10px 8px 44px}
+
+  /* 月表示 */
+  .cell{min-height:86px; padding:5px 4px;}
+  .c-num{font-size:15px}
+  .c-count{font-size:11px; padding:1px 6px;}
+  .c-item{font-size:11.5px; padding:2px 4px; line-height:1.3;}
+  .c-more{font-size:11px}
+  .dow div{font-size:12.5px}
+  .nav .label{font-size:17px; min-width:120px}
+  .bar-top h1{font-size:20px}
+
+  /* 日表示 */
+  .day-head .d{font-size:25px}
+  .day-head .w{font-size:15px}
+  .counts{font-size:14.5px}
+  .counts b{font-size:17px}
+  .hint{font-size:13.5px}
+  .t-name{font-size:18px; line-height:1.4;}
+  .t-sub{font-size:14.5px}
+  .t-meta{font-size:13.5px; gap:6px 12px;}
+  .t-time{font-size:13.5px; padding:3px 9px;}
+  .task-card{padding:14px 15px; gap:6px;}
+  .task-bg{font-size:17px}
+
+  /* 押しやすさ */
+  button{font-size:15.5px; min-height:46px; padding:9px 15px;}
+  button.icon{font-size:19px; min-width:46px;}
+  .t-actions button{font-size:14.5px; min-height:42px;}
+  .empty-msg{font-size:15px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div id="gate" class="gate" hidden>
+    <form id="gate-form" autocomplete="on">
+      <h2>出荷作業</h2>
+      <p>合言葉を入力してください。<br>一度入力すると、次回からは自動で開きます。</p>
+      <input type="password" id="gate-input" autocomplete="current-password" placeholder="合言葉">
+      <button type="submit">開く</button>
+      <div class="gate-err" id="gate-err"></div>
+    </form>
+  </div>
   <div id="boot" class="boot">読み込んでいます…</div>
   <div id="app" hidden></div>
 </div>
@@ -179,11 +245,30 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 "use strict";
 
 /* ================= 接続先 ================= */
-/* 接続先URLは config.js に書いてあります。変更するときはそちらだけ直してください */
+/* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
+      デプロイし直してURLが変わったら、ここも直します。 */
 const API = window.SHUKKA_API || "";
 
-/* 合言葉はURLの ?k=... から読みます。このファイルには書きません */
-const KEY = new URLSearchParams(location.search).get("k") || "";
+/* パスワードは端末に保存します。このファイルには書きません。
+   URLに ?k=... が付いていればそれを使い、成功したらURLから消します。 */
+const STORE = "shukka_work_key";
+
+function loadKey(){
+  const q = new URLSearchParams(location.search).get("k");
+  if (q) return q;
+  try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
+}
+function saveKey(k){
+  try { localStorage.setItem(STORE, k); } catch(e){}
+  if (location.search.indexOf("k=") >= 0){
+    try { history.replaceState(null, "", location.pathname); } catch(e){}
+  }
+}
+function forgetKey(){
+  try { localStorage.removeItem(STORE); } catch(e){}
+}
+
+let KEY = loadKey();
 
 function call(api, params){
   const u = new URL(API);
@@ -232,6 +317,7 @@ function load(silent){
       TODAY = b.today;
       doneLabel = b.doneLabel || "出荷";
       if (!view) view = p(TODAY);
+      saveKey(KEY);
       if (!booted){
         booted = true;
         document.getElementById("boot").hidden = true;
@@ -241,13 +327,47 @@ function load(silent){
       setState("最終更新 " + hm(), "");
     })
     .catch(function(e){
+      if (/合言葉|権限/.test(e.message)){
+        forgetKey();
+        showGate("合言葉が違います");
+        return;
+      }
       if (!booted){
+        document.getElementById("boot").hidden = false;
         document.getElementById("boot").innerHTML =
           '読み込みに失敗しました<div class="err-box"></div>';
         document.querySelector("#boot .err-box").textContent = e.message;
       }
       setState("読み込み失敗", "err");
     });
+}
+
+/* ---------- パスワード入力 ---------- */
+function showGate(msg){
+  document.getElementById("boot").hidden = true;
+  app.hidden = true;
+  const g = document.getElementById("gate");
+  g.hidden = false;
+  document.getElementById("gate-err").textContent = msg || "";
+  const inp = document.getElementById("gate-input");
+  inp.value = "";
+  setTimeout(function(){ inp.focus(); }, 50);
+}
+
+document.getElementById("gate-form").addEventListener("submit", function(e){
+  e.preventDefault();
+  const v = document.getElementById("gate-input").value.trim();
+  if (!v) return;
+  KEY = v;
+  document.getElementById("gate").hidden = true;
+  document.getElementById("boot").hidden = false;
+  document.getElementById("boot").textContent = "読み込んでいます…";
+  load(false);
+});
+
+function start(){
+  if (!KEY){ showGate(); return; }
+  load(false);
 }
 
 function hm(){
@@ -310,20 +430,28 @@ function renderMonth(){
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const gridStart = iso(new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay()));
   const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
-  const rows = Math.ceil((first.getDay() + daysInMonth) / 7);
+  const ROWS = 6;                       /* 月が変わっても行数を揃える */
 
-  for (let i = 0; i < rows * 7; i++){
+  for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
     const dt = p(date);
+    const w = dt.getDay();
+
+    /* 当月以外（前月の末尾・翌月の頭）は空欄にする */
+    if (dt.getMonth() !== view.getMonth()){
+      const blank = document.createElement('div');
+      blank.className = 'cell blank' + ((w === 0 || w === 6) ? ' off' : '');
+      grid.appendChild(blank);
+      continue;
+    }
+
     const list = jobsOn(date);
     const undone = list.filter(j => !j.done).length;
-    const w = dt.getDay();
 
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'cell'
       + ((w === 0 || w === 6) ? ' off' : '')
-      + (dt.getMonth() !== view.getMonth() ? ' out' : '')
       + (date === TODAY ? ' today' : '')
       + (list.length ? '' : ' empty');
     cell.dataset.date = date;
@@ -535,11 +663,11 @@ function commit(j, done){
 
 /* ---------- 自動更新 ---------- */
 setInterval(function(){
-  if (pending || document.hidden) return;
+  if (pending || document.hidden || !booted) return;
   load(true);
 }, 60000);
 
-load(false);
+start();
 })();
 </script>
 </body>
