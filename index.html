@@ -117,11 +117,11 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .cell.empty:hover{background:var(--surface)}
 .cell.empty.off:hover{background:var(--weekend)}
 .c-head{display:flex; align-items:center; justify-content:space-between; gap:4px;}
-.c-num{font-size:15px; font-weight:600;}
+.c-num{font-size:15px; font-weight:600; white-space:nowrap;}
 .cell.today .c-num{color:var(--accent)}
 .cell.off .c-num{color:var(--off-ink); font-weight:700;}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
-  background:var(--accent); color:var(--accent-ink);}
+  background:var(--accent); color:var(--accent-ink); white-space:nowrap; flex:none;}
 .c-count.all-done{background:var(--surface-2); color:var(--muted);}
 .c-list{display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden;}
 .c-item{
@@ -225,69 +225,68 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .err-box{margin-top:12px; padding:10px 14px; border-radius:6px; background:var(--danger-soft);
   color:var(--danger); font-size:13px;}
 
-/* スマホ・タブレット：文字をおよそ1.5倍にする */
+/* スマホ・タブレット：文字の大きさ。
+   「1.5倍」から半分ぶん下げて、だいたいPC版と同じ大きさにしています。
+   指を置く場所（ボタン）だけは押しやすさのため高さを残します */
 @media (max-width:1000px){
-  body{font-size:22px}
+  body{font-size:15px}
   .wrap{padding:10px 8px 10px}
 
   /* 月表示 */
-  .cell{min-height:0; padding:7px 6px;}
-  .c-num{font-size:22px}
-  .c-count{font-size:16px; padding:2px 10px;}
-  .c-item{font-size:17px; padding:4px 7px; line-height:1.35;}
-  .c-more{font-size:16px}
-  .dow div{font-size:17px; padding:8px 4px;}
+  .cell{min-height:0; padding:6px 5px;}
+  .c-num{font-size:15px}
+  .c-count{font-size:11px; padding:1px 7px;}
+  .c-item{font-size:12px; padding:3px 5px; line-height:1.35;}
+  .c-more{font-size:11px}
+  .dow div{font-size:12px; padding:6px 4px;}
   .bar-top{min-height:0; margin-bottom:6px;}
-  .bar-top h1{font-size:26px}
-  .bar-top h1 small{font-size:15px}
-  .state{font-size:16px}
+  .bar-top h1{font-size:18px}
+  .bar-top h1 small{font-size:10.5px}
+  .state{font-size:11px}
   .nav{margin-bottom:6px}
-  .nav .label{font-size:25px; min-width:0; flex:1 1 auto; text-align:center;}
-  .nav button{font-size:18px; min-height:48px; padding:8px 14px;}
-  .nav button.icon{font-size:24px; min-width:48px; padding:8px 10px;}
+  .nav .label{font-size:17px; min-width:0; flex:1 1 auto; text-align:center;}
+  .nav button{font-size:13px; min-height:42px; padding:8px 12px;}
+  .nav button.icon{font-size:17px; min-width:42px; padding:8px 10px;}
 
   /* 日表示 */
-  .day-head .d{font-size:39px}
-  .day-head .w{font-size:21px}
-  .counts{font-size:19px}
-  .counts b{font-size:22px}
-  .hint{font-size:19px; padding:11px 14px;}
-  .section-label{font-size:16px}
-  .t-name{font-size:24px; line-height:1.4;}
-  .t-sub{font-size:19px}
-  .t-meta{font-size:18px; gap:8px 16px;}
-  .t-time{font-size:18px; padding:5px 12px;}
-  .task-card{padding:18px 18px; gap:8px;}
-  .task-bg{font-size:22px}
+  .day-head .d{font-size:27px}
+  .day-head .w{font-size:14px}
+  .counts{font-size:13px}
+  .counts b{font-size:15px}
+  .hint{font-size:13px; padding:9px 12px;}
+  .section-label{font-size:11px}
+  .t-name{font-size:17px; line-height:1.4;}
+  .t-sub{font-size:13px}
+  .t-meta{font-size:12.5px; gap:6px 14px;}
+  .t-time{font-size:12.5px; padding:4px 10px;}
+  .task-card{padding:13px 14px; gap:6px;}
+  .task-bg{font-size:15px}
 
-  /* 押しやすさ */
-  button{font-size:21px; min-height:60px; padding:12px 20px;}
-  button.icon{font-size:26px; min-width:60px;}
-  .t-actions button{font-size:19px; min-height:52px;}
-  .empty-msg{font-size:21px}
-  .gate h2{font-size:28px}
-  .gate p{font-size:20px}
-  .gate input{font-size:25px; padding:16px 16px;}
-  .gate button{font-size:24px; min-height:64px;}
+  /* 押しやすさ（文字は小さくしても、指で押す高さは確保します） */
+  button{font-size:15px; min-height:46px; padding:10px 16px;}
+  button.icon{font-size:18px; min-width:46px;}
+  .t-actions button{font-size:14px; min-height:44px;}
+  .empty-msg{font-size:15px}
+  .gate h2{font-size:19px}
+  .gate p{font-size:14px}
+  .gate input{font-size:17px; padding:12px 14px;}
+  .gate button{font-size:16px; min-height:48px;}
 }
-/* スマホ縦持ち：7列に案件名を入れても読めないので、日付と件数だけにします。
-   日付をタップすればその日の一覧が出ます */
+/* スマホ縦持ち：幅が狭いので、枠まわりをもう一段小さくします */
 @media (max-width:560px){
-  .c-item, .c-more{display:none}
-  .c-head{flex-direction:column; align-items:flex-start; gap:4px;}
-  .c-num{font-size:20px}
-  .c-count{font-size:15px; padding:2px 9px;}
-  .cell{padding:6px 5px; justify-content:flex-start;}
+  .c-num{font-size:14px}
+  .c-count{font-size:10.5px; padding:1px 6px;}
+  .cell{padding:5px 4px; justify-content:flex-start;}
 
   /* 月の切り替えを1行に収める */
   .nav{gap:4px}
-  .nav .label{font-size:20px; white-space:nowrap;}
-  .nav button{font-size:15px; min-height:42px; padding:6px 10px;}
-  .nav button.icon{font-size:20px; min-width:38px; padding:6px 8px;}
-  .bar-top h1{font-size:22px}
-  .bar-top h1 small{font-size:13px}
-  .state{font-size:14px}
-  .dow div{font-size:14px; padding:6px 2px;}
+  .nav .label{font-size:15px; white-space:nowrap;}
+  .nav button{font-size:12px; min-height:40px; padding:6px 10px;}
+  .nav button.icon{font-size:15px; min-width:36px; padding:6px 8px;}
+  .bar-top h1{font-size:16px}
+  .bar-top h1 small{font-size:10px}
+  .state{font-size:10.5px}
+  .dow div{font-size:11px; padding:5px 2px;}
 }
 
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
@@ -315,7 +314,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v15";
+const BUILD = "v17";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -406,9 +405,13 @@ const agoText = d => {
 
 /* 休みの日。会社の休日カレンダーが読めていればそれを使います */
 let HOLIDAYS = {};
-let USE_HOLIDAY_CAL = false;
-const isOff = s => USE_HOLIDAY_CAL ? !!HOLIDAYS[s]
-                                   : (function(){ const w = p(s).getDay(); return w === 0 || w === 6; })();
+/* 土日は常に休み。会社の休日カレンダーに入っている日（祝日・臨時休業など）も休みにします。
+   休日カレンダーに土日が登録されていなくても、土日はきちんと色が付きます */
+const isOff = s => {
+  const w = p(s).getDay();
+  if (w === 0 || w === 6) return true;
+  return !!HOLIDAYS[s];
+};
 
 let jobs = [];   /* サーバーからは tasks で来ます（製造・出荷の2種類） */
 let TODAY = null;
@@ -447,7 +450,6 @@ function applyBoard(b){
   jobs = b.tasks || [];
   HOLIDAYS = {};
   (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
-  USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
   TODAY = b.today;
   doneLabel = "完了";
   if (!view) view = p(TODAY);
@@ -606,10 +608,7 @@ function renderMonth(){
   const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
   /* 1日の曜日と日数から、必要な行数だけ出します（余分な行を作らない） */
   const ROWS = Math.ceil((first.getDay() + daysInMonth) / 7);
-  /* 文字が大きい端末では、1マスに入る件数を減らします。
-     件数は右上のバッジで分かるので、スマホでは「ほか○件」は省きます */
-  const NARROW = (window.innerWidth <= 1000);
-  const MAXI = NARROW ? 2 : 3;
+  const MAXI = 3;                       /* 1マスに出す件数。残りは「ほか○件」 */
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
@@ -645,7 +644,7 @@ function renderMonth(){
       it.textContent = (j.kind === 's' ? '出 ' : '製 ') + j.name;
       box.appendChild(it);
     });
-    if (list.length > MAXI && !NARROW){
+    if (list.length > MAXI){
       const m = el('div', 'c-more');
       m.textContent = "ほか" + (list.length - MAXI) + "件";
       box.appendChild(m);

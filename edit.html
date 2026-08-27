@@ -319,7 +319,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v15";
+const BUILD = "v17";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -391,9 +391,13 @@ const diff = (a,b) => Math.round((p(b) - p(a)) / 86400000);
    会社の休日カレンダーが読めていればそれを使い、
    読めていない場合だけ土日を休みとみなします。 */
 let HOLIDAYS = {};
-let USE_HOLIDAY_CAL = false;
-const isOff = s => USE_HOLIDAY_CAL ? !!HOLIDAYS[s]
-                                   : (function(){ const w = p(s).getDay(); return w === 0 || w === 6; })();
+/* 土日は常に休み。会社の休日カレンダーに入っている日（祝日・臨時休業など）も休みにします。
+   休日カレンダーに土日が登録されていなくても、土日はきちんと色が付きます */
+const isOff = s => {
+  const w = p(s).getDay();
+  if (w === 0 || w === 6) return true;
+  return !!HOLIDAYS[s];
+};
 const md = s => { const a = s.split("-"); return Number(a[1]) + "/" + Number(a[2]); };
 /* 完了したものに出す「何日前」。赤い「遅れ」とは別の色で表示します */
 const agoText = s => {
@@ -477,7 +481,6 @@ function applyBoard(b){
   TODAY = b.today;
   HOLIDAYS = {};
   (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
-  USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
   if (!anchor) anchor = homeAnchor();
   document.getElementById("gate").hidden = true;
   document.getElementById("boot").hidden = true;
