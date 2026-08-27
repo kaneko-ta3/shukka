@@ -309,34 +309,42 @@ const app = document.getElementById("app");
 /* ---------- 読み込み ---------- */
 function ym(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
 
+let loading = false;
+
 function load(silent){
+  if (loading) return;              /* 読み込みが重なって表示が食い違うのを防ぐ */
+  loading = true;
   if (!silent) setState("読み込み中…", "busy");
   call("work", {ym: view ? ym(view) : null})
     .then(function(b){
+      loading = false;
       jobs = b.jobs;
       TODAY = b.today;
       doneLabel = b.doneLabel || "出荷";
       if (!view) view = p(TODAY);
       saveKey(KEY);
-      if (!booted){
-        booted = true;
-        document.getElementById("boot").hidden = true;
-        app.hidden = false;
-      }
+      booted = true;
+      document.getElementById("gate").hidden = true;
+      document.getElementById("boot").hidden = true;
+      app.hidden = false;
       render();
       setState("最終更新 " + hm(), "");
     })
     .catch(function(e){
-      if (/合言葉|権限/.test(e.message)){
+      loading = false;
+      const msg = String(e && e.message || e);
+      /* 合言葉そのものが違うときだけ入力画面に戻す */
+      if (/合言葉が違います|割り付け担当者/.test(msg)){
         forgetKey();
-        showGate("合言葉が違います");
+        showGate(msg);
         return;
       }
       if (!booted){
+        document.getElementById("gate").hidden = true;
         document.getElementById("boot").hidden = false;
         document.getElementById("boot").innerHTML =
           '読み込みに失敗しました<div class="err-box"></div>';
-        document.querySelector("#boot .err-box").textContent = e.message;
+        document.querySelector("#boot .err-box").textContent = msg;
       }
       setState("読み込み失敗", "err");
     });

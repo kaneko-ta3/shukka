@@ -399,10 +399,15 @@ function log(msg, ok, isErr){
   while (ul.children.length > 40) ul.lastChild.remove();
 }
 
+let loading = false;
+
 function load(first){
+  if (loading) return;              /* 読み込みが重なって表示が食い違うのを防ぐ */
+  loading = true;
   setState("読み込み中…", "busy");
   call("board")
     .then(function(b){
+      loading = false;
       jobs = b.jobs;
       TODAY = b.today;
       doneLabel = b.doneLabel || "完了";
@@ -418,15 +423,21 @@ function load(first){
       if (first) log("読み込み完了：" + jobs.length + "件（未配置 " + jobs.filter(j=>!j.start).length + "件）", "");
     })
     .catch(function(e){
-      if (/合言葉|権限/.test(e.message)){
+      loading = false;
+      const msg = String(e && e.message || e);
+      /* 合言葉そのものが違うときだけ入力画面に戻す */
+      if (/合言葉が違います|割り付け担当者/.test(msg)){
         forgetKey();
-        showGate("合言葉が違います");
+        showGate(msg);
         return;
       }
       setState("読み込み失敗", "err");
-      document.getElementById("boot").hidden = false;
-      document.getElementById("boot").textContent = "読み込みに失敗しました：" + e.message;
-      log("読み込み失敗：" + e.message, "", true);
+      if (document.getElementById("app").hidden){
+        document.getElementById("gate").hidden = true;
+        document.getElementById("boot").hidden = false;
+        document.getElementById("boot").textContent = "読み込みに失敗しました：" + msg;
+      }
+      log("読み込み失敗：" + msg, "", true);
     });
 }
 
