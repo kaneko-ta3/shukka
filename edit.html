@@ -247,7 +247,7 @@ body.resizing{cursor:col-resize; user-select:none;}
     <div class="tb-right">
       <span class="state" id="state">読み込み中…</span>
       <button id="reload">再読み込み</button>
-      <button id="auto">自動配置</button>
+      <button id="auto">出荷日 自動配置</button>
       <button id="undo" disabled>元に戻す</button>
     </div>
   </div>
@@ -308,7 +308,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v9";
+const BUILD = "v11";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -319,9 +319,19 @@ function stripUrl(){
   if (location.search.indexOf("k=") < 0) return;
   try { history.replaceState(null, "", location.pathname); } catch(e){}
 }
+/* 書き換えで消えない場合は、読み込み直して消します。
+   合言葉が端末に保存できているときだけ実行します */
+function stripUrlHard(){
+  if (location.search.indexOf("k=") < 0) return;
+  stripUrl();
+  if (location.search.indexOf("k=") < 0) return;
+  let saved = "";
+  try { saved = localStorage.getItem(STORE) || ""; } catch(e){}
+  if (saved) location.replace(location.pathname);
+}
 window.addEventListener("load", stripUrl);
 setTimeout(stripUrl, 300);
-setTimeout(stripUrl, 1500);
+setTimeout(stripUrlHard, 2500);
 
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
@@ -924,40 +934,44 @@ document.getElementById("undo").onclick = () => {
     .catch(e => { busy(false); log("元に戻せませんでした：" + e.message, "", true); load(false); });
 };
 
-document.getElementById("auto").onclick = () => {
-  const pool = tasks.filter(t => !t.start && !t.done && t.limit).sort(byLimit);
-  if (!pool.length){ log("期限の入った未配置タスクはありません", ""); return; }
-  if (!confirm(pool.length + "件を自動で割り付けます。よろしいですか？\n（シートとカレンダーに反映されます）")) return;
-  pushHistory();
+/* 納品日から輸送日数を引いて出荷日を決める。
+   土日は出荷しないので、その分さらに前へずらします。
+   製造は現場の都合があるので対象にしません。 */
+function shipDateFor(t){
+  let d = t.due;
+  let n = Math.max(1, Number(t.lead) || 2);
+  while (n > 0){ d = add(d, -1); if (!isOff(d)) n--; }   // 稼働日で n 日さかのぼる
+  while (isOff(d)) d = add(d, -1);                       // 着地が土日なら前倒し
+  return d;
+}
 
-  const placed = {m:[], s:[]};
-  pool.forEach(t => {
-    const occ = occupancy();
-    let best = null, bestLoad = Infinity;
-    for (let k = 0; k < 200; k++){
-      const cand = add(TODAY, k);
-      if (diff(cand, t.limit) < t.days - 1) break;
-      let off = false, loadN = 0;
-      for (let i = 0; i < t.days; i++){
-        const d = add(cand, i);
-        if (isOff(d)){ off = true; break; }
-        loadN += occ.get(d) || 0;
-      }
-      if (off) continue;
-      if (loadN < bestLoad){ bestLoad = loadN; best = cand; }
-      if (loadN === 0) break;
-    }
-    t.start = best || add(t.limit, -(t.days - 1));
-    placed[t.kind].push(t.row + "|" + t.kind + "|" + t.start + "|" + t.days);
+document.getElementById("auto").onclick = () => {
+  const pool = tasks.filter(t => t.kind === "s" && !t.start && !t.done && t.due).sort(byLimit);
+  if (!pool.length){ log("納品日の入った未配置の出荷タスクはありません", ""); return; }
+
+  const plan = pool.map(t => ({t:t, date:shipDateFor(t)}));
+  const past = plan.filter(x => x.date < TODAY).length;
+
+  const msg = "出荷タスク " + pool.length + "件に出荷日を入れます。\n\n"
+    + "納品日から輸送日数を引いた日にします\n"
+    + "（関東〜兵庫は1日前、それより西・東北・北海道は2日前。土日は避けます）\n\n"
+    + (past ? "※ うち " + past + "件は計算上すでに過去の日付になります\n\n" : "")
+    + "製造タスクは対象外です。よろしいですか？";
+  if (!confirm(msg)) return;
+
+  pushHistory();
+  const items = [];
+  plan.forEach(x => {
+    x.t.start = x.date;
+    x.t.ship  = x.date;
+    syncShip(x.t);
+    items.push(x.t.row + "|s|" + x.date + "|1");
   });
   render();
 
-  const jobs = [];
-  if (placed.m.length) jobs.push(call("batch", {kind:"m", items: placed.m.join(",")}));
-  if (placed.s.length) jobs.push(call("batch", {kind:"s", items: placed.s.join(",")}));
   busy(true);
-  Promise.all(jobs)
-    .then(rs => { busy(false); rs.forEach(r => log("自動配置：" + r.message, "完了")); load(false); })
+  call("batch", {kind:"s", items: items.join(",")})
+    .then(r => { busy(false); log("出荷日 自動配置：" + r.message, "完了"); load(false); })
     .catch(e => { busy(false); log("自動配置に失敗：" + e.message, "", true); load(false); });
 };
 

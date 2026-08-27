@@ -269,7 +269,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v9";
+const BUILD = "v11";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -285,9 +285,19 @@ function stripUrl(){
   if (location.search.indexOf("k=") < 0) return;
   try { history.replaceState(null, "", location.pathname); } catch(e){}
 }
+/* 書き換えで消えない場合は、読み込み直して消します。
+   合言葉が端末に保存できているときだけ実行します */
+function stripUrlHard(){
+  if (location.search.indexOf("k=") < 0) return;
+  stripUrl();
+  if (location.search.indexOf("k=") < 0) return;
+  let saved = "";
+  try { saved = localStorage.getItem(STORE) || ""; } catch(e){}
+  if (saved) location.replace(location.pathname);
+}
 window.addEventListener("load", stripUrl);
 setTimeout(stripUrl, 300);
-setTimeout(stripUrl, 1500);
+setTimeout(stripUrlHard, 2500);
 
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
