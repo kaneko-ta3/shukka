@@ -10,7 +10,7 @@
 <style>
 :root{
   --ground:#F3F5F4; --surface:#FFFFFF; --surface-2:#E9EDEB; --weekend:#EAEEEC;
-  --line:#D7DDDA; --line-strong:#B6C0BC; --ink:#131A18; --muted:#5D6A66;
+  --line:#C4CFCA; --line-strong:#98A7A2; --ink:#131A18; --muted:#5D6A66;
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --mfg:#3B72D9; --mfg-ink:#FFFFFF; --mfg-soft:#DEE9FB;
   --ship:#D9601F; --ship-ink:#FFFFFF; --ship-soft:#FBE5D8;
@@ -22,7 +22,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-    --line:#2A3431; --line-strong:#3D4A46; --ink:#E7EDEA; --muted:#8E9C97;
+    --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
     --ship:#FF9B6B; --ship-ink:#3A1707; --ship-soft:#3E2415;
@@ -81,20 +81,20 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 #pool-m{grid-area:pm} #pool-s{grid-area:ps}
 .cal{grid-area:cal} #done{grid-area:done} .log{grid-area:log}
 
-.cal{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+.cal{background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius);
   display:flex; flex-direction:column; min-height:0; overflow-y:auto; overflow-x:hidden;}
 #weeks{flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
-.dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-bottom:1px solid var(--line);
+.dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-bottom:1px solid var(--line-strong);
   background:var(--surface-2); position:sticky; top:0; z-index:3;}
-.dow div{padding:5px 8px; font-size:12px; font-weight:500; letter-spacing:.1em; color:var(--ink); border-right:1px solid var(--line);}
+.dow div{padding:5px 8px; font-size:12px; font-weight:500; letter-spacing:.1em; color:var(--ink); border-right:1px solid var(--line-strong);}
 .dow div:last-child{border-right:0}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
 
-.week{position:relative; border-bottom:1px solid var(--line);
+.week{position:relative; border-bottom:1px solid var(--line-strong);
   flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
 .week:last-child{border-bottom:0}
 .week-days{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); flex:1 1 auto;}
-.day{border-right:1px solid var(--line); min-height:max(112px, calc(30px + var(--lanes,0) * 25px + 14px));
+.day{border-right:1px solid var(--line-strong); min-height:max(112px, calc(30px + var(--lanes,0) * 25px + 14px));
   padding:5px 6px 0; position:relative; min-width:0;}
 .day:last-child{border-right:0}
 .day.off{background:var(--weekend)}
@@ -435,7 +435,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v22";
+const BUILD = "v23";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";

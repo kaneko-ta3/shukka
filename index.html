@@ -10,7 +10,7 @@
 <style>
 :root{
   --ground:#F3F5F4; --surface:#FFFFFF; --surface-2:#E9EDEB; --weekend:#EAEEEC;
-  --line:#D7DDDA; --line-strong:#B6C0BC; --ink:#131A18; --muted:#5D6A66;
+  --line:#C4CFCA; --line-strong:#98A7A2; --ink:#131A18; --muted:#5D6A66;
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
   --off-ink:#8C443C; --ago-ink:#3C6C86;
@@ -20,7 +20,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-    --line:#2A3431; --line-strong:#3D4A46; --ink:#E7EDEA; --muted:#8E9C97;
+    --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
     --off-ink:#A85F57; --ago-ink:#8CBBD4;
@@ -87,12 +87,12 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .nav .label{font-size:18px; font-weight:700; min-width:132px; text-align:center;}
 .nav .sp{flex:1}
 
-.cal{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;
+.cal{background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden;
   flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
 
 /* 土日は幅を狭める（作業がほぼ入らないため） */
 .dow, .grid{display:grid; grid-template-columns:0.62fr repeat(5, 1fr) 0.62fr;}
-.dow{background:var(--surface-2); border-bottom:1px solid var(--line); flex:none;}
+.dow{background:var(--surface-2); border-bottom:1px solid var(--line-strong); flex:none;}
 .dow div{padding:6px 4px; font-size:11.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-align:center; min-width:0;}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
 
@@ -100,7 +100,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .grid{flex:1 1 auto; min-height:0; grid-auto-rows:minmax(0, 1fr);}
 
 .cell{
-  border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+  border-right:1px solid var(--line-strong); border-bottom:1px solid var(--line-strong);
   padding:6px 5px; text-align:left;
   background:var(--surface); font:inherit; color:inherit; cursor:pointer;
   display:flex; flex-direction:column; gap:3px; align-items:stretch;
@@ -318,7 +318,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v22";
+const BUILD = "v23";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
