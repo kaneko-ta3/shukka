@@ -31,11 +31,11 @@
 /* hidden 属性を確実に効かせる（クラス側の display 指定に負けないようにする） */
 [hidden]{display:none !important;}
 
-/* 製造＝コバルト（青）、出荷＝マンゴー（橙）で見分ける。
+/* 製造＝コバルト（青）、出荷＝レモン（黄）で見分ける。
    Googleカレンダーの色名に合わせています */
-:root{--mfg:#3B72D9; --mfg-ink:#FFFFFF; --mfg-soft:#DEE9FB; --ship:#D9601F; --ship-ink:#FFFFFF; --ship-soft:#FBE5D8;}
+:root{--mfg:#3B72D9; --mfg-ink:#FFFFFF; --mfg-soft:#DEE9FB; --ship:#8F7200; --ship-ink:#FFFFFF; --ship-soft:#FAF0C4;}
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){--mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A; --ship:#FF9B6B; --ship-ink:#3A1707; --ship-soft:#3E2415;}
+  :root:not([data-theme="light"]){--mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A; --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;}
 }
 .kind{display:inline-block; font-size:.62em; font-weight:700; padding:2px 7px; border-radius:4px;
   margin-right:8px; vertical-align:middle;
@@ -318,7 +318,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v23";
+const BUILD = "v25";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
