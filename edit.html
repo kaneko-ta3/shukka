@@ -121,16 +121,15 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .bar.k-s{background:var(--ship-soft); border-color:var(--ship); border-left-color:var(--ship);}
 .bar:hover{filter:brightness(.98); box-shadow:var(--shadow);}
 .bar:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
-/* 期限オーバーは、塗り色は種別のまま（製造＝コバルト／出荷＝レモン）にして、
-   赤いふちで示します。塗り替えると種別が分からなくなるためです */
-.bar.late{box-shadow:inset 0 0 0 2px var(--danger);}
+/* 期限オーバーは枠だけを真っ赤にします。
+   中の色（製造＝コバルト／出荷＝レモン）と「造」「出」のタグはそのままなので、
+   赤くなっても種別は分かります */
+.bar.late{border:2px solid var(--danger); border-left:3px solid var(--danger);}
 .bar.sel{box-shadow:0 0 0 2px var(--accent);}
-.bar.late.sel{box-shadow:inset 0 0 0 2px var(--danger), 0 0 0 2px var(--accent);}
 .bar.pending{opacity:.55}
 .bar .tag{flex:none; font-size:10.5px; font-weight:700; padding:0 4px; border-radius:2px;
   background:var(--mfg); color:var(--mfg-ink);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
-.bar.late .tag{background:var(--danger); color:#fff;}
 .bar .nm{overflow:hidden; text-overflow:ellipsis; font-weight:500;}
 .bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.7; font-size:11px;}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
@@ -438,7 +437,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v25";
+const BUILD = "v26";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -698,7 +697,17 @@ function occupancy(){
 }
 
 const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
-const isLate = t => !!(t.limit && t.start && endOf(t) > t.limit);
+/* 期限オーバーの判定。
+   ・自分の期限（製造なら出荷日、出荷なら納品日）を過ぎている
+   ・または、種別に関係なく納品日を過ぎている
+   どちらかに当てはまれば赤にします */
+const isLate = t => {
+  if (!t.start) return false;
+  const end = endOf(t);
+  if (t.limit && end > t.limit) return true;
+  if (t.due   && end > t.due)   return true;
+  return false;
+};
 
 function renderSummary(){
   const pm = tasks.filter(t => t.kind === "m" && !t.start && !t.done);
@@ -790,7 +799,7 @@ function renderCal(){
         + (t.limit ? "\n期限 " + md(t.limit) + (late ? "　← 超過しています" : "") : "\n期限 未設定")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
       b.innerHTML = '<span class="tag"></span><span class="nm"></span><span class="code"></span><span class="grip"></span>';
-      b.querySelector(".tag").textContent = t.kind === "m" ? "製" : "出";
+      b.querySelector(".tag").textContent = t.kind === "m" ? "造" : "出";
       b.querySelector(".nm").textContent = t.name;
       b.querySelector(".code").textContent = t.code ? t.code.slice(-3) : "";
       if (t.kind === "s") b.querySelector(".grip").remove();
