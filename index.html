@@ -269,7 +269,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v8";
+const BUILD = "v9";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -280,12 +280,20 @@ const API = window.SHUKKA_API || "";
    URLに ?k=... が付いていればそれを使い、成功したらURLから消します。 */
 const STORE = "shukka_work_key";
 
+/* URLから合言葉を消す。読み込み中だと無視されることがあるので何度か呼びます */
+function stripUrl(){
+  if (location.search.indexOf("k=") < 0) return;
+  try { history.replaceState(null, "", location.pathname); } catch(e){}
+}
+window.addEventListener("load", stripUrl);
+setTimeout(stripUrl, 300);
+setTimeout(stripUrl, 1500);
+
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
   if (q){
-    /* URLに合言葉があれば、この時点で保存してURLから消す */
     try { localStorage.setItem(STORE, q); } catch(e){}
-    try { history.replaceState(null, "", location.pathname); } catch(e){}
+    stripUrl();
     return q;
   }
   try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }

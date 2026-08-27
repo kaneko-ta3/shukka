@@ -308,17 +308,26 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v8";
+const BUILD = "v9";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
 const STORE = "shukka_edit_key";
 
+/* URLから合言葉を消す。読み込み中だと無視されることがあるので何度か呼びます */
+function stripUrl(){
+  if (location.search.indexOf("k=") < 0) return;
+  try { history.replaceState(null, "", location.pathname); } catch(e){}
+}
+window.addEventListener("load", stripUrl);
+setTimeout(stripUrl, 300);
+setTimeout(stripUrl, 1500);
+
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
   if (q){
     try { localStorage.setItem(STORE, q); } catch(e){}
-    try { history.replaceState(null, "", location.pathname); } catch(e){}
+    stripUrl();
     return q;
   }
   try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
