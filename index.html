@@ -228,7 +228,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 <div class="wrap">
   <div id="gate" class="gate" hidden>
     <form id="gate-form" autocomplete="on">
-      <h2>出荷作業</h2>
+      <h2>出荷作業 <span id="gate-build" style="font-size:11px;font-weight:500;color:var(--muted)"></span></h2>
       <p>合言葉を入力してください。<br>一度入力すると、次回からは自動で開きます。</p>
       <input type="password" id="gate-input" autocomplete="current-password" placeholder="合言葉">
       <button type="submit">開く</button>
@@ -243,6 +243,10 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 <script>
 (function(){
 "use strict";
+
+/* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
+   表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
+const BUILD = "v4";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -374,6 +378,8 @@ document.getElementById("gate-form").addEventListener("submit", function(e){
 });
 
 function start(){
+  const gb = document.getElementById("gate-build");
+  if (gb) gb.textContent = BUILD;
   if (!KEY){ showGate(); return; }
   load(false);
 }
@@ -385,7 +391,7 @@ function hm(){
 function setState(t, cls){
   const el = document.getElementById("state");
   if (!el) return;
-  el.textContent = t;
+  el.textContent = t + "　" + BUILD;
   el.className = "state" + (cls ? " " + cls : "");
 }
 

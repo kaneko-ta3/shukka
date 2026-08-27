@@ -243,7 +243,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
   <div id="gate" class="gate" hidden>
     <form id="gate-form" autocomplete="on">
-      <h2>作業日の割り付け</h2>
+      <h2>作業日の割り付け <span id="gate-build" style="font-size:11px;font-weight:500;color:var(--muted)"></span></h2>
       <p>合言葉を入力してください。<br>一度入力すると、次回からは自動で開きます。</p>
       <input type="password" id="gate-input" autocomplete="current-password" placeholder="合言葉">
       <button type="submit">開く</button>
@@ -288,6 +288,9 @@ body.resizing{cursor:col-resize; user-select:none;}
 <script>
 (function(){
 "use strict";
+
+/* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。 */
+const BUILD = "v4";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -373,7 +376,7 @@ function pushHistory(){
 /* ---------- 通信 ---------- */
 function setState(text, cls){
   const el = document.getElementById("state");
-  el.textContent = text;
+  el.textContent = text + "　" + BUILD;
   el.className = "state" + (cls ? " " + cls : "");
 }
 function busy(on){
@@ -465,6 +468,8 @@ document.getElementById("gate-form").addEventListener("submit", function(e){
 });
 
 function start(){
+  const gb = document.getElementById("gate-build");
+  if (gb) gb.textContent = BUILD;
   if (!KEY){ showGate(); return; }
   load(true);
 }
