@@ -25,6 +25,8 @@
   }
 }
 *{box-sizing:border-box}
+/* hidden 属性を確実に効かせる（クラス側の display 指定に負けないようにする） */
+[hidden]{display:none !important;}
 body{
   margin:0; background:var(--ground); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
@@ -163,7 +165,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);}
 .boot{padding:70px 20px; text-align:center; color:var(--muted);}
 
-/* ---- パスワード入力 ---- */
+/* ---- 合言葉の入力 ---- */
 .gate{padding:56px 16px; display:flex; justify-content:center;}
 .gate form{
   width:100%; max-width:360px; background:var(--surface);
@@ -246,7 +248,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v4";
+const BUILD = "v5";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。

@@ -25,6 +25,8 @@
   }
 }
 *{box-sizing:border-box}
+/* hidden 属性を確実に効かせる（クラス側の display 指定に負けないようにする） */
+[hidden]{display:none !important;}
 html,body{height:100%; overflow:hidden;}   /* ページ自体はスクロールさせず、各列の中でスクロールさせる */
 body{
   margin:0; background:var(--ground); color:var(--ink);
@@ -290,7 +292,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 "use strict";
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。 */
-const BUILD = "v4";
+const BUILD = "v5";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
