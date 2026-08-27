@@ -12,7 +12,7 @@
   --line:#D7DDDA; --line-strong:#B6C0BC; --ink:#131A18; --muted:#5D6A66;
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
-  --off-ink:#8E2B22;
+  --off-ink:#8C443C;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 8px 20px rgba(19,26,24,.07);
   --radius:8px;
 }
@@ -22,7 +22,7 @@
     --line:#2A3431; --line-strong:#3D4A46; --ink:#E7EDEA; --muted:#8E9C97;
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
-    --off-ink:#F08279;
+    --off-ink:#A85F57;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.35);
   }
 }
@@ -50,6 +50,9 @@ body{
 }
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums;}
 .wrap{max-width:1100px; margin:0 auto; padding:14px 14px 40px;}
+
+/* 前回の内容を表示している間は、触れないようにして誤操作を防ぎます */
+body.stale #app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 
 /* ---- 共通バー ---- */
 .bar-top{display:flex; align-items:center; gap:10px; margin-bottom:12px; min-height:40px;}
@@ -271,7 +274,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v13";
+const BUILD = "v14";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -318,6 +321,11 @@ function saveKey(k){
 }
 function forgetKey(){
   try { localStorage.removeItem(STORE); } catch(e){}
+  dropSnaps();
+  try {
+    document.body.classList.remove("stale");
+    document.getElementById("app").hidden = true;
+  } catch(e){}
 }
 
 let KEY = loadKey();
@@ -369,26 +377,67 @@ function ym(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2
 
 let loading = false;
 
+/* 前回の内容を控えておき、開いた直後にすぐ表示します。
+   最新が届くまでは触れないようにしてあります（古い内容のまま完了を送らないため） */
+function snapKey(){ return "shukka_work_snap_" + ym(view || new Date()); }
+
+function saveSnap(b){
+  try { localStorage.setItem(snapKey(), JSON.stringify(b)); } catch(e){}
+}
+function dropSnaps(){
+  try {
+    const del = [];
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.indexOf("shukka_work_snap_") === 0) del.push(k);
+    }
+    del.forEach(function(k){ localStorage.removeItem(k); });
+  } catch(e){}
+}
+
+function applyBoard(b){
+  jobs = b.tasks || [];
+  HOLIDAYS = {};
+  (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
+  USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
+  TODAY = b.today;
+  doneLabel = "完了";
+  if (!view) view = p(TODAY);
+  booted = true;
+  document.getElementById("gate").hidden = true;
+  document.getElementById("boot").hidden = true;
+  app.hidden = false;
+  render();
+}
+
+function showSnapshot(){
+  if (!KEY) return false;
+  let b = null;
+  try { b = JSON.parse(localStorage.getItem(snapKey()) || "null"); } catch(e){}
+  if (!b || !b.tasks) return false;
+  try {
+    document.body.classList.add("stale");
+    applyBoard(b);
+    setState("前回の内容／最新を取得中…", "busy");
+    return true;
+  } catch(e){
+    document.body.classList.remove("stale");
+    return false;
+  }
+}
+
 function load(silent){
   if (loading) return;              /* 読み込みが重なって表示が食い違うのを防ぐ */
   loading = true;
-  if (!silent) setState("読み込み中…", "busy");
+  if (!silent) setState(document.body.classList.contains("stale")
+    ? "前回の内容／最新を取得中…" : "読み込み中…", "busy");
   call("work", {ym: view ? ym(view) : null})
     .then(function(b){
       loading = false;
-      jobs = b.tasks || [];
-      HOLIDAYS = {};
-      (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
-      USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
-      TODAY = b.today;
-      doneLabel = "完了";
-      if (!view) view = p(TODAY);
+      document.body.classList.remove("stale");
       saveKey(KEY);
-      booted = true;
-      document.getElementById("gate").hidden = true;
-      document.getElementById("boot").hidden = true;
-      app.hidden = false;
-      render();
+      applyBoard(b);
+      saveSnap(b);
       setState("最終更新 " + hm(), "");
     })
     .catch(function(e){
@@ -438,6 +487,7 @@ function start(){
   const gb = document.getElementById("gate-build");
   if (gb) gb.textContent = BUILD;
   if (!KEY){ showGate(); return; }
+  showSnapshot();     // 前回の内容をすぐ出して、待ち時間を体感させない
   load(false);
 }
 

@@ -13,7 +13,7 @@
   --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
   --ship:#8A4B1F; --ship-ink:#FFFFFF; --ship-soft:#F6E6D8;
   --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
-  --off-ink:#8E2B22;
+  --off-ink:#8C443C;
   --shadow:0 1px 2px rgba(19,26,24,.08), 0 6px 16px rgba(19,26,24,.06);
   --radius:6px;
 }
@@ -24,7 +24,7 @@
     --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
     --ship:#E0A46B; --ship-ink:#2A1607; --ship-soft:#3A2716;
     --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
-    --off-ink:#F08279;
+    --off-ink:#A85F57;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
   }
 }
@@ -68,6 +68,9 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 button.icon{padding:4px 9px; font-size:14px; line-height:1.3;}
 button:disabled{opacity:.42; cursor:default;}
 button:disabled:hover{background:var(--surface); border-color:var(--line);}
+
+/* 前回の内容を表示している間は、触れないようにして誤操作を防ぎます */
+body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 
 .app{display:grid; gap:9px; align-items:stretch; flex:1 1 auto; min-height:0;
   grid-template-columns:224px 224px minmax(0,1fr) 240px 196px;
@@ -311,7 +314,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v13";
+const BUILD = "v14";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -345,7 +348,14 @@ function loadKey(){
   }
   try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
 }
-function forgetKey(){ try { localStorage.removeItem(STORE); } catch(e){} }
+function forgetKey(){
+  try { localStorage.removeItem(STORE); } catch(e){}
+  try { localStorage.removeItem("shukka_board_snap"); } catch(e){}
+  try {
+    document.body.classList.remove("stale");
+    document.getElementById("app").hidden = true;
+  } catch(e){}
+}
 
 let KEY = loadKey();
 
@@ -441,25 +451,59 @@ function log(msg, ok, isErr){
 /* ================= 読み込み ================= */
 let loading = false;
 
+/* 前回の内容を控えておき、開いた直後にすぐ表示します。
+   最新が届くまでは操作できないようにしてあります（古い内容のまま書き込まないため） */
+const SNAP = "shukka_board_snap";
+
+function saveSnap(b){
+  try { localStorage.setItem(SNAP, JSON.stringify(b)); } catch(e){}
+}
+function readSnap(){
+  try { return JSON.parse(localStorage.getItem(SNAP) || "null"); } catch(e){ return null; }
+}
+
+function applyBoard(b){
+  tasks = b.tasks || [];
+  TODAY = b.today;
+  HOLIDAYS = {};
+  (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
+  USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
+  if (!anchor) anchor = homeAnchor();
+  document.getElementById("gate").hidden = true;
+  document.getElementById("boot").hidden = true;
+  document.getElementById("app").hidden = false;
+  render();
+}
+
+/* 開いた直後、前回の内容があればそれを先に描いておきます */
+function showSnapshot(){
+  if (!KEY) return false;
+  const b = readSnap();
+  if (!b || !b.tasks) return false;
+  try {
+    document.body.classList.add("stale");
+    applyBoard(b);
+    setState("前回の内容を表示中／最新を取得しています…", "busy");
+    return true;
+  } catch(e){
+    document.body.classList.remove("stale");
+    return false;
+  }
+}
+
 function load(first){
   if (loading) return;
   loading = true;
-  setState("読み込み中…", "busy");
+  setState(document.body.classList.contains("stale")
+    ? "前回の内容を表示中／最新を取得しています…" : "読み込み中…", "busy");
   call("board")
     .then(function(b){
       loading = false;
-      tasks = b.tasks || [];
-      TODAY = b.today;
-      HOLIDAYS = {};
-      (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
-      USE_HOLIDAY_CAL = (b.holidays || []).length > 0;
-      if (!anchor) anchor = homeAnchor();
-      document.getElementById("gate").hidden = true;
-      document.getElementById("boot").hidden = true;
-      document.getElementById("app").hidden = false;
+      document.body.classList.remove("stale");
+      saveSnap(b);
+      applyBoard(b);
       pending = 0;
       setState("最終更新 " + nowHM(), "");
-      render();
       if (first){
         const m = tasks.filter(t => t.kind === "m" && !t.start && !t.done).length;
         const s = tasks.filter(t => t.kind === "s" && !t.start && !t.done).length;
@@ -1000,6 +1044,7 @@ function start(){
   const gb = document.getElementById("gate-build");
   if (gb) gb.textContent = BUILD;
   if (!KEY){ showGate(); return; }
+  showSnapshot();     // 前回の内容をすぐ出して、待ち時間を体感させない
   load(true);
 }
 start();
