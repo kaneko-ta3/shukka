@@ -173,14 +173,14 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
   <div id="app" hidden></div>
 </div>
 
+<script src="config.js"></script>
 <script>
 (function(){
 "use strict";
 
 /* ================= 接続先 ================= */
-/* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
-      デプロイし直してURLが変わったら、ここも直します。 */
-const API = "https://script.google.com/macros/s/AKfycbwy8OA0-OpdMF7kKSKNmiso37mZlm1R99pqcH4kZUYsLRhAFWgLhFmUZ3fy-bGGTvd4/exec";
+/* 接続先URLは config.js に書いてあります。変更するときはそちらだけ直してください */
+const API = window.SHUKKA_API || "";
 
 /* 合言葉はURLの ?k=... から読みます。このファイルには書きません */
 const KEY = new URLSearchParams(location.search).get("k") || "";
