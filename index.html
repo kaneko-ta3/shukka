@@ -190,38 +190,45 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .err-box{margin-top:12px; padding:10px 14px; border-radius:6px; background:var(--danger-soft);
   color:var(--danger); font-size:13px;}
 
-@media (max-width:700px){
-  body{font-size:16px}
+@media (max-width:1000px){
+  body{font-size:17px}
   .wrap{padding:10px 8px 44px}
 
   /* 月表示 */
-  .cell{min-height:86px; padding:5px 4px;}
-  .c-num{font-size:15px}
-  .c-count{font-size:11px; padding:1px 6px;}
-  .c-item{font-size:11.5px; padding:2px 4px; line-height:1.3;}
-  .c-more{font-size:11px}
-  .dow div{font-size:12.5px}
-  .nav .label{font-size:17px; min-width:120px}
-  .bar-top h1{font-size:20px}
+  .cell{min-height:92px; padding:6px 5px;}
+  .c-num{font-size:17px}
+  .c-count{font-size:12px; padding:2px 8px;}
+  .c-item{font-size:13px; padding:3px 5px; line-height:1.35;}
+  .c-more{font-size:12px}
+  .dow div{font-size:13.5px}
+  .nav .label{font-size:19px; min-width:132px}
+  .bar-top h1{font-size:22px}
+  .bar-top h1 small{font-size:12.5px}
+  .state{font-size:12.5px}
 
   /* 日表示 */
-  .day-head .d{font-size:25px}
-  .day-head .w{font-size:15px}
-  .counts{font-size:14.5px}
-  .counts b{font-size:17px}
-  .hint{font-size:13.5px}
-  .t-name{font-size:18px; line-height:1.4;}
-  .t-sub{font-size:14.5px}
-  .t-meta{font-size:13.5px; gap:6px 12px;}
-  .t-time{font-size:13.5px; padding:3px 9px;}
-  .task-card{padding:14px 15px; gap:6px;}
-  .task-bg{font-size:17px}
+  .day-head .d{font-size:28px}
+  .day-head .w{font-size:16px}
+  .counts{font-size:16px}
+  .counts b{font-size:19px}
+  .hint{font-size:14.5px}
+  .section-label{font-size:12.5px}
+  .t-name{font-size:20px; line-height:1.4;}
+  .t-sub{font-size:15.5px}
+  .t-meta{font-size:14.5px; gap:6px 12px;}
+  .t-time{font-size:14.5px; padding:4px 10px;}
+  .task-card{padding:15px 16px; gap:7px;}
+  .task-bg{font-size:18px}
 
   /* 押しやすさ */
-  button{font-size:15.5px; min-height:46px; padding:9px 15px;}
-  button.icon{font-size:19px; min-width:46px;}
-  .t-actions button{font-size:14.5px; min-height:42px;}
-  .empty-msg{font-size:15px}
+  button{font-size:16.5px; min-height:48px; padding:10px 16px;}
+  button.icon{font-size:20px; min-width:48px;}
+  .t-actions button{font-size:15.5px; min-height:44px;}
+  .empty-msg{font-size:16px}
+  .gate h2{font-size:21px}
+  .gate p{font-size:15px}
+  .gate input{font-size:18px; padding:14px 15px;}
+  .gate button{font-size:17px; min-height:52px;}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
@@ -248,7 +255,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v5";
+const BUILD = "v6";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -261,7 +268,12 @@ const STORE = "shukka_work_key";
 
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
-  if (q) return q;
+  if (q){
+    /* URLに合言葉があれば、この時点で保存してURLから消す */
+    try { localStorage.setItem(STORE, q); } catch(e){}
+    try { history.replaceState(null, "", location.pathname); } catch(e){}
+    return q;
+  }
   try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
 }
 function saveKey(k){

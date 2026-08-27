@@ -292,7 +292,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 "use strict";
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。 */
-const BUILD = "v5";
+const BUILD = "v6";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -305,7 +305,12 @@ const STORE = "shukka_edit_key";
 
 function loadKey(){
   const q = new URLSearchParams(location.search).get("k");
-  if (q) return q;
+  if (q){
+    /* URLに合言葉があれば、この時点で保存してURLから消す */
+    try { localStorage.setItem(STORE, q); } catch(e){}
+    try { history.replaceState(null, "", location.pathname); } catch(e){}
+    return q;
+  }
   try { return localStorage.getItem(STORE) || ""; } catch(e){ return ""; }
 }
 function saveKey(k){
