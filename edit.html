@@ -8,28 +8,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+/* 見る端末やOSの設定に関係なく、いつもダークで表示します。
+   PCとスマホで色が変わると見比べづらいので固定しました */
 :root{
-  --ground:#F3F5F4; --surface:#FFFFFF; --surface-2:#E9EDEB; --weekend:#EAEEEC;
-  --line:#C4CFCA; --line-strong:#98A7A2; --ink:#131A18; --muted:#5D6A66;
-  --accent:#0D6B5C; --accent-ink:#FFFFFF; --accent-soft:#DCEFEA;
-  --mfg:#3B72D9; --mfg-ink:#FFFFFF; --mfg-soft:#DEE9FB;
-  --ship:#8F7200; --ship-ink:#FFFFFF; --ship-soft:#FAF0C4;
-  --warn:#9C6510; --warn-soft:#F8EDD8; --danger:#A93129; --danger-soft:#F8E1DE;
-  --off-ink:#8C443C; --ago-ink:#3C6C86; --ago-soft:#DCE9F0;
-  --shadow:0 1px 2px rgba(19,26,24,.08), 0 6px 16px rgba(19,26,24,.06);
+  color-scheme: dark;
+  --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
+  --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
+  --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
+  --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
+  --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+  --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
   --radius:6px;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-    --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
-    --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
-    --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
-    --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
-    --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
-    --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
-  }
 }
 *{box-sizing:border-box}
 [hidden]{display:none !important;}
@@ -121,11 +112,11 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .bar.k-s{background:var(--ship-soft); border-color:var(--ship); border-left-color:var(--ship);}
 .bar:hover{filter:brightness(.98); box-shadow:var(--shadow);}
 .bar:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+/* タップでの選択は使わなくなったので、選択の見た目は出しません */
 /* 期限オーバーは枠だけを真っ赤にします。
    中の色（製造＝コバルト／出荷＝レモン）と「造」「出」のタグはそのままなので、
    赤くなっても種別は分かります */
 .bar.late{border:2px solid var(--danger); border-left:3px solid var(--danger);}
-.bar.sel{box-shadow:0 0 0 2px var(--accent);}
 .bar.pending{opacity:.55}
 .bar .tag{flex:none; font-size:10.5px; font-weight:700; padding:0 4px; border-radius:2px;
   background:var(--mfg); color:var(--mfg-ink);}
@@ -166,13 +157,14 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip.k-s{border-left-color:var(--ship)}
 .chip:hover{border-color:var(--line-strong); box-shadow:var(--shadow);}
 .chip:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
-.chip.sel{border-color:var(--accent); background:var(--accent-soft);}
 .chip.pending{opacity:.55}
-.chip .nm{font-size:13.5px; font-weight:500; line-height:1.4;}
-.chip .sub{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+/* カードのタイトルは種別の色（製造＝コバルト／出荷＝レモン）、本文は白 */
+.chip .nm{font-size:13.5px; font-weight:700; line-height:1.4; color:var(--mfg);}
+.chip.k-s .nm{color:var(--ship)}
+.chip .sub{font-size:12px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .chip .lim{display:flex; flex-wrap:wrap; gap:3px 6px; margin-top:2px;}
 .chip .lim span{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
-  padding:1px 5px; border-radius:3px; background:var(--surface-2); color:var(--muted); white-space:nowrap;}
+  padding:1px 5px; border-radius:3px; background:var(--surface-2); color:var(--ink); white-space:nowrap;}
 .chip .lim span.near{background:var(--warn-soft); color:var(--warn);}
 .chip .lim span.over{background:var(--danger); color:#fff;}
 /* 完了したものは「遅れ」を出さないので、期限は控えめな表示にします */
@@ -191,7 +183,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip .foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:1px;}
 .chip .code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted);}
 .chip.is-done{border-left-color:var(--line-strong); background:var(--surface-2);}
-.chip.is-done .nm{color:var(--muted); text-decoration:line-through; font-weight:500;}
+.chip.is-done .nm{color:var(--ink); text-decoration:line-through; font-weight:600;}
 .chip .done-on{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--mfg); font-weight:600;}
 .chip.k-s .done-on{color:var(--ship)}
 .empty{padding:18px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
@@ -462,7 +454,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v30";
+const BUILD = "v34";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1317,26 +1309,15 @@ function dayUnder(x, y){
 document.addEventListener("click", e => {
   if (suppressClick){ suppressClick = false; return; }
   if (e.target.closest(".cs")) return;       // 在庫チェックの操作
-  const card = e.target.closest(".chip, .bar");
-  const onGrip = !!e.target.closest(".grip");
 
-  if (card && !onGrip){
-    selected = (selected === card.dataset.id) ? null : card.dataset.id;
-    render();
-    return;
-  }
-
-  /* 日付を押したら、その日の一覧を出します */
+  /* 日付を押したら、その日の一覧を出します。
+     カードをタップしても何も起きません（移動はドラッグのみ） */
   const day = e.target.closest(".day");
   if (day) showDay(day.dataset.date);
 });
 
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && openDay){ closeDay(); return; }
-  if (e.key === "Escape" && selected){ selected = null; render(); return; }
-  if (e.key !== "Enter" && e.key !== " ") return;
-  const card = e.target.closest(".chip, .bar");
-  if (card){ e.preventDefault(); selected = (selected === card.dataset.id) ? null : card.dataset.id; render(); }
+  if (e.key === "Escape" && openDay) closeDay();
 });
 
 /* ================= 右端ドラッグで複数日に（製造のみ） ================= */
