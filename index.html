@@ -190,6 +190,21 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-meta .due.ago{color:var(--ago-ink); font-weight:700;}
 .task.done .t-meta .due.ago{color:var(--ago-ink)}
 .t-meta .code{font-family:"IBM Plex Mono",monospace;}
+/* 在庫：SKUごとの「作らない」チェック */
+.t-skus{display:flex; flex-direction:column; gap:5px; margin-top:6px;
+  border-top:1px dashed var(--line-strong); padding-top:7px;}
+.t-sku{display:flex; align-items:flex-start; gap:8px; font-size:12.5px; line-height:1.4;}
+.t-sku input{width:20px; height:20px; margin:1px 0 0; flex:none; accent-color:var(--danger);}
+.t-sku .b{min-width:0}
+.t-sku .code{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--ink);}
+.t-sku .nm{color:var(--muted); overflow:hidden; text-overflow:ellipsis;}
+.t-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--ink);}
+.t-sku .lab{color:var(--muted)}
+.t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
+.t-sku.off .lab{color:var(--danger); font-weight:700;}
+.t-sku.busy{opacity:.5}
+.t-skus .note{font-size:12px; color:var(--warn)}
+
 .t-actions{display:flex; justify-content:flex-end; margin-top:4px;}
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
 
@@ -260,6 +275,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
   .t-name{font-size:15.5px; line-height:1.4;}
   .t-sub{font-size:12px}
   .t-meta{font-size:11.5px; gap:6px 13px;}
+  .t-sku{font-size:12px}
+  .t-sku input{width:22px; height:22px;}
   .t-time{font-size:11.5px; padding:4px 9px;}
   .task-card{padding:13px 14px; gap:6px;}
   .task-bg{font-size:14px}
@@ -318,7 +335,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v26";
+const BUILD = "v28";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -754,6 +771,7 @@ function taskEl(j){
     +   (j.boxes ? '<span class="boxes"></span>' : '')
     +   (j.code ? '<span class="code"></span>' : '')
     + '</div>'
+    + '<div class="t-skus" hidden></div>'
     + '<div class="t-actions"><button type="button" class="act"></button></div>';
 
   card.querySelector('.t-name').innerHTML =
@@ -768,6 +786,9 @@ function taskEl(j){
   if (j.qty) card.querySelector('.qty').textContent = j.qty;
   if (j.boxes) card.querySelector('.boxes').textContent = j.boxes + '個口';
   if (j.code) card.querySelector('.code').textContent = j.code;
+
+  /* 製造タスクだけ、在庫のSKU一覧と「作らない」チェックを出します */
+  if (j.kind !== 's') buildSkus(card.querySelector('.t-skus'), j);
 
   const act = card.querySelector('.act');
   act.textContent = j.done ? '完了を取り消す' : '完了にする';
@@ -791,6 +812,7 @@ function enableSwipe(task, card, j){
   card.addEventListener('pointerdown', e => {
     if (e.button) return;
     if (e.target.closest('button')) return;
+    if (e.target.closest('.t-skus')) return;   /* 在庫チェックの操作はスワイプにしない */
     active = true; decided = false; horiz = false;
     sx = e.clientX; sy = e.clientY; dx = 0; pid = e.pointerId;
     card.classList.remove('snap');
@@ -829,6 +851,68 @@ function enableSwipe(task, card, j){
 }
 
 /* ---------- 完了／取り消しを送信 ---------- */
+/* ---------- 在庫：作らないチェック ---------- */
+function buildSkus(box, j){
+  if (!box) return;
+  const list = j.skus || [];
+  box.innerHTML = "";
+
+  if (!list.length){
+    /* 在庫シートに行がまだ無い。朝と昼のGASで増えるので、そのうち出ます */
+    box.hidden = false;
+    const n = el('div', 'note');
+    n.textContent = '在庫の行がまだ作られていません（自動で反映されます）';
+    box.appendChild(n);
+    return;
+  }
+
+  box.hidden = false;
+  list.forEach(function(x){
+    const row = el('div', 't-sku' + (x.skip ? ' off' : ''));
+    const id = 'nm-' + j.row + '-' + (x.sku || '');
+    row.innerHTML = '<input type="checkbox" id="' + id + '">'
+      + '<label class="b" for="' + id + '">'
+      +   '<span class="code"></span> <span class="nm"></span><br>'
+      +   '<span class="qty"></span> <span class="lab"></span>'
+      + '</label>';
+
+    const cb = row.querySelector('input');
+    cb.checked = !!x.skip;
+    row.querySelector('.code').textContent = x.sku || '（SKU未設定）';
+    row.querySelector('.nm').textContent = x.name || '';
+    const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
+    row.querySelector('.qty').textContent = (q === null || q === undefined) ? '' : ('残り' + q);
+    row.querySelector('.lab').textContent = '在庫から出す（作らない）';
+
+    cb.onclick = function(e){ e.stopPropagation(); };
+    cb.onchange = function(){ toggleNoMake(j, x, row, cb); };
+    box.appendChild(row);
+  });
+}
+
+function toggleNoMake(j, x, row, cb){
+  const on = cb.checked;
+  row.classList.add('busy');
+  pending++;
+  setState("保存中…", "busy");
+
+  call("setNoMake", {no:j.code, sku:x.sku || "", on: on ? 1 : 0})
+    .then(function(res){
+      pending--;
+      x.skip = res.skip;
+      row.classList.remove('busy');
+      row.classList.toggle('off', !!res.skip);
+      setState("最終更新 " + hm(), "");
+    })
+    .catch(function(e){
+      pending--;
+      cb.checked = !on;
+      row.classList.remove('busy');
+      setState("保存できませんでした", "err");
+      alert("在庫シートに反映できませんでした。\n\n" + e.message);
+    });
+}
+
 function commit(j, done){
   const task = app.querySelector('.task[data-row="' + j.row + '"]');
   if (task) task.classList.add('busy');
@@ -839,7 +923,7 @@ function commit(j, done){
     .then(function(res){
       pending--;
       j.done = res.done;
-      setState("最終更新 " + hm(), "");
+      setState((res.stock ? res.stock : "最終更新 " + hm()), res.stock ? "busy" : "");
       render();
     })
     .catch(function(e){

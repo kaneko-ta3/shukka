@@ -249,6 +249,20 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-lim span.near{background:var(--warn-soft); color:var(--warn);}
 .dv-lim span.over{background:var(--danger); color:#fff;}
 .dv-lim span.ago{background:var(--ago-soft); color:var(--ago-ink);}
+/* 在庫：SKUごとの「作らない」チェック */
+.dv-skus{display:flex; flex-direction:column; gap:5px; margin-top:7px;
+  border-top:1px dashed var(--line-strong); padding-top:7px;}
+.dv-sku{display:flex; align-items:flex-start; gap:8px; font-size:12px; line-height:1.4;}
+.dv-sku input{width:17px; height:17px; margin:1px 0 0; flex:none; accent-color:var(--danger);}
+.dv-sku .code{font-family:"IBM Plex Mono",monospace; font-weight:600;}
+.dv-sku .nm{color:var(--muted)}
+.dv-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:600;}
+.dv-sku .lab{color:var(--muted)}
+.dv-sku.off .code, .dv-sku.off .qty{color:var(--danger)}
+.dv-sku.off .lab{color:var(--danger); font-weight:700;}
+.dv-sku.busy{opacity:.5}
+.dv-skus .note{font-size:11.5px; color:var(--warn)}
+
 .dv-act{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .dv-act button{font-size:12px; padding:6px 12px;}
 .dv-empty{padding:26px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
@@ -437,7 +451,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v26";
+const BUILD = "v28";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -526,6 +540,14 @@ const remainText = n => n === null ? ""
   : (n < 0 ? Math.abs(n) + "日 遅れ" : (n === 0 ? "本日まで" : "あと" + n + "日"));
 
 /* ================= 状態 ================= */
+
+/* この画面で完了枠へ動かした順番。読み込み直しても消えないように
+   タスクIDで覚えておき、完了枠の並びで一番上に出します */
+const doneOrder = {};
+let doneSeq = 0;
+const markMoved   = id => { doneOrder[id] = ++doneSeq; };
+const clearMoved  = id => { delete doneOrder[id]; };
+
 let tasks = [];
 let TODAY = null;
 let anchor = null;
@@ -873,8 +895,16 @@ function renderPool(kind){
 
 function renderDone(){
   const list = document.getElementById("done-list");
-  const done = tasks.filter(t => t.done)
-    .sort((a,b) => (a.start === b.start) ? (b.row - a.row) : (a.start > b.start ? -1 : 1));
+  const done = tasks.filter(t => t.done).sort(function(a, b){
+    /* さっき手で動かしたものを上に。新しく動かしたものほど上 */
+    const da = doneOrder[a.id] || 0, db = doneOrder[b.id] || 0;
+    if (da !== db) return db - da;
+    /* それ以外は実施日の新しい順。日付が無いものは後ろ */
+    if (!a.start && b.start) return 1;
+    if (a.start && !b.start) return -1;
+    if (a.start !== b.start) return a.start > b.start ? -1 : 1;
+    return b.row - a.row;
+  });
   document.getElementById("done-count").textContent = done.length + "件";
   list.innerHTML = "";
   if (!done.length){
@@ -899,6 +929,7 @@ function place(id, date){
   const prev = {start:t.start, days:t.days, done:t.done};
   const undone = !!t.done;
   pushHistory();
+  if (undone) clearMoved(id);
   t.start = date;
   if (undone) t.done = false;
   t._pending = true;
@@ -926,6 +957,7 @@ function unplace(id){
   const prev = {start:t.start, days:t.days, done:t.done};
   const undone = !!t.done;
   pushHistory();
+  if (undone) clearMoved(id);
   t.start = null;
   if (undone) t.done = false;
   t._pending = true;
@@ -949,6 +981,7 @@ function markDone(id){
   const t = byId(id);
   if (!t || t.done) return;
   pushHistory();
+  markMoved(id);          // 完了枠の一番上に出す
   t.done = true;
   t._pending = true;
   selected = null;
@@ -957,7 +990,7 @@ function markDone(id){
   call("setDone", {row:t.row, kind:t.kind, done:1})
     .then(function(res){
       t.done = res.done; t._pending = false; busy(false); render();
-      log(res.message, "シート更新");
+      log(res.message, res.stock ? "在庫も更新" : "シート更新");
     })
     .catch(function(e){
       t.done = false; t._pending = false; busy(false); render();
@@ -969,6 +1002,7 @@ function markUndone(id){
   const t = byId(id);
   if (!t || !t.done) return;
   pushHistory();
+  clearMoved(id);
   t.done = false;
   t._pending = true;
   selected = null;
@@ -977,7 +1011,7 @@ function markUndone(id){
   call("setDone", {row:t.row, kind:t.kind, done:0})
     .then(function(res){
       t.done = res.done; t._pending = false; busy(false); render();
-      log(res.message, "シート更新");
+      log(res.message, res.stock ? "在庫も更新" : "シート更新");
     })
     .catch(function(e){
       t.done = true; t._pending = false; busy(false); render();
@@ -1018,7 +1052,8 @@ function dayRow(t){
   el.className = "dv-row k-" + t.kind + (t.done ? " is-done" : "") + (t._pending ? " pending" : "");
 
   el.innerHTML = '<div class="dv-nm"><span class="dv-kind"></span><span class="dv-nmtxt"></span></div>'
-    + '<div class="dv-sub"></div><div class="dv-lim"></div><div class="dv-act"></div>';
+    + '<div class="dv-sub"></div><div class="dv-lim"></div>'
+    + '<div class="dv-skus" hidden></div><div class="dv-act"></div>';
 
   const kd = el.querySelector(".dv-kind");
   kd.textContent = kindName(t.kind);
@@ -1047,6 +1082,9 @@ function dayRow(t){
     lim.appendChild(ag);
   }
 
+  /* 製造タスクだけ、在庫のSKU一覧と「作らない」チェックを出します */
+  if (t.kind === "m") buildSkus(el.querySelector(".dv-skus"), t);
+
   const act = el.querySelector(".dv-act");
   const b1 = document.createElement("button");
   b1.textContent = t.done ? "完了を取り消す" : "完了にする";
@@ -1059,6 +1097,63 @@ function dayRow(t){
   act.appendChild(b2);
 
   return el;
+}
+
+/* ---------- 在庫：作らないチェック ---------- */
+function buildSkus(box, t){
+  if (!box) return;
+  const list = t.skus || [];
+  box.innerHTML = "";
+  box.hidden = false;
+
+  if (!list.length){
+    const n = document.createElement("div");
+    n.className = "note";
+    n.textContent = "在庫の行がまだ作られていません（自動で反映されます）";
+    box.appendChild(n);
+    return;
+  }
+
+  list.forEach(function(x){
+    const row = document.createElement("div");
+    row.className = "dv-sku" + (x.skip ? " off" : "");
+    const id = "dvnm-" + t.row + "-" + (x.sku || "");
+    row.innerHTML = '<input type="checkbox" id="' + id + '">'
+      + '<label for="' + id + '">'
+      +   '<span class="code"></span> <span class="nm"></span>'
+      +   ' 　<span class="qty"></span> <span class="lab">在庫から出す（作らない）</span>'
+      + '</label>';
+
+    const cb = row.querySelector("input");
+    cb.checked = !!x.skip;
+    row.querySelector(".code").textContent = x.sku || "（SKU未設定）";
+    row.querySelector(".nm").textContent = x.name || "";
+    const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
+    row.querySelector(".qty").textContent = (q === null || q === undefined) ? "" : ("残り" + q);
+
+    cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
+    box.appendChild(row);
+  });
+}
+
+function toggleNoMake(t, x, row, cb){
+  const on = cb.checked;
+  row.classList.add("busy");
+  busy(true);
+  call("setNoMake", {no:t.code, sku:x.sku || "", on: on ? 1 : 0})
+    .then(function(res){
+      x.skip = res.skip;
+      row.classList.remove("busy");
+      row.classList.toggle("off", !!res.skip);
+      busy(false);
+      log(res.message, "在庫シート更新");
+    })
+    .catch(function(e){
+      cb.checked = !on;
+      row.classList.remove("busy");
+      busy(false);
+      log("在庫シートに反映できませんでした：" + e.message, "", true);
+    });
 }
 
 function renderDayView(){
