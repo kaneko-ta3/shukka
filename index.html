@@ -12,7 +12,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#B7C3BF;
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4;
@@ -27,10 +27,10 @@
    Googleカレンダーの色名に合わせています */
 :root{--mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
       --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;}
-.kind{display:inline-block; font-size:.62em; font-weight:700; padding:2px 7px; border-radius:4px;
-  margin-right:8px; vertical-align:middle;
-  background:var(--mfg-soft); color:var(--mfg);}
-.kind.k-s{background:var(--ship-soft); color:var(--ship);}
+.kind{display:inline-block; font-size:.6em; font-weight:700; padding:2px 7px; border-radius:4px;
+  margin-right:8px; vertical-align:middle; letter-spacing:.04em;
+  background:var(--mfg); color:var(--mfg-ink);}
+.kind.k-s{background:var(--ship); color:var(--ship-ink);}
 .task.k-s .task-card{border-left:3px solid var(--ship);}
 .task.k-m .task-card{border-left:3px solid var(--mfg);}
 .c-item.k-s{background:var(--ship-soft); border-left-color:var(--ship);}
@@ -128,8 +128,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 /* ---- 日表示 ---- */
 .day-head{display:flex; align-items:baseline; gap:12px; margin-bottom:4px;}
 .day-head .d{font-size:26px; font-weight:700; letter-spacing:.01em;}
-.day-head .w{font-size:14px; color:var(--muted);}
-.counts{font-size:13px; color:var(--muted); margin:0 0 14px;}
+.day-head .w{font-size:14px; color:var(--ink);}
+.counts{font-size:13px; color:var(--ink); margin:0 0 14px;}
 .counts b{color:var(--ink); font-size:15px;}
 .hint{
   display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted);
@@ -168,11 +168,13 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .task-card.snap{transition:transform .18s ease-out}
 .task.busy .task-card{opacity:.6}
 .t-row1{display:flex; align-items:baseline; gap:10px;}
-.t-name{font-size:16px; font-weight:700; line-height:1.35; flex:1;}
+/* タイトルは種別の色、本文は白。色で製造／出荷を見分けられるようにします */
+.t-name{font-size:16px; font-weight:700; line-height:1.35; flex:1; color:var(--mfg);}
+.task.k-s .t-name{color:var(--ship)}
 .t-time{font-size:12px; font-weight:600; color:var(--accent); background:var(--accent-soft);
   padding:2px 8px; border-radius:4px; white-space:nowrap;}
-.t-sub{font-size:13px; color:var(--muted); line-height:1.5;}
-.t-meta{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--muted); margin-top:2px;}
+.t-sub{font-size:13px; color:var(--ink); line-height:1.5;}
+.t-meta{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--ink); margin-top:2px;}
 .t-meta .due{font-family:"IBM Plex Mono",monospace; font-weight:600;}
 .t-meta .due.near{color:var(--warn)}
 .t-meta .due.over{color:var(--danger)}
@@ -186,7 +188,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
   border-top:1px dashed var(--line-strong); padding-top:7px;}
 .t-sku{display:grid; gap:1px; font-size:12.5px; line-height:1.4;}
 .t-sku .code{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink);}
-.t-sku .nm{color:var(--muted)}
+.t-sku .nm{color:var(--ink)}
 .t-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink); margin-left:6px;}
 .t-sku .lab{color:var(--danger); font-weight:700; display:block;}
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
@@ -195,8 +197,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-actions{display:flex; justify-content:flex-end; margin-top:4px;}
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
 
-.task.done .task-card{background:var(--surface); border-color:var(--line); border-left:3px solid var(--accent);}
-.task.done .t-name{color:var(--ink); font-weight:600;}   /* 日表示では取り消し線を付けない */
+.task.done .task-card{background:var(--surface-2); border-color:var(--line);}
+.task.done .t-name{font-weight:600; opacity:.75;}   /* 日表示では取り消し線を付けない */
 .task.done .t-sub, .task.done .t-meta{color:var(--muted)}
 .task.done{box-shadow:none}
 
@@ -321,7 +323,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v34";
+const BUILD = "v35";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。

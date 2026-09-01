@@ -13,7 +13,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#8E9C97;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#B7C3BF;
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
   --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
@@ -40,6 +40,7 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .stat{padding:2px 11px; border-right:1px solid var(--line); min-width:74px;}
 .stat:last-child{border-right:0}
 .stat .k{font-size:9.5px; letter-spacing:.06em; color:var(--muted); display:block; white-space:nowrap;}
+.stat .v small{color:var(--ink)}
 .stat .v{font-size:16px; font-weight:600; line-height:1.15; display:flex; align-items:baseline; gap:2px;}
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
@@ -142,7 +143,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .pane-head{padding:8px 10px; border-bottom:1px solid var(--line);}
 .pane-head h2{margin:0; font-size:12.5px; font-weight:700; display:flex; align-items:baseline; gap:6px;
   word-break:keep-all; overflow-wrap:normal;}
-.pane-head h2 span{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); font-weight:500;}
+.pane-head h2 span{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink); font-weight:500;}
 .pane-head p{margin:3px 0 0; font-size:10.5px; color:var(--muted); line-height:1.45;}
 .pane-list{overflow-y:auto; padding:7px; display:flex; flex-direction:column; gap:6px;
   flex:1 1 auto; min-height:60px;}
@@ -190,7 +191,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
 .log{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   padding:8px 9px; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
-.log h3{margin:0 0 6px; font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--muted); flex:none;}
+.log h3{margin:0 0 6px; font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--ink); flex:none;}
 .log ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
   flex:1 1 auto; min-height:0; overflow-y:auto;}
 .log li{font-size:11.5px; color:var(--muted); display:grid; gap:1px; font-family:"IBM Plex Mono",monospace;
@@ -454,7 +455,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v34";
+const BUILD = "v35";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
