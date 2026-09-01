@@ -335,7 +335,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v28";
+const BUILD = "v30";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -882,7 +882,7 @@ function buildSkus(box, j){
     row.querySelector('.nm').textContent = x.name || '';
     const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
     row.querySelector('.qty').textContent = (q === null || q === undefined) ? '' : ('残り' + q);
-    row.querySelector('.lab').textContent = '在庫から出す（作らない）';
+    row.querySelector('.lab').textContent = '在庫から消費(製造しない)';
 
     cb.onclick = function(e){ e.stopPropagation(); };
     cb.onchange = function(){ toggleNoMake(j, x, row, cb); };

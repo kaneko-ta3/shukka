@@ -179,6 +179,15 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
 .chip .ago{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
   padding:0 5px; border-radius:2px; background:var(--ago-soft); color:var(--ago-ink);}
+/* カードの中の「在庫から消費」チェック */
+.chip .cs{display:flex; flex-direction:column; gap:2px; margin-top:3px;
+  border-top:1px dashed var(--line-strong); padding-top:4px;}
+.chip .cs-row{display:flex; align-items:center; gap:6px; font-size:10.5px; line-height:1.3; min-width:0;}
+.chip .cs-row input{width:15px; height:15px; margin:0; flex:none; accent-color:var(--danger); cursor:pointer;}
+.chip .cs-row .t{color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;}
+.chip .cs-row.off .t{color:var(--danger); font-weight:700;}
+.chip .cs-row.busy{opacity:.5}
+
 .chip .foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:1px;}
 .chip .code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted);}
 .chip.is-done{border-left-color:var(--line-strong); background:var(--surface-2);}
@@ -344,6 +353,8 @@ body.resizing{cursor:col-resize; user-select:none;}
   .chip .lim{gap:2px 5px}
   .chip .lim span{font-size:8.5px; padding:0 4px;}
   .chip .code, .chip .done-on, .chip .ago{font-size:8.5px}
+  .chip .cs-row{font-size:10px; gap:5px;}
+  .chip .cs-row input{width:17px; height:17px;}
   .empty{font-size:10px; padding:12px 6px;}
   .log li{font-size:9.5px}
   .log h3{font-size:9.5px}
@@ -451,7 +462,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v28";
+const BUILD = "v30";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -875,7 +886,42 @@ function chipEl(t, done){
   el.querySelector(".done-on").textContent = done ? (t.start ? "✓ " + md(t.start) : "✓ 完了") : "";
   el.querySelector(".ago").textContent = (done && t.start) ? agoText(t.start) : "";
   el.querySelector(".code").textContent = t.code;
+
+  /* 製造だけ「在庫から消費」のチェックを出します */
+  if (t.kind === "m") buildChipSkus(el, t);
   return el;
+}
+
+/* カードの中に出す、コンパクトな在庫チェック。
+   SKUが1つなら1行、複数ならSKUごとに1行です */
+function buildChipSkus(chip, t){
+  const list = t.skus || [];
+  if (!list.length) return;
+  const one = (list.length === 1);
+
+  const box = document.createElement("div");
+  box.className = "cs";
+
+  list.forEach(function(x){
+    const row = document.createElement("div");
+    row.className = "cs-row" + (x.skip ? " off" : "");
+    const id = "cs-" + t.row + "-" + (x.sku || "");
+    row.innerHTML = '<input type="checkbox" id="' + id + '">'
+                  + '<label class="t" for="' + id + '"></label>';
+
+    const cb = row.querySelector("input");
+    cb.checked = !!x.skip;
+
+    const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
+    row.querySelector(".t").textContent = one
+      ? "在庫から消費(製造しない)"
+      : ((x.sku || "") + ((q === null || q === undefined) ? "" : "　残り" + q));
+
+    cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
+    box.appendChild(row);
+  });
+
+  chip.appendChild(box);
 }
 
 function byLimit(a, b){
@@ -1121,7 +1167,7 @@ function buildSkus(box, t){
     row.innerHTML = '<input type="checkbox" id="' + id + '">'
       + '<label for="' + id + '">'
       +   '<span class="code"></span> <span class="nm"></span>'
-      +   ' 　<span class="qty"></span> <span class="lab">在庫から出す（作らない）</span>'
+      +   ' 　<span class="qty"></span> <span class="lab">在庫から消費(製造しない)</span>'
       + '</label>';
 
     const cb = row.querySelector("input");
@@ -1209,6 +1255,7 @@ function dropOn(target, id){
 document.addEventListener("pointerdown", e => {
   if (e.button) return;
   if (e.target.closest(".grip")) return;
+  if (e.target.closest(".cs")) return;      // 在庫チェックの操作はドラッグにしない
   const src = e.target.closest(".bar, .chip");
   if (!src) return;
   drag = {id:src.dataset.id, el:src, x0:e.clientX, y0:e.clientY, pid:e.pointerId, moved:false, ghost:null};
@@ -1264,27 +1311,24 @@ function dayUnder(x, y){
   return t && t.classList.contains("day") ? t : null;
 }
 
+/* 配置・移動は「ドラッグだけ」にしています。
+   タップで選んでから日付をタップ、という操作は誤操作が多いので入れていません。
+   タップは「選んで目印を付ける」と「日付を開く」だけです */
 document.addEventListener("click", e => {
   if (suppressClick){ suppressClick = false; return; }
+  if (e.target.closest(".cs")) return;       // 在庫チェックの操作
   const card = e.target.closest(".chip, .bar");
   const onGrip = !!e.target.closest(".grip");
 
-  if (selected && !onGrip && !(card && card.dataset.id === selected)){
-    const day = e.target.closest(".day")
-      || (card && card.classList.contains("bar") ? dayUnder(e.clientX, e.clientY) : null);
-    if (day){ place(selected, day.dataset.date); return; }
-  }
   if (card && !onGrip){
     selected = (selected === card.dataset.id) ? null : card.dataset.id;
     render();
     return;
   }
-  const pane = e.target.closest(".pane");
-  if (pane && selected){ const id = selected; selected = null; dropOn(pane, id); return; }
 
-  /* 何も選んでいないときに日付を押したら、その日の一覧を出します */
+  /* 日付を押したら、その日の一覧を出します */
   const day = e.target.closest(".day");
-  if (day && !card && !selected) showDay(day.dataset.date);
+  if (day) showDay(day.dataset.date);
 });
 
 document.addEventListener("keydown", e => {
