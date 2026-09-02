@@ -40,7 +40,6 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .stat{padding:2px 11px; border-right:1px solid var(--line); min-width:74px;}
 .stat:last-child{border-right:0}
 .stat .k{font-size:9.5px; letter-spacing:.06em; color:var(--muted); display:block; white-space:nowrap;}
-.stat .v small{color:var(--ink)}
 .stat .v{font-size:16px; font-weight:600; line-height:1.15; display:flex; align-items:baseline; gap:2px;}
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
@@ -455,7 +454,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v36";
+const BUILD = "v37";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
