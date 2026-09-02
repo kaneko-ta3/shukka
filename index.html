@@ -154,7 +154,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 /* 左端に「未完了」。右の完了枠と対になるようにしています */
 .hint .lab{color:var(--ink); font-weight:700; white-space:nowrap; flex:none;}
 .hint .arrow{color:var(--accent); font-weight:700; font-size:15px; letter-spacing:-.05em; flex:none;}
-.hint .msg{flex:1 1 auto; min-width:0;}
+.hint .msg{flex:1 1 auto; min-width:0; color:var(--ink);}
 
 .section-label{font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--muted); margin:0 0 8px;}
 .tasks{display:flex; flex-direction:column; gap:9px;}
@@ -350,7 +350,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v61";
+const BUILD = "v62";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
