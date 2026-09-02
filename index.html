@@ -347,7 +347,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v58";
+const BUILD = "v59";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -469,7 +469,6 @@ function miscTime(m){
 let TODAY = null;
 let view = null;          /* Date: 表示中の月 */
 let openDate = null;      /* 'yyyy-MM-dd' or null（null なら月表示） */
-let doneLabel = "完了";
 let pending = 0;
 let booted = false;
 
@@ -504,7 +503,6 @@ function applyBoard(b){
   HOLIDAYS = {};
   (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
   TODAY = b.today;
-  doneLabel = "完了";
   if (!view) view = p(TODAY);
   booted = true;
   document.getElementById("gate").hidden = true;
@@ -786,8 +784,8 @@ function renderDay(){
   const left = el('div', 'col');
   if (undone.length){
     const hint = el('div', 'hint');
-    hint.innerHTML = '<span class="arrow">→→</span><span>カードを右へスワイプすると「'
-      + doneLabel + '」が完了になり、右へ移ります</span>';
+    hint.innerHTML = '<span class="arrow">→→</span>'
+      + '<span>カードを右へスワイプすると、タスクが完了へ移動します</span>';
     left.appendChild(hint);
     const wrap = el('div', 'tasks');
     undone.forEach(j => wrap.appendChild(taskEl(j)));
