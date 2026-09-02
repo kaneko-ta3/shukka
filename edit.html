@@ -13,7 +13,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#B7C3BF;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 白の75%。真っ白より一段だけ落とす */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
   --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
@@ -90,7 +90,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
   padding:5px 6px 0; position:relative; min-width:0;}
 .day:last-child{border-right:0}
 .day.off{background:var(--weekend)}
-.day.past{opacity:.5}
+.day.past{opacity:.75}
 .day.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .day.drop-hint{background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent);}
 .day-head{display:flex; align-items:center; justify-content:space-between; gap:4px; height:20px;}
@@ -123,7 +123,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
   background:var(--mfg); color:var(--mfg-ink);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
 .bar .nm{overflow:hidden; text-overflow:ellipsis; font-weight:500;}
-.bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.7; font-size:11px;}
+.bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.75; font-size:11px;}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
 .bar.cont-r{border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed;}
 .grip{position:absolute; right:0; top:0; width:9px; height:100%; cursor:col-resize;}
@@ -197,7 +197,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .log li{font-size:11.5px; color:var(--muted); display:grid; gap:1px; font-family:"IBM Plex Mono",monospace;
   padding-bottom:6px; border-bottom:1px solid var(--line);}
 .log li:last-child{border-bottom:0}
-.log li .t{color:var(--line-strong);}
+.log li .t{color:var(--muted);}
 .log li .m{color:var(--ink); font-family:"Zen Kaku Gothic New",sans-serif; line-height:1.4;}
 .log li .ok{color:var(--accent);}
 .log li.err .m{color:var(--danger);}
@@ -455,7 +455,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v35";
+const BUILD = "v36";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";

@@ -12,7 +12,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#B7C3BF;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 白の75%。真っ白より一段だけ落とす */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4;
@@ -101,7 +101,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .cell.off{background:var(--weekend)}
 /* 当月以外（同じ行に入る前月末・翌月頭）は薄く見せる */
 .cell.other{background:var(--ground);}
-.cell.other .c-num{opacity:.5}
+.cell.other .c-num{opacity:.75}
 .cell.other .c-item{opacity:.75}
 .cell.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .cell.empty{cursor:default}
@@ -198,7 +198,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
 
 .task.done .task-card{background:var(--surface-2); border-color:var(--line);}
-.task.done .t-name{font-weight:600; opacity:.75;}   /* 日表示では取り消し線を付けない */
+.task.done .t-name{font-weight:600;}   /* 日表示では取り消し線を付けない */
 .task.done .t-sub, .task.done .t-meta{color:var(--muted)}
 .task.done{box-shadow:none}
 
@@ -323,7 +323,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v35";
+const BUILD = "v36";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
