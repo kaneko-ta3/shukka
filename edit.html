@@ -123,6 +123,8 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
 .bar .nm{overflow:hidden; text-overflow:ellipsis; font-weight:500;}
 .bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.75; font-size:11px;}
+/* ラベル未発行の出荷は、バーにもオレンジの印を出します */
+.bar .nl{flex:none; font-size:10px; font-weight:700; color:var(--warn);}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
 .bar.cont-r{border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed;}
 .grip{position:absolute; right:0; top:0; width:9px; height:100%; cursor:col-resize;}
@@ -161,11 +163,20 @@ body.resizing{cursor:col-resize; user-select:none;}
 /* カードのタイトルは種別の色（製造＝コバルト／出荷＝レモン）、本文は白 */
 .chip .nm{font-size:13.5px; font-weight:700; line-height:1.4; color:var(--mfg);}
 .chip.k-s .nm{color:var(--ship)}
+/* 種別は「［出荷］」ではなくバッジで出します。
+   編集者は濃い背景＋種別色の文字（日表示のバッジと同じ）。
+   作業者側は塗りバッジなので、見た目で画面の区別が付きます */
+.chip .kd{display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.04em;
+  padding:1px 6px; border-radius:3px; margin-right:6px; vertical-align:1px;
+  background:var(--mfg-soft); color:var(--mfg);}
+.chip.k-s .kd{background:var(--ship-soft); color:var(--ship);}
+.chip.is-done .kd{opacity:.85}
 .chip .sub{font-size:12px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .chip .lim{display:flex; flex-wrap:wrap; gap:3px 6px; margin-top:2px;}
 .chip .lim span{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
   padding:1px 5px; border-radius:3px; background:var(--surface-2); color:var(--ink); white-space:nowrap;}
 .chip .lim span.near{background:var(--warn-soft); color:var(--warn);}
+.chip .lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
 .chip .lim span.over{background:var(--danger); color:#fff;}
 /* 完了したものは「遅れ」を出さないので、期限は控えめな表示にします */
 .chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
@@ -184,6 +195,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip .code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted);}
 .chip.is-done{border-left-color:var(--line-strong); background:var(--surface-2);}
 .chip.is-done .nm{color:var(--ink); text-decoration:line-through; font-weight:600;}
+.chip.is-done .kd{text-decoration:none}
 .chip .done-on{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--mfg); font-weight:600;}
 .chip.k-s .done-on{color:var(--ship)}
 .empty{padding:18px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
@@ -248,6 +260,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-lim span{font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600;
   padding:1px 6px; border-radius:3px; background:var(--surface-2); color:var(--muted); white-space:nowrap;}
 .dv-lim span.near{background:var(--warn-soft); color:var(--warn);}
+.dv-lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
 .dv-lim span.over{background:var(--danger); color:#fff;}
 .dv-lim span.ago{background:var(--ago-soft); color:var(--ago-ink);}
 /* 在庫：SKUごとの「作らない」チェック */
@@ -336,8 +349,6 @@ body.resizing{cursor:col-resize; user-select:none;}
   .pane-head h2{font-size:11px; gap:4px; display:block; line-height:1.35;}
   .pane-head h2 span{margin-left:4px}
   .pane-head p{display:none}
-  /* 未スケジュールの一覧では種別の［製造］［出荷］を省きます（見出しに出ているため） */
-  #pool-m .chip .kd, #pool-s .chip .kd{display:none}
   .pane-list{padding:5px; gap:5px;}
   .chip{padding:5px 6px;}
   .chip .nm{font-size:11px; line-height:1.35;}
@@ -454,7 +465,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v37";
+const BUILD = "v39";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -823,7 +834,9 @@ function renderCal(){
         + "\n実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "")
         + (t.limit ? "\n期限 " + md(t.limit) + (late ? "　← 超過しています" : "") : "\n期限 未設定")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
-      b.innerHTML = '<span class="tag"></span><span class="nm"></span><span class="code"></span><span class="grip"></span>';
+      b.innerHTML = '<span class="tag"></span><span class="nm"></span>'
+        + (t.label === false ? '<span class="nl">ラベル未</span>' : '')
+        + '<span class="code"></span><span class="grip"></span>';
       b.querySelector(".tag").textContent = t.kind === "m" ? "造" : "出";
       b.querySelector(".nm").textContent = t.name;
       b.querySelector(".code").textContent = t.code ? t.code.slice(-3) : "";
@@ -862,11 +875,17 @@ function chipEl(t, done){
      見出しに「製造」「出荷」と出ているので隠します */
   const nm = el.querySelector(".nm");
   nm.innerHTML = '<span class="kd"></span><span class="nmtxt"></span>';
-  nm.querySelector(".kd").textContent = (t.kind === "m" ? "［製造］" : "［出荷］");
+  nm.querySelector(".kd").textContent = (t.kind === "m" ? "製造" : "出荷");
   nm.querySelector(".nmtxt").textContent = t.name;
   el.querySelector(".sub").textContent = [t.cust, t.qty, t.who].filter(Boolean).join("　");
 
   const lim = el.querySelector(".lim");
+  if (t.label === false){
+    const nl = document.createElement("span");
+    nl.className = "nolabel";
+    nl.textContent = "ラベル未発行";
+    lim.appendChild(nl);
+  }
   limitChips(t).forEach(function(c){
     const s = document.createElement("span");
     /* 完了したものに「遅れ」は出しません（もう終わっているため） */
@@ -1102,6 +1121,12 @@ function dayRow(t){
       .filter(Boolean).join("　");
 
   const lim = el.querySelector(".dv-lim");
+  if (t.label === false){
+    const nl = document.createElement("span");
+    nl.className = "nolabel";
+    nl.textContent = "ラベル未発行";
+    lim.appendChild(nl);
+  }
   const impl = document.createElement("span");
   impl.textContent = "実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "");
   lim.appendChild(impl);

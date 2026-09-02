@@ -183,6 +183,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-meta .due.ago{color:var(--ago-ink); font-weight:700;}
 .task.done .t-meta .due.ago{color:var(--ago-ink)}
 .t-meta .code{font-family:"IBM Plex Mono",monospace;}
+/* ラベルがまだ出ていない出荷タスクの注意書き */
+.t-meta .nolabel{color:var(--warn); font-weight:700;}
 /* 在庫：何をいくつ作るかの表示（読むだけ。押せません）。
    作らない指示が付いているものは赤で知らせます */
 .t-skus{display:flex; flex-direction:column; gap:5px; margin-top:6px;
@@ -199,7 +201,8 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
 
 .task.done .task-card{background:var(--surface-2); border-color:var(--line);}
-.task.done .t-name{font-weight:600;}   /* 日表示では取り消し線を付けない */
+/* 完了ぶんは隣の塗りバッジで種別が分かるので、タイトルは白でいい */
+.task.done .t-name{color:var(--ink); font-weight:600;}   /* 日表示では取り消し線を付けない */
 .task.done .t-sub, .task.done .t-meta{color:var(--muted)}
 .task.done{box-shadow:none}
 
@@ -324,7 +327,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v37";
+const BUILD = "v39";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -756,6 +759,7 @@ function taskEl(j){
     + '<div class="t-sub"></div>'
     + '<div class="t-meta">'
     +   (j.due ? '<span class="due' + dueCls + '"></span>' : '')
+    +   (j.label === false ? '<span class="nolabel">ラベル未発行</span>' : '')
     +   (j.qty ? '<span class="qty"></span>' : '')
     +   (j.boxes ? '<span class="boxes"></span>' : '')
     +   (j.code ? '<span class="code"></span>' : '')
