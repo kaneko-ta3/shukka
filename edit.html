@@ -18,7 +18,7 @@
   --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
   --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
   /* ほかの業務（Googleカレンダーの参考表示）＝ライラック */
-  --misc:#B3A7EA; --misc-ink:#1B1436; --misc-soft:#2A2447;
+  --misc:#D0C7F4; --misc-ink:#221A47; --misc-soft:#2E2752;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
@@ -63,6 +63,8 @@ button:hover{background:var(--surface-2); border-color:var(--line-strong);}
 button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 button.icon{padding:4px 9px; font-size:15px; line-height:1.3;}
 button:disabled{opacity:.42; cursor:default;}
+/* ボタンの文字。狭い画面では短い方に差し替えます */
+button .sm{display:none}
 /* ほかの業務の表示切り替え */
 button.misc-btn{border-color:var(--misc); color:var(--misc);}
 button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:700;}
@@ -343,6 +345,13 @@ body.resizing{cursor:col-resize; user-select:none;}
   .cal{min-height:400px}
   #pool-m .pane-list, #pool-s .pane-list{max-height:320px}
 
+  /* 狭い画面ではボタンの文字を短くして、1行に収めます */
+  button .lg{display:none}
+  button .sm{display:inline}
+  .tb-right{gap:4px; flex-wrap:nowrap;}
+  .tb-right .state{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .tb-right button{flex:none}
+
   /* 上のバーは高さを半分くらいまで詰めます。空いた分はカレンダーが使います */
   .wrap{padding:6px 8px 8px}
   h1{font-size:11.5px; margin:0 4px 0 2px;} h1 .sub{font-size:7.5px; letter-spacing:.08em;}
@@ -416,10 +425,10 @@ body.resizing{cursor:col-resize; user-select:none;}
 
     <div class="tb-right">
       <span class="state" id="state">読み込み中…</span>
-      <button type="button" class="misc-btn" id="misc-btn">ほか 表示中</button>
-      <button id="reload">再読み込み</button>
-      <button id="auto">出荷日 自動配置</button>
-      <button id="undo" disabled>元に戻す</button>
+      <button type="button" class="misc-btn" id="misc-btn" title="Googleカレンダーの予定を出すかどうか">ほか予定</button>
+      <button id="reload"><span class="lg">再読み込み</span><span class="sm">更新</span></button>
+      <button id="auto"><span class="lg">出荷日 自動配置</span><span class="sm">自動配置</span></button>
+      <button id="undo" disabled><span class="lg">元に戻す</span><span class="sm">戻す</span></button>
     </div>
   </div>
 
@@ -493,7 +502,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v46";
+const BUILD = "v47";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -614,8 +623,10 @@ function miscTime(m){
 function syncMiscButton(){
   const b = document.getElementById("misc-btn");
   if (!b) return;
+  /* 文字は変えず、塗りで「出している状態」を示します。
+     ボタンの幅が変わらないので、上のバーが折り返しません */
   b.classList.toggle("on", MISC_ON);
-  b.textContent = MISC_ON ? "ほか 表示中" : "ほか 非表示";
+  b.title = MISC_ON ? "ほか予定を隠す" : "ほか予定を表示する";
 }
 let TODAY = null;
 let anchor = null;
@@ -891,7 +902,7 @@ function renderCal(){
         b.style.setProperty("--span", sg.span);
         b.style.setProperty("--lane", sg.lane);
         b.title = m.name + "\n" + miscTime(m) + "\n（Googleカレンダーの予定）";
-        b.innerHTML = '<span class="tag">ほか</span><span class="nm"></span>';
+        b.innerHTML = '<span class="tag">ほか予定</span><span class="nm"></span>';
         b.querySelector(".nm").textContent = (m.from ? m.from + " " : "") + m.name;
         barsEl.appendChild(b);
         return;
@@ -1325,7 +1336,7 @@ function renderDayView(){
   other.forEach(function(m){
     const el = document.createElement("div");
     el.className = "dv-row k-x";
-    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">ほか</span>'
+    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">ほか予定</span>'
                  + '<span class="dv-nmtxt"></span></div><div class="dv-sub"></div>';
     el.querySelector(".dv-nmtxt").textContent = m.name;
     el.querySelector(".dv-sub").textContent = miscTime(m) + "　（Googleカレンダーの予定）";
@@ -1338,7 +1349,7 @@ function renderDayView(){
   const b = document.createElement("button");
   b.type = "button";
   b.className = "misc-btn" + (MISC_ON ? " on" : "");
-  b.textContent = MISC_ON ? "ほかの業務を隠す" : "ほかの業務を表示";
+  b.textContent = MISC_ON ? "ほか予定を隠す" : "ほか予定を表示";
   b.onclick = function(e){ e.stopPropagation(); setMiscOn(!MISC_ON); };
   wrap.appendChild(b);
   ul.appendChild(wrap);
