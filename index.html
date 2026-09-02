@@ -308,6 +308,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 }
 /* スマホ縦持ち：幅が狭いので、枠まわりをもう一段小さくします */
 @media (max-width:560px){
+  /* 案内文は読点で改行します。中途半端な位置で折り返すと読みにくいので */
+  .hint .p1{display:block}
   .c-item{font-size:9.5px; padding:2px 3px; border-left-width:2px;}
   .c-more{font-size:9.5px}
   .c-num{font-size:13px}
@@ -350,7 +352,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v62";
+const BUILD = "v63";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -780,7 +782,8 @@ function renderDay(){
     const hint = el('div', 'hint');
     hint.innerHTML = '<span class="lab">未完了 ' + undone.length + '件</span>'
       + '<span class="arrow">→→</span>'
-      + '<span class="msg">カードを右へスワイプすると、タスクが完了へ移動します</span>';
+      + '<span class="msg"><span class="p1">カードを右へスワイプすると、</span>'
+      + '<span class="p2">タスクが完了へ移動します</span></span>';
     left.appendChild(hint);
     const wrap = el('div', 'tasks');
     undone.forEach(j => wrap.appendChild(taskEl(j)));
