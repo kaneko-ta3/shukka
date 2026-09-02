@@ -479,7 +479,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v44";
+const BUILD = "v45";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1267,7 +1267,7 @@ document.getElementById("dv-back").onclick = closeDay;
  * 触っただけでは動かないので、カレンダーの上からでも画面をスクロールできます。
  * マウスのときは今までどおり、押してすぐ動かせます。
  */
-const LONG_PRESS_MS = 400;   // 指で持ち上がるまでの時間
+const LONG_PRESS_MS = 300;   // 指で持ち上がるまでの時間
 const MOVE_SLOP = 8;         // これ以上動いたらスクロールとみなして持ち上げない
 
 let drag = null;
