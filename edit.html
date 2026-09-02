@@ -108,7 +108,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
   display:flex; align-items:center; gap:5px; padding:0 6px;
   background:var(--mfg-soft); border:1px solid var(--mfg); border-left:3px solid var(--mfg);
   border-radius:3px; font-size:12px; white-space:nowrap; overflow:hidden;
-  cursor:grab; user-select:none; touch-action:none;}
+  cursor:grab; user-select:none; touch-action:auto;}
 .bar.k-s{background:var(--ship-soft); border-color:var(--ship); border-left-color:var(--ship);}
 .bar:hover{filter:brightness(.98); box-shadow:var(--shadow);}
 .bar:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
@@ -118,6 +118,12 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
    赤くなっても種別は分かります */
 .bar.late{border:2px solid var(--danger); border-left:3px solid var(--danger);}
 .bar.pending{opacity:.55}
+/* 指で長押しして「持ち上げた」状態。動かせることが分かるようにします */
+.bar.held, .chip.held{
+  box-shadow:0 0 0 2px var(--accent), 0 6px 18px rgba(0,0,0,.5);
+  transform:scale(1.04); z-index:5; position:relative;
+}
+.bar.held{transform:scale(1.06)}
 .bar .tag{flex:none; font-size:10.5px; font-weight:700; padding:0 4px; border-radius:2px;
   background:var(--mfg); color:var(--mfg-ink);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
@@ -156,7 +162,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
 .chip{border:1px solid var(--line); border-left:3px solid var(--mfg);
   border-radius:4px; padding:6px 8px; background:var(--surface);
-  cursor:grab; display:grid; gap:2px; touch-action:pan-y; user-select:none;}
+  cursor:grab; display:grid; gap:2px; touch-action:auto; user-select:none;}
 .chip.k-s{border-left-color:var(--ship)}
 .chip:hover{border-color:var(--line-strong); box-shadow:var(--shadow);}
 .chip:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
@@ -473,7 +479,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v42";
+const BUILD = "v43";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1255,9 +1261,46 @@ function renderDayView(){
 document.getElementById("dv-close").onclick = closeDay;
 document.getElementById("dv-back").onclick = closeDay;
 
-/* ================= ドラッグ＆ドロップ ================= */
+/* ================= ドラッグ＆ドロップ =================
+ *
+ * 指のときは「0.5秒長押しして持ち上げてから動かす」方式にしています。
+ * 触っただけでは動かないので、カレンダーの上からでも画面をスクロールできます。
+ * マウスのときは今までどおり、押してすぐ動かせます。
+ */
+const LONG_PRESS_MS = 500;   // 指で持ち上がるまでの時間
+const MOVE_SLOP = 8;         // これ以上動いたらスクロールとみなして持ち上げない
+
 let drag = null;
 let suppressClick = false;
+
+function cancelDrag(){
+  if (!drag) return;
+  clearTimeout(drag.timer);
+  if (drag.el) drag.el.classList.remove("held");
+  if (drag.ghost) drag.ghost.remove();
+  drag = null;
+  document.body.classList.remove("dragging");
+  clearHints();
+}
+
+/** 持ち上げた合図。指のときは長押しで、マウスのときは動かした瞬間に呼ばれます */
+function armDrag(){
+  if (!drag || drag.armed) return;
+  drag.armed = true;
+  drag.el.classList.add("held");
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch(_){}
+  try { drag.el.setPointerCapture(drag.pid); } catch(_){}
+
+  const t = byId(drag.id);
+  const g = document.createElement("div");
+  g.className = "ghost" + (t && t.kind === "s" ? " k-s" : "");
+  g.textContent = t ? ("【" + kindName(t.kind) + "】" + t.name) : "";
+  g.style.left = (drag.x0 + 12) + "px";
+  g.style.top  = (drag.y0 + 14) + "px";
+  document.body.appendChild(g);
+  drag.ghost = g;
+  document.body.classList.add("dragging");
+}
 
 function hitTarget(x, y){
   const held = document.body.classList.contains("dragging");
@@ -1272,7 +1315,12 @@ function clearHints(){ document.querySelectorAll(".drop-hint").forEach(el => el.
 function dropOn(target, id){
   const t = byId(id);
   if (!t) return;
-  if (target.classList.contains("day")) { place(id, target.dataset.date); return; }
+  if (target.classList.contains("day")) {
+    /* 同じ日に落としたときは何もしません（無駄な書き込みを防ぐため） */
+    if (t.start === target.dataset.date && !t.done) return;
+    place(id, target.dataset.date);
+    return;
+  }
   if (target.id === "done") { markDone(id); return; }
   if (target.id === "pool-m" && t.kind === "m") { unplace(id); return; }
   if (target.id === "pool-s" && t.kind === "s") { unplace(id); return; }
@@ -1284,23 +1332,29 @@ document.addEventListener("pointerdown", e => {
   if (e.target.closest(".cs")) return;      // 在庫チェックの操作はドラッグにしない
   const src = e.target.closest(".bar, .chip");
   if (!src) return;
-  drag = {id:src.dataset.id, el:src, x0:e.clientX, y0:e.clientY, pid:e.pointerId, moved:false, ghost:null};
+
+  const byFinger = (e.pointerType === "touch" || e.pointerType === "pen");
+  drag = {id:src.dataset.id, el:src, x0:e.clientX, y0:e.clientY, pid:e.pointerId,
+          armed:false, moved:false, ghost:null, timer:0, finger:byFinger};
+
+  /* 指のときは長押しを待ちます。その間に動いたらスクロール扱いで中止します */
+  if (byFinger) drag.timer = setTimeout(armDrag, LONG_PRESS_MS);
 });
 
 document.addEventListener("pointermove", e => {
   if (!drag) return;
-  if (!drag.moved){
-    if (Math.abs(e.clientX - drag.x0) < 5 && Math.abs(e.clientY - drag.y0) < 5) return;
-    drag.moved = true;
-    const t = byId(drag.id);
-    const g = document.createElement("div");
-    g.className = "ghost" + (t && t.kind === "s" ? " k-s" : "");
-    g.textContent = t ? ("【" + kindName(t.kind) + "】" + t.name) : "";
-    document.body.appendChild(g);
-    drag.ghost = g;
-    document.body.classList.add("dragging");
-    try { drag.el.setPointerCapture(drag.pid); } catch(_){}
+  const mx = e.clientX - drag.x0, my = e.clientY - drag.y0;
+
+  if (!drag.armed){
+    if (Math.abs(mx) < MOVE_SLOP && Math.abs(my) < MOVE_SLOP) return;
+    /* まだ持ち上がっていないのに動いた
+         指   … スクロールしたいのだと判断して中止
+         マウス … そのまま持ち上げる（今までどおり） */
+    if (drag.finger) { cancelDrag(); return; }
+    armDrag();
   }
+
+  drag.moved = true;
   e.preventDefault();
   drag.ghost.style.left = (e.clientX + 12) + "px";
   drag.ghost.style.top  = (e.clientY + 14) + "px";
@@ -1309,27 +1363,31 @@ document.addEventListener("pointermove", e => {
   if (t) t.classList.add("drop-hint");
 });
 
+/* 持ち上げている間だけ、画面のスクロールを止めます。
+   passive:false でないと preventDefault が効きません */
+document.addEventListener("touchmove", function (e) {
+  if (drag && drag.armed) e.preventDefault();
+}, {passive: false});
+
 document.addEventListener("pointerup", e => {
   if (!drag) return;
   const d = drag;
   drag = null;
-  const t = d.moved ? hitTarget(e.clientX, e.clientY) : null;
+  clearTimeout(d.timer);
+  if (d.el) d.el.classList.remove("held");
+  const t = (d.armed && d.moved) ? hitTarget(e.clientX, e.clientY) : null;
   document.body.classList.remove("dragging");
   if (d.ghost) d.ghost.remove();
   clearHints();
-  if (!d.moved) return;
+  if (!d.armed || !d.moved) return;
   suppressClick = true;
   if (!t) return;
   dropOn(t, d.id);
 });
 
-document.addEventListener("pointercancel", () => {
-  if (!drag) return;
-  if (drag.ghost) drag.ghost.remove();
-  drag = null;
-  document.body.classList.remove("dragging");
-  clearHints();
-});
+/* ブラウザがスクロールを引き取るとここに来ます */
+document.addEventListener("pointercancel", cancelDrag);
+window.addEventListener("scroll", function(){ if (drag && !drag.armed) cancelDrag(); }, true);
 
 /* ================= クリックで選ぶ／置く ================= */
 function dayUnder(x, y){
