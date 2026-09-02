@@ -123,8 +123,9 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .bar.k-s .tag{background:var(--ship); color:var(--ship-ink);}
 .bar .nm{overflow:hidden; text-overflow:ellipsis; font-weight:500;}
 .bar .code{font-family:"IBM Plex Mono",monospace; font-weight:500; flex:none; margin-left:auto; opacity:.75; font-size:11px;}
-/* ラベル未発行の出荷は、バーにもオレンジの印を出します */
-.bar .nl{flex:none; font-size:10px; font-weight:700; color:var(--warn);}
+/* ラベル未発行の出荷は、案件名をオレンジにします。
+   専用の印を足すと、狭いマスで案件名が押し出されてしまうため */
+.bar.nolabel .nm{color:var(--warn); font-weight:700;}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
 .bar.cont-r{border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed;}
 .grip{position:absolute; right:0; top:0; width:9px; height:100%; cursor:col-resize;}
@@ -465,7 +466,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v39";
+const BUILD = "v40";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -823,8 +824,9 @@ function renderCal(){
       const late = isLate(t);
       const b = document.createElement("div");
       b.className = "bar k-" + t.kind + (late ? " late" : "")
+        + (t.label === false ? " nolabel" : "")
         + (sg.contL ? " cont-l" : "") + (sg.contR ? " cont-r" : "")
-        + (selected === t.id ? " sel" : "") + (t._pending ? " pending" : "");
+        + (t._pending ? " pending" : "");
       b.style.setProperty("--col", sg.col);
       b.style.setProperty("--span", sg.span);
       b.style.setProperty("--lane", sg.lane);
@@ -833,9 +835,9 @@ function renderCal(){
       b.title = "【" + kindName(t.kind) + "】" + t.name + "\n" + t.cust + (t.qty ? "　" + t.qty : "")
         + "\n実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "")
         + (t.limit ? "\n期限 " + md(t.limit) + (late ? "　← 超過しています" : "") : "\n期限 未設定")
+        + (t.label === false ? "\nラベル未発行" : "")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
       b.innerHTML = '<span class="tag"></span><span class="nm"></span>'
-        + (t.label === false ? '<span class="nl">ラベル未</span>' : '')
         + '<span class="code"></span><span class="grip"></span>';
       b.querySelector(".tag").textContent = t.kind === "m" ? "造" : "出";
       b.querySelector(".nm").textContent = t.name;
