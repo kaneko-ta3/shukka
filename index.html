@@ -347,7 +347,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v59";
+const BUILD = "v60";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -765,16 +765,7 @@ function renderDay(){
     const e = el('div', 'empty-msg');
     e.textContent = 'この日の作業はありません。';
     app.appendChild(e);
-    if (other.length){
-      const lab = el('div', 'section-label');
-      lab.style.marginTop = '14px';
-      lab.textContent = '他予定　' + other.length + '件';
-      app.appendChild(lab);
-      const wrap = el('div', 'tasks');
-      other.forEach(m => wrap.appendChild(miscEl(m)));
-      app.appendChild(wrap);
-    }
-    app.appendChild(miscButton());
+    app.appendChild(miscSection(other));
     return;
   }
 
@@ -817,16 +808,27 @@ function renderDay(){
   app.appendChild(cols);
 
   /* いちばん下にほかの業務。読むだけです */
+  app.appendChild(miscSection(other));
+}
+
+/* いちばん下の「他予定」欄。
+   PCでは未完了と同じ幅に収めます（右の完了枠まではみ出させない）。
+   スマホは1列なのでそのまま幅いっぱいになります */
+function miscSection(other){
+  const box = el('div', 'day-cols');
+  const col = el('div', 'col');
   if (other.length){
     const lab = el('div', 'section-label');
     lab.style.marginTop = '14px';
     lab.textContent = '他予定　' + other.length + '件';
-    app.appendChild(lab);
+    col.appendChild(lab);
     const wrap = el('div', 'tasks');
     other.forEach(m => wrap.appendChild(miscEl(m)));
-    app.appendChild(wrap);
+    col.appendChild(wrap);
   }
-  app.appendChild(miscButton());
+  col.appendChild(miscButton());
+  box.appendChild(col);
+  return box;
 }
 
 /* ほかの業務を出す・隠すボタン。月表示でも日表示でも同じ設定を切り替えます */
