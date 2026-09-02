@@ -15,6 +15,7 @@
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
   --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 白の75%。真っ白より一段だけ落とす */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
+  --today-bg:#12796A;   /* 本日の丸。白字が読める濃さにしています */
   --mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
   --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
   /* ほかの業務（Googleカレンダーの参考表示）＝ライラック */
@@ -109,7 +110,7 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 /* 休みの日は数字を暗い赤にして見分けやすくする */
 .day.off .dnum{color:var(--off-ink); font-weight:700;}
 .day.today .dnum{
-  background:var(--accent); color:var(--accent-ink); font-weight:700;
+  background:var(--today-bg); color:#FFFFFF; font-weight:700;
   border-radius:999px; padding:1px 7px; min-width:1.6em;
   display:inline-flex; align-items:center; justify-content:center;
 }
@@ -511,7 +512,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v53";
+const BUILD = "v54";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -964,13 +965,11 @@ function renderCal(){
         + (t.limit ? "\n期限 " + md(t.limit) + (late ? "　← 超過しています" : "") : "\n期限 未設定")
         + (t.label === false ? "\nラベル未発行" : "")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
+      /* バーの末尾には何も出しません。数量は日付を開けば読めます */
       b.innerHTML = '<span class="tag"></span><span class="nm"></span>'
-        + '<span class="code"></span><span class="grip"></span>';
+        + '<span class="grip"></span>';
       b.querySelector(".tag").textContent = t.kind === "m" ? "造" : "出";
       b.querySelector(".nm").textContent = t.name;
-      /* バーの末尾は作成数。管理番号は長いだけで見て分からないのでやめました。
-         数量が取れないときは何も出しません */
-      b.querySelector(".code").textContent = t.num ? t.num : "";
       if (t.kind === "s") b.querySelector(".grip").remove();
       barsEl.appendChild(b);
     });
