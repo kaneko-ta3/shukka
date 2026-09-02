@@ -502,7 +502,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v48";
+const BUILD = "v49";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -902,7 +902,7 @@ function renderCal(){
         b.style.setProperty("--span", sg.span);
         b.style.setProperty("--lane", sg.lane);
         b.title = m.name + "\n" + miscTime(m) + "\n（Googleカレンダーの予定）";
-        b.innerHTML = '<span class="tag">他予定</span><span class="nm"></span>';
+        b.innerHTML = '<span class="tag">他</span><span class="nm"></span>';
         b.querySelector(".nm").textContent = (m.from ? m.from + " " : "") + m.name;
         barsEl.appendChild(b);
         return;
@@ -964,7 +964,8 @@ function chipEl(t, done){
      見出しに「製造」「出荷」と出ているので隠します */
   const nm = el.querySelector(".nm");
   nm.innerHTML = '<span class="kd"></span><span class="nmtxt"></span>';
-  nm.querySelector(".kd").textContent = (t.kind === "m" ? "製造" : "出荷");
+  /* バッジは漢字1文字に収めます（造・出・他） */
+  nm.querySelector(".kd").textContent = (t.kind === "m" ? "造" : "出");
   nm.querySelector(".nmtxt").textContent = t.name;
   el.querySelector(".sub").textContent = [t.cust, t.qty, t.who].filter(Boolean).join("　");
 
@@ -1202,7 +1203,7 @@ function dayRow(t){
     + '<div class="dv-skus" hidden></div><div class="dv-act"></div>';
 
   const kd = el.querySelector(".dv-kind");
-  kd.textContent = kindName(t.kind);
+  kd.textContent = (t.kind === "m" ? "造" : "出");
   if (t.kind === "s") kd.classList.add("k-s");
   el.querySelector(".dv-nmtxt").textContent = t.name;
   el.querySelector(".dv-sub").textContent =
@@ -1336,7 +1337,7 @@ function renderDayView(){
   other.forEach(function(m){
     const el = document.createElement("div");
     el.className = "dv-row k-x";
-    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">他予定</span>'
+    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">他</span>'
                  + '<span class="dv-nmtxt"></span></div><div class="dv-sub"></div>';
     el.querySelector(".dv-nmtxt").textContent = m.name;
     el.querySelector(".dv-sub").textContent = miscTime(m) + "　（Googleカレンダーの予定）";

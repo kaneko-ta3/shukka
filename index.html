@@ -340,7 +340,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v48";
+const BUILD = "v49";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -842,7 +842,7 @@ function miscEl(m){
   const card = el('div', 'task-card');
   card.innerHTML = '<div class="t-row1"><span class="t-name"></span></div>'
                  + '<div class="t-sub"></div>';
-  card.querySelector('.t-name').innerHTML = '<span class="kind">他予定</span>';
+  card.querySelector('.t-name').innerHTML = '<span class="kind">他</span>';
   card.querySelector('.t-name').appendChild(document.createTextNode(m.name));
   card.querySelector('.t-sub').textContent = miscTime(m);
   t.appendChild(card);
@@ -878,7 +878,8 @@ function taskEl(j){
     + '<div class="t-actions"><button type="button" class="act"></button></div>';
 
   card.querySelector('.t-name').innerHTML =
-    '<span class="kind k-' + (j.kind || 'm') + '">' + (j.kind === 's' ? '出荷' : '製造') + '</span>';
+    /* バッジは漢字1文字に収めます（造・出・他） */
+    '<span class="kind k-' + (j.kind || 'm') + '">' + (j.kind === 's' ? '出' : '造') + '</span>';
   card.querySelector('.t-name').appendChild(document.createTextNode(j.name));
   if (j.time) card.querySelector('.t-time').textContent = j.time;
   card.querySelector('.t-sub').textContent = [j.cust, j.to].filter(Boolean).join(' → ');
