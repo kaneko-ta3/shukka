@@ -111,13 +111,17 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 /* 当月以外は日付の数字だけ薄くします。
    案件まで薄くすると、同じ「済」でも月をまたいだ側だけ暗く見えてしまうため */
 .cell.other .c-num{opacity:.75}
-.cell.today{box-shadow:inset 0 0 0 2px var(--accent);}
+/* 本日は日付を丸（1日は「9/1」なので角丸の帯）で囲みます */
 .cell.empty{cursor:default}
 .cell.empty:hover{background:var(--surface)}
 .cell.empty.off:hover{background:var(--weekend)}
 .c-head{display:flex; align-items:center; justify-content:space-between; gap:4px;}
 .c-num{font-size:15px; font-weight:600; white-space:nowrap;}
-.cell.today .c-num{color:var(--accent)}
+.cell.today .c-num{
+  background:var(--accent); color:var(--accent-ink); font-weight:700;
+  border-radius:999px; padding:1px 7px; min-width:1.6em;
+  display:inline-flex; align-items:center; justify-content:center;
+}
 .cell.off .c-num{color:var(--off-ink); font-weight:700;}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
   background:var(--accent); color:var(--accent-ink); white-space:nowrap; flex:none;}
@@ -340,7 +344,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v51";
+const BUILD = "v52";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
