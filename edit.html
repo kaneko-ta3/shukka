@@ -425,7 +425,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
     <div class="tb-right">
       <span class="state" id="state">読み込み中…</span>
-      <button type="button" class="misc-btn" id="misc-btn" title="Googleカレンダーの予定を出すかどうか">ほか予定</button>
+      <button type="button" class="misc-btn" id="misc-btn" title="Googleカレンダーの予定を出すかどうか">他予定</button>
       <button id="reload"><span class="lg">再読み込み</span><span class="sm">更新</span></button>
       <button id="auto"><span class="lg">出荷日 自動配置</span><span class="sm">自動配置</span></button>
       <button id="undo" disabled><span class="lg">元に戻す</span><span class="sm">戻す</span></button>
@@ -502,7 +502,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v47";
+const BUILD = "v48";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -626,7 +626,7 @@ function syncMiscButton(){
   /* 文字は変えず、塗りで「出している状態」を示します。
      ボタンの幅が変わらないので、上のバーが折り返しません */
   b.classList.toggle("on", MISC_ON);
-  b.title = MISC_ON ? "ほか予定を隠す" : "ほか予定を表示する";
+  b.title = MISC_ON ? "他予定を隠す" : "他予定を表示する";
 }
 let TODAY = null;
 let anchor = null;
@@ -902,7 +902,7 @@ function renderCal(){
         b.style.setProperty("--span", sg.span);
         b.style.setProperty("--lane", sg.lane);
         b.title = m.name + "\n" + miscTime(m) + "\n（Googleカレンダーの予定）";
-        b.innerHTML = '<span class="tag">ほか予定</span><span class="nm"></span>';
+        b.innerHTML = '<span class="tag">他予定</span><span class="nm"></span>';
         b.querySelector(".nm").textContent = (m.from ? m.from + " " : "") + m.name;
         barsEl.appendChild(b);
         return;
@@ -1336,7 +1336,7 @@ function renderDayView(){
   other.forEach(function(m){
     const el = document.createElement("div");
     el.className = "dv-row k-x";
-    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">ほか予定</span>'
+    el.innerHTML = '<div class="dv-nm"><span class="dv-kind k-x">他予定</span>'
                  + '<span class="dv-nmtxt"></span></div><div class="dv-sub"></div>';
     el.querySelector(".dv-nmtxt").textContent = m.name;
     el.querySelector(".dv-sub").textContent = miscTime(m) + "　（Googleカレンダーの予定）";
@@ -1349,7 +1349,7 @@ function renderDayView(){
   const b = document.createElement("button");
   b.type = "button";
   b.className = "misc-btn" + (MISC_ON ? " on" : "");
-  b.textContent = MISC_ON ? "ほか予定を隠す" : "ほか予定を表示";
+  b.textContent = MISC_ON ? "他予定を隠す" : "他予定を表示";
   b.onclick = function(e){ e.stopPropagation(); setMiscOn(!MISC_ON); };
   wrap.appendChild(b);
   ul.appendChild(wrap);

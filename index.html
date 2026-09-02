@@ -340,7 +340,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v47";
+const BUILD = "v48";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -641,8 +641,8 @@ function renderMonth(){
   nav.querySelector("#rel").onclick = () => load(false);
   const mb = nav.querySelector("#mbtn");
   mb.classList.toggle('on', MISC_ON);
-  mb.textContent = 'ほか予定';
-  mb.title = MISC_ON ? 'ほか予定を隠す' : 'ほか予定を表示する';
+  mb.textContent = '他予定';
+  mb.title = MISC_ON ? '他予定を隠す' : '他予定を表示する';
   mb.onclick = () => setMiscOn(!MISC_ON);
 
   const cal = el('div', 'cal');
@@ -754,7 +754,7 @@ function renderDay(){
   }
 
   /* タスクが1件も無い日は、未完了／完了の枠を出しません。
-     「ほか予定」だけの日に「すべて完了しています」と出るのを避けるためです */
+     「他予定」だけの日に「すべて完了しています」と出るのを避けるためです */
   if (!list.length){
     const e = el('div', 'empty-msg');
     e.textContent = 'この日の作業はありません。';
@@ -762,7 +762,7 @@ function renderDay(){
     if (other.length){
       const lab = el('div', 'section-label');
       lab.style.marginTop = '14px';
-      lab.textContent = 'ほか予定　' + other.length + '件';
+      lab.textContent = '他予定　' + other.length + '件';
       app.appendChild(lab);
       const wrap = el('div', 'tasks');
       other.forEach(m => wrap.appendChild(miscEl(m)));
@@ -814,7 +814,7 @@ function renderDay(){
   if (other.length){
     const lab = el('div', 'section-label');
     lab.style.marginTop = '14px';
-    lab.textContent = 'ほか予定　' + other.length + '件';
+    lab.textContent = '他予定　' + other.length + '件';
     app.appendChild(lab);
     const wrap = el('div', 'tasks');
     other.forEach(m => wrap.appendChild(miscEl(m)));
@@ -830,7 +830,7 @@ function miscButton(){
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'misc-btn' + (MISC_ON ? ' on' : '');
-  b.textContent = MISC_ON ? 'ほか予定を隠す' : 'ほか予定を表示';
+  b.textContent = MISC_ON ? '他予定を隠す' : '他予定を表示';
   b.onclick = function(e){ e.stopPropagation(); setMiscOn(!MISC_ON); };
   wrap.appendChild(b);
   return wrap;
@@ -842,7 +842,7 @@ function miscEl(m){
   const card = el('div', 'task-card');
   card.innerHTML = '<div class="t-row1"><span class="t-name"></span></div>'
                  + '<div class="t-sub"></div>';
-  card.querySelector('.t-name').innerHTML = '<span class="kind">ほか予定</span>';
+  card.querySelector('.t-name').innerHTML = '<span class="kind">他予定</span>';
   card.querySelector('.t-name').appendChild(document.createTextNode(m.name));
   card.querySelector('.t-sub').textContent = miscTime(m);
   t.appendChild(card);
