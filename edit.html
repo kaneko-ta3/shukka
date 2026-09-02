@@ -505,7 +505,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v50";
+const BUILD = "v51";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -869,6 +869,16 @@ function renderCal(){
           segs.push({m:m, col:diff(wStart, m.date), span:1, contL:false, contR:false});
         });
     }
+    /* 段の割り当ては「左の列から順に詰める」前提なので、
+       タスクと他予定をまとめて列の順に並べ直します。
+       同じ列ならタスクが先、他予定が後です。
+       これをしないと、あとから足した他予定が空いている段を使えません */
+    segs.sort(function(a, b){
+      if (a.col !== b.col) return a.col - b.col;
+      const am = a.m ? 1 : 0, bm = b.m ? 1 : 0;
+      return am - bm;
+    });
+
     const laneEnd = [];
     segs.forEach(sg => {
       let lane = 0;
