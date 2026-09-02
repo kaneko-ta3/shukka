@@ -340,7 +340,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v49";
+const BUILD = "v50";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -660,7 +660,7 @@ function renderMonth(){
   const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
   /* 1日の曜日と日数から、必要な行数だけ出します（余分な行を作らない） */
   const ROWS = Math.ceil((first.getDay() + daysInMonth) / 7);
-  const MAXI = 3;                       /* 1マスに出す件数。残りは「ほか○件」 */
+  const MAXI = 4;                       /* 1マスに出す件数。残りは「+○件」 */
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
@@ -714,7 +714,8 @@ function renderMonth(){
     const rest = list.length + other.length - shown;
     if (rest > 0){
       const m = el('div', 'c-more');
-      m.textContent = "ほか" + rest + "件";
+      /* 「他予定」と読み間違えないように、あふれは + で示します */
+      m.textContent = "+" + rest + "件";
       box.appendChild(m);
     }
     cell.appendChild(box);

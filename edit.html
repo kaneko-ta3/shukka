@@ -99,6 +99,9 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .day.past{opacity:.75}
 .day.today{box-shadow:inset 0 0 0 2px var(--accent);}
 .day.drop-hint{background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent);}
+/* 段数の上限を超えて隠れたぶんの件数 */
+.day .more{position:absolute; right:3px; bottom:1px; font-size:9.5px; font-weight:600;
+  color:var(--muted); pointer-events:none;}
 .day-head{display:flex; align-items:center; justify-content:space-between; gap:4px; height:20px;}
 .dnum{font-size:13.5px; font-weight:500;}
 /* 休みの日は数字を暗い赤にして見分けやすくする */
@@ -502,7 +505,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v49";
+const BUILD = "v50";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -831,6 +834,11 @@ function renderSummary(){
 }
 
 function renderCal(){
+  /* スマホはマスの高さを揃えたいので、段数に上限を付けます。
+     マスが縦に伸びるとドラッグの狙いが安定しないためです。
+     PCはマウスなので、伸びても困らないので上限なし */
+  const LANE_CAP = (window.innerWidth <= 820) ? 4 : 999;
+
   const gridStart = anchor, gridEnd = anchorEnd();
   document.getElementById("mlabel").textContent =
     p(gridStart).getFullYear() + "年 " + md(gridStart) + " – " + md(gridEnd);
@@ -869,6 +877,15 @@ function renderCal(){
       sg.lane = lane;
     });
 
+    /* 上限を超えた段は描かず、その日の「+N件」として数えます */
+    const hidden = [0, 0, 0, 0, 0, 0, 0];
+    segs.forEach(sg => {
+      if (sg.lane < LANE_CAP) return;
+      sg.over = true;
+      for (let c = sg.col; c < sg.col + sg.span && c < 7; c++) hidden[c]++;
+    });
+    const lanesShown = Math.min(laneEnd.length, LANE_CAP);
+
     const week = document.createElement("div");
     week.className = "week";
     const daysEl = document.createElement("div");
@@ -881,11 +898,17 @@ function renderCal(){
       cell.className = "day" + (isOff(date) ? " off" : "")
         + (date < TODAY ? " past" : "") + (date === TODAY ? " today" : "");
       cell.dataset.date = date;
-      cell.style.setProperty("--lanes", laneEnd.length);
+      cell.style.setProperty("--lanes", lanesShown);
       const lv = n >= 6 ? " lv3" : (n >= 3 ? " lv2" : " lv1");
       cell.innerHTML = '<div class="day-head"><span class="dnum mono">'
         + (dt.getDate() === 1 ? (dt.getMonth()+1) + "/1" : dt.getDate())
         + '</span>' + (n ? '<span class="load mono' + lv + '">' + n + '件</span>' : "") + '</div>';
+      if (hidden[i]){
+        const mo = document.createElement("div");
+        mo.className = "more";
+        mo.textContent = "+" + hidden[i] + "件";
+        cell.appendChild(mo);
+      }
       daysEl.appendChild(cell);
     }
     week.appendChild(daysEl);
@@ -893,6 +916,7 @@ function renderCal(){
     const barsEl = document.createElement("div");
     barsEl.className = "week-bars";
     segs.forEach(sg => {
+      if (sg.over) return;                 // 上限を超えた段は描きません
       /* ほかの業務のバー。押しても動きません */
       if (sg.m){
         const m = sg.m;
@@ -1550,6 +1574,18 @@ document.getElementById("next").onclick = () => { anchor = add(anchor, 28); rend
 document.getElementById("today-btn").onclick = () => { anchor = homeAnchor(); render(); };
 document.getElementById("reload").onclick = () => load(false);
 document.getElementById("misc-btn").onclick = () => setMiscOn(!MISC_ON);
+
+/* 画面を回したり窓の幅を変えたとき、段数の上限が変わるので描き直します */
+let resizeTimer = 0;
+let lastW = window.innerWidth;
+window.addEventListener("resize", function(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){
+    if (Math.abs(window.innerWidth - lastW) < 30) return;
+    lastW = window.innerWidth;
+    if (!document.getElementById("app").hidden) render();
+  }, 200);
+});
 
 document.getElementById("undo").onclick = () => {
   const prev = history.pop();
