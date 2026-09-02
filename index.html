@@ -147,11 +147,14 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .counts{font-size:13px; color:var(--ink); margin:0 0 14px;}
 .counts b{color:var(--ink); font-size:15px;}
 .hint{
-  display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted);
-  background:var(--surface); border:1px dashed var(--line-strong);
-  border-radius:6px; padding:8px 12px; margin-bottom:12px;
+  display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);
+  background:var(--surface); border:1px solid var(--line-strong);
+  border-radius:6px; padding:9px 12px; margin-bottom:12px; line-height:1.45;
 }
-.hint .arrow{color:var(--accent); font-weight:700; letter-spacing:-.05em;}
+/* 左端に「未完了」。右の完了枠と対になるようにしています */
+.hint .lab{color:var(--ink); font-weight:700; white-space:nowrap; flex:none;}
+.hint .arrow{color:var(--accent); font-weight:700; font-size:15px; letter-spacing:-.05em; flex:none;}
+.hint .msg{flex:1 1 auto; min-width:0;}
 
 .section-label{font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--muted); margin:0 0 8px;}
 .tasks{display:flex; flex-direction:column; gap:9px;}
@@ -347,7 +350,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v60";
+const BUILD = "v61";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -775,8 +778,9 @@ function renderDay(){
   const left = el('div', 'col');
   if (undone.length){
     const hint = el('div', 'hint');
-    hint.innerHTML = '<span class="arrow">→→</span>'
-      + '<span>カードを右へスワイプすると、タスクが完了へ移動します</span>';
+    hint.innerHTML = '<span class="lab">未完了 ' + undone.length + '件</span>'
+      + '<span class="arrow">→→</span>'
+      + '<span class="msg">カードを右へスワイプすると、タスクが完了へ移動します</span>';
     left.appendChild(hint);
     const wrap = el('div', 'tasks');
     undone.forEach(j => wrap.appendChild(taskEl(j)));
