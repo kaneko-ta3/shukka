@@ -352,7 +352,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v63";
+const BUILD = "v64";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -806,7 +806,7 @@ function renderDay(){
     right.appendChild(wrap);
   } else {
     const e = el('div', 'empty-msg');
-    e.textContent = 'まだありません。\n左のカードを右へスワイプすると\nここに移ります。';
+    e.textContent = 'まだありません。\n未完了のカードを右へスワイプすると\nここに移ります。';
     e.style.whiteSpace = 'pre-line';
     right.appendChild(e);
   }
