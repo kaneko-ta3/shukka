@@ -14,7 +14,8 @@
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523; --weekend:#121817;
   --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 白の75%。真っ白より一段だけ落とす */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
-  --today-bg:#189683;   /* 本日の丸。白字が読める濃さにしています */
+  /* 本日の丸。件数バッジ（緑の塗り）と見分けるため、白丸に緑字にしています */
+  --today-bg:#FFFFFF; --today-ink:#0D6B5C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.35);
@@ -119,7 +120,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .c-head{display:flex; align-items:center; justify-content:space-between; gap:4px;}
 .c-num{font-size:15px; font-weight:600; white-space:nowrap;}
 .cell.today .c-num{
-  background:var(--today-bg); color:#FFFFFF; font-weight:700;
+  background:var(--today-bg); color:var(--today-ink); font-weight:700;
   border-radius:999px; padding:1px 7px; min-width:1.6em;
   display:inline-flex; align-items:center; justify-content:center;
 }
@@ -345,7 +346,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v55";
+const BUILD = "v56";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
