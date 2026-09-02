@@ -26,7 +26,9 @@
 /* 製造＝コバルト（青）、出荷＝レモン（黄）で見分ける。
    Googleカレンダーの色名に合わせています */
 :root{--mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
-      --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;}
+      --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
+      /* ほかの業務（Googleカレンダーの参考表示）＝ライラック */
+      --misc:#B3A7EA; --misc-ink:#1B1436; --misc-soft:#2A2447;}
 .kind{display:inline-block; font-size:.6em; font-weight:700; padding:2px 7px; border-radius:4px;
   margin-right:8px; vertical-align:middle; letter-spacing:.04em;
   background:var(--mfg); color:var(--mfg-ink);}
@@ -34,6 +36,8 @@
 .task.k-s .task-card{border-left:3px solid var(--ship);}
 .task.k-m .task-card{border-left:3px solid var(--mfg);}
 .c-item.k-s{background:var(--ship-soft); border-left-color:var(--ship);}
+/* ほかの業務。読むだけなので押せません */
+.c-item.misc{background:var(--misc-soft); border-left-color:var(--misc); color:var(--misc);}
 html,body{height:100%;}
 @supports (height: 100dvh){ html,body{height:100dvh;} }
 body{
@@ -71,6 +75,9 @@ button:hover{background:var(--surface-2)}
 button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 button.icon{padding:8px 12px; font-size:17px; min-width:42px;}
 button.ghost{background:transparent; border-color:transparent; color:var(--accent); font-weight:500;}
+/* ほかの業務の表示切り替え。押している状態が分かるようにします */
+button.misc-btn{border-color:var(--misc); color:var(--misc); background:transparent;}
+button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:700;}
 
 /* ---- 月表示 ---- */
 .nav{display:flex; align-items:center; gap:6px; margin-bottom:8px; flex:none;}
@@ -196,6 +203,12 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 .t-sku .lab{color:var(--danger); font-weight:700; display:block;}
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
 .t-skus .note{font-size:12px; color:var(--warn)}
+
+/* ほかの業務のカード。ボタンもスワイプも無い、読むだけのもの */
+.task.misc .task-card{border-left:3px solid var(--misc); cursor:default;}
+.task.misc .t-name{color:var(--misc)}
+.task.misc .kind{background:var(--misc); color:var(--misc-ink);}
+.task.misc .t-sub{color:var(--ink)}
 
 .t-actions{display:flex; justify-content:flex-end; margin-top:4px;}
 .t-actions button{font-size:13px; padding:6px 12px; min-height:34px;}
@@ -327,7 +340,7 @@ button.ghost{background:transparent; border-color:transparent; color:var(--accen
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v45";
+const BUILD = "v46";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -427,6 +440,25 @@ const isOff = s => {
 };
 
 let jobs = [];   /* サーバーからは tasks で来ます（製造・出荷の2種類） */
+let misc = [];   /* ほかの業務。Googleカレンダーの参考表示（読むだけ） */
+
+/* ほかの業務を出すかどうか。端末ごとに覚えます */
+const MISC_KEY = "shukka_misc_on";
+let MISC_ON = true;
+try { MISC_ON = (localStorage.getItem(MISC_KEY) !== "0"); } catch(e){}
+function setMiscOn(on){
+  MISC_ON = !!on;
+  try { localStorage.setItem(MISC_KEY, MISC_ON ? "1" : "0"); } catch(e){}
+  render();
+}
+function miscOn(date){
+  if (!MISC_ON) return [];
+  return misc.filter(function(m){ return m.date === date; });
+}
+function miscTime(m){
+  if (m.allDay || !m.from) return "終日";
+  return m.from + (m.to ? "〜" + m.to : "");
+}
 let TODAY = null;
 let view = null;          /* Date: 表示中の月 */
 let openDate = null;      /* 'yyyy-MM-dd' or null（null なら月表示） */
@@ -461,6 +493,7 @@ function dropSnaps(){
 
 function applyBoard(b){
   jobs = b.tasks || [];
+  misc = b.misc || [];
   HOLIDAYS = {};
   (b.holidays || []).forEach(function(d){ HOLIDAYS[d] = true; });
   TODAY = b.today;
@@ -598,6 +631,7 @@ function renderMonth(){
     '<span class="label mono" id="mlabel"></span>' +
     '<button class="icon" id="next" aria-label="次の月">›</button>' +
     '<button id="tbtn">今日</button><span class="sp"></span>' +
+    '<button type="button" class="misc-btn" id="mbtn"></button>' +
     '<button class="ghost" id="rel">更新</button>';
   app.appendChild(nav);
   nav.querySelector("#mlabel").textContent = view.getFullYear() + "年" + (view.getMonth()+1) + "月";
@@ -605,6 +639,10 @@ function renderMonth(){
   nav.querySelector("#next").onclick = () => { view = new Date(view.getFullYear(), view.getMonth()+1, 1); render(); load(true); };
   nav.querySelector("#tbtn").onclick = () => { view = p(TODAY); render(); load(true); };
   nav.querySelector("#rel").onclick = () => load(false);
+  const mb = nav.querySelector("#mbtn");
+  mb.classList.toggle('on', MISC_ON);
+  mb.textContent = MISC_ON ? 'ほか 表示中' : 'ほか 非表示';
+  mb.onclick = () => setMiscOn(!MISC_ON);
 
   const cal = el('div', 'cal');
   const dow = el('div', 'dow');
@@ -627,20 +665,21 @@ function renderMonth(){
     const date = add(gridStart, i);
     const dt = p(date);
     const w = dt.getDay();
-    const other = (dt.getMonth() !== view.getMonth());
+    const otherMonth = (dt.getMonth() !== view.getMonth());
 
     const list = jobsOn(date);
+    const other = miscOn(date);
     const undone = list.filter(j => !j.done).length;
 
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'cell'
       + (isOff(date) ? ' off' : '')
-      + (other ? ' other' : '')
+      + (otherMonth ? ' other' : '')
       + (date === TODAY ? ' today' : '')
-      + (list.length ? '' : ' empty');
+      + (list.length + other.length ? '' : ' empty');
     cell.dataset.date = date;
-    if (!list.length) cell.disabled = true;
+    if (!list.length && !other.length) cell.disabled = true;
 
     let html = '<div class="c-head"><span class="c-num mono">'
              + (dt.getDate() === 1 ? (dt.getMonth()+1) + '/1' : dt.getDate()) + '</span>';
@@ -652,6 +691,9 @@ function renderMonth(){
     cell.innerHTML = html;
 
     const box = el('div', 'c-list');
+    /* タスクを先に出して、ほかの業務は一番下に回します。
+       これで出荷や製造が押し出されません */
+    let shown = 0;
     list.slice(0, MAXI).forEach(j => {
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
       /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
@@ -659,10 +701,19 @@ function renderMonth(){
       it.textContent = j.name;
       it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name;
       box.appendChild(it);
+      shown++;
     });
-    if (list.length > MAXI){
+    other.slice(0, Math.max(0, MAXI - shown)).forEach(m => {
+      const it = el('div', 'c-item misc');
+      it.textContent = (m.from ? m.from + ' ' : '') + m.name;
+      it.title = miscTime(m) + '　' + m.name;
+      box.appendChild(it);
+      shown++;
+    });
+    const rest = list.length + other.length - shown;
+    if (rest > 0){
       const m = el('div', 'c-more');
-      m.textContent = "ほか" + (list.length - MAXI) + "件";
+      m.textContent = "ほか" + rest + "件";
       box.appendChild(m);
     }
     cell.appendChild(box);
@@ -693,13 +744,14 @@ function renderDay(){
   counts.innerHTML = '未完了 <b>' + undone.length + '</b> 件　/　完了 <b>' + done.length + '</b> 件';
   app.appendChild(counts);
 
-  if (!list.length){
+  if (!list.length && !other.length){
     const e = el('div', 'empty-msg');
     e.textContent = 'この日の予定はありません。';
     app.appendChild(e);
     return;
   }
 
+  const other = miscOn(openDate);
   const cols = el('div', 'day-cols');
 
   /* 左：これから作業するもの */
@@ -737,6 +789,44 @@ function renderDay(){
   cols.appendChild(right);
 
   app.appendChild(cols);
+
+  /* いちばん下にほかの業務。読むだけです */
+  if (other.length){
+    const lab = el('div', 'section-label');
+    lab.style.marginTop = '14px';
+    lab.textContent = 'ほかの業務　' + other.length + '件';
+    app.appendChild(lab);
+    const wrap = el('div', 'tasks');
+    other.forEach(m => wrap.appendChild(miscEl(m)));
+    app.appendChild(wrap);
+  }
+  app.appendChild(miscButton());
+}
+
+/* ほかの業務を出す・隠すボタン。月表示でも日表示でも同じ設定を切り替えます */
+function miscButton(){
+  const wrap = el('div', '');
+  wrap.style.cssText = 'display:flex; justify-content:center; margin-top:16px;';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'misc-btn' + (MISC_ON ? ' on' : '');
+  b.textContent = MISC_ON ? 'ほかの業務を隠す' : 'ほかの業務を表示';
+  b.onclick = function(e){ e.stopPropagation(); setMiscOn(!MISC_ON); };
+  wrap.appendChild(b);
+  return wrap;
+}
+
+/* ほかの業務のカード。読むだけです */
+function miscEl(m){
+  const t = el('div', 'task misc');
+  const card = el('div', 'task-card');
+  card.innerHTML = '<div class="t-row1"><span class="t-name"></span></div>'
+                 + '<div class="t-sub"></div>';
+  card.querySelector('.t-name').innerHTML = '<span class="kind">ほか</span>';
+  card.querySelector('.t-name').appendChild(document.createTextNode(m.name));
+  card.querySelector('.t-sub').textContent = miscTime(m);
+  t.appendChild(card);
+  return t;
 }
 
 function taskEl(j){
