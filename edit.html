@@ -85,8 +85,15 @@ button:disabled:hover{background:var(--surface); border-color:var(--line);}
 body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 
 .app{display:grid; gap:9px; align-items:stretch; flex:1 1 auto; min-height:0;
-  grid-template-columns:238px 238px minmax(0,1fr) 254px 206px;
+  grid-template-columns:var(--w-pm,238px) var(--w-ps,238px) minmax(0,1fr)
+                        var(--w-done,254px) var(--w-log,206px);
   grid-template-areas:"pm ps cal done log";}
+/* 畳んだ枠は細い帯だけ残します。4つ独立して畳めるので、
+   組み合わせを並べずに済むよう列の幅を変数にしています */
+body.fold-pm{--w-pm:28px}
+body.fold-ps{--w-ps:28px}
+body.fold-done{--w-done:28px}
+body.fold-log{--w-log:28px}
 #pool-m{grid-area:pm} #pool-s{grid-area:ps}
 .cal{grid-area:cal} #done{grid-area:done} .log{grid-area:log}
 
@@ -187,7 +194,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
 .pane{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   display:flex; flex-direction:column; min-height:0; overflow:hidden;}
-.pane-head{padding:8px 10px; border-bottom:1px solid var(--line);}
+.pane-head{padding:8px 30px 8px 10px; border-bottom:1px solid var(--line);}
 .pane-head h2{margin:0; font-size:12.5px; font-weight:700; display:flex; align-items:baseline; gap:6px;
   word-break:keep-all; overflow-wrap:normal;}
 .pane-head h2 span{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink); font-weight:500;}
@@ -195,6 +202,31 @@ body.resizing{cursor:col-resize; user-select:none;}
 .pane-list{overflow-y:auto; padding:7px; display:flex; flex-direction:column; gap:6px;
   flex:1 1 auto; min-height:60px;}
 .pane.drop-hint{box-shadow:inset 0 0 0 2px var(--accent);}
+
+/* ---- 枠を畳む ---- */
+/* 見出しの右端の「‹」。押すと細い帯になります */
+.fold{position:absolute; top:5px; right:5px; z-index:2;
+  min-height:0; padding:1px 6px; font-size:12px; line-height:1.3;
+  background:transparent; border-color:transparent; color:var(--muted);}
+.fold:hover{background:var(--surface-2); color:var(--ink);}
+.pane, .log{position:relative}
+/* 畳んだときに出る縦の帯。文字を縦に流します */
+.spine{display:none}
+.folded{cursor:pointer}
+.folded > .pane-head, .folded > .pane-list, .folded > h3, .folded > ul{display:none}
+.folded > .fold{display:none}
+.folded > .spine{
+  display:flex; align-items:center; justify-content:flex-start; gap:8px;
+  writing-mode:vertical-rl; height:100%; width:100%;
+  padding:9px 0; font-size:11.5px; font-weight:700; letter-spacing:.04em;
+  color:var(--muted); user-select:none; overflow:hidden;
+}
+.folded:hover > .spine{color:var(--ink)}
+.folded > .spine .n{font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:11px;}
+.folded > .spine .mark{font-weight:700; color:var(--line-strong);}
+#pool-m.folded > .spine{color:var(--mfg)}
+#pool-s.folded > .spine{color:var(--ship)}
+.log.folded{padding:0}
 #pool-m .pane-head h2{color:var(--mfg)}
 #pool-s .pane-head h2{color:var(--ship)}
 #done.drop-hint{background:var(--accent-soft)}
@@ -248,7 +280,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 
 .log{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   padding:8px 9px; display:flex; flex-direction:column; min-height:0; overflow:hidden;}
-.log h3{margin:0 0 6px; font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--ink); flex:none;}
+.log h3{margin:0 30px 6px 0; font-size:11px; letter-spacing:.12em; font-weight:600; color:var(--ink); flex:none;}
 .log ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
   flex:1 1 auto; min-height:0; overflow-y:auto;}
 .log li{font-size:11.5px; color:var(--muted); display:grid; gap:1px; font-family:"IBM Plex Mono",monospace;
@@ -339,10 +371,26 @@ body.resizing{cursor:col-resize; user-select:none;}
 }
 
 @media (max-width:1500px){
-  .app{grid-template-columns:210px 210px minmax(0,1fr) 224px;
-       grid-template-rows:1fr auto;
+  .app{grid-template-columns:var(--w-pm,210px) var(--w-ps,210px) minmax(0,1fr) var(--w-r,224px);
+       grid-template-rows:var(--h-done,1fr) var(--h-log,auto);
        grid-template-areas:"pm ps cal done" "pm ps cal log";}
   .log{max-height:140px}
+
+  /* この幅では完了とログが縦に並んでいます。
+     片方だけ畳んだときは、その枠の高さだけを帯にします（横書き） */
+  body.fold-done{--h-done:30px}
+  body.fold-log{--h-log:30px}
+  #done.folded > .spine, .log.folded > .spine{
+    writing-mode:horizontal-tb; height:30px; width:100%;
+    padding:0 10px; justify-content:flex-start;}
+
+  /* 両方畳んだときだけ、列ごと細くしてカレンダーを広げます。
+     このときは帯を縦書きに戻します */
+  body.fold-done.fold-log{--w-r:30px; --h-done:1fr; --h-log:1fr;}
+  body.fold-done.fold-log #done.folded > .spine,
+  body.fold-done.fold-log .log.folded > .spine{
+    writing-mode:vertical-rl; height:100%; padding:9px 0;}
+  body.fold-done.fold-log .log{max-height:none}
 }
 
 /* 見出しは飾りなので、幅が足りなくなったら先に省きます。
@@ -363,6 +411,13 @@ body.resizing{cursor:col-resize; user-select:none;}
   .cal{overflow:visible; max-height:none; min-height:520px;}
   #pool-m .pane-list, #pool-s .pane-list{max-height:300px}
   #done .pane-list{max-height:200px}
+  /* 縦に積む幅では枠を畳む意味がないので、機能ごと隠します */
+  .fold, .spine{display:none !important}
+  .pane-head{padding-right:10px}
+  .log h3{margin-right:0}
+  .folded > .pane-head, .folded > .pane-list,
+  .folded > h3, .folded > ul{display:flex !important}
+  .folded > .pane-head, .folded > h3{display:block !important}
   .toolbar{grid-template-columns:minmax(0,1fr); gap:6px;}
   .tb-right{justify-content:flex-start}
   .summary{flex-wrap:wrap}
@@ -499,7 +554,9 @@ body.resizing{cursor:col-resize; user-select:none;}
   </div>
 
   <div class="app" id="app" hidden>
-    <aside class="pane" id="pool-m">
+    <aside class="pane" id="pool-m" data-fold="pm">
+      <button type="button" class="fold" title="この枠を畳んでカレンダーを広げる">‹</button>
+      <div class="spine"><span class="mark">›</span>製造 未スケジュール <span class="n" id="pm-count2">–</span></div>
       <div class="pane-head">
         <h2>製造 未スケジュール <span id="pm-count">–</span></h2>
         <p>製造日が空のもの。期限は出荷日（未定なら納品日）。</p>
@@ -507,7 +564,9 @@ body.resizing{cursor:col-resize; user-select:none;}
       <div class="pane-list" id="pm-list"></div>
     </aside>
 
-    <aside class="pane" id="pool-s">
+    <aside class="pane" id="pool-s" data-fold="ps">
+      <button type="button" class="fold" title="この枠を畳んでカレンダーを広げる">‹</button>
+      <div class="spine"><span class="mark">›</span>出荷 未スケジュール <span class="n" id="ps-count2">–</span></div>
       <div class="pane-head">
         <h2>出荷 未スケジュール <span id="ps-count">–</span></h2>
         <p>出荷日が空のもの。期限は納品日。</p>
@@ -522,7 +581,9 @@ body.resizing{cursor:col-resize; user-select:none;}
       <div id="weeks"></div>
     </div>
 
-    <aside class="pane" id="done">
+    <aside class="pane" id="done" data-fold="done">
+      <button type="button" class="fold" title="この枠を畳んでカレンダーを広げる">›</button>
+      <div class="spine"><span class="mark">‹</span>完了 <span class="n" id="done-count2">–</span></div>
       <div class="pane-head">
         <h2>完了 <span id="done-count">–</span></h2>
         <p>ここへドラッグすると完了。戻すと取り消せます。</p>
@@ -530,7 +591,9 @@ body.resizing{cursor:col-resize; user-select:none;}
       <div class="pane-list" id="done-list"></div>
     </aside>
 
-    <div class="log">
+    <div class="log" data-fold="log">
+      <button type="button" class="fold" title="この枠を畳んでカレンダーを広げる">›</button>
+      <div class="spine"><span class="mark">‹</span>反映ログ</div>
       <h3>反映ログ</h3>
       <ul id="loglist"><li class="none">操作するとシートとカレンダーへの書き込み結果がここに出ます。</li></ul>
     </div>
@@ -542,7 +605,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v67";
+const BUILD = "v68";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -874,6 +937,8 @@ function renderSummary(){
   document.getElementById("st-late").className = "stat" + (late ? " is-danger" : "");
   document.getElementById("pm-count").textContent = pm.length + "件";
   document.getElementById("ps-count").textContent = ps.length + "件";
+  document.getElementById("pm-count2").textContent = pm.length + "件";
+  document.getElementById("ps-count2").textContent = ps.length + "件";
 }
 
 function renderCal(){
@@ -1133,6 +1198,7 @@ function renderDone(){
     return b.row - a.row;
   });
   document.getElementById("done-count").textContent = done.length + "件";
+  document.getElementById("done-count2").textContent = done.length + "件";
   list.innerHTML = "";
   if (!done.length){
     list.innerHTML = '<div class="empty">まだありません。<br>カレンダーの案件をここへドラッグすると完了になります。</div>';
@@ -1631,6 +1697,50 @@ document.addEventListener("pointerup", () => {
     saveDays(t, days0);
   } else render();
 });
+
+/* ================= 枠を畳む =================
+ *
+ * 未スケジュール2枠・完了・ログを、それぞれ別々に畳めます。
+ * 畳むと細い帯になり、その帯を押すと戻ります。
+ * どれを畳んでいるかは端末に覚えるので、次に開いたときも同じ形です。
+ *
+ * 畳んだ帯もドラッグの受け皿としては生きています（幅は狭くなります）。
+ */
+const FOLD_KEY = "shukka_fold";
+let FOLDED = {};
+try {
+  const raw = localStorage.getItem(FOLD_KEY) || "";
+  raw.split(",").filter(String).forEach(function(n){ FOLDED[n] = true; });
+} catch(e){}
+
+function applyFold(){
+  ["pm", "ps", "done", "log"].forEach(function(name){
+    const on = !!FOLDED[name];
+    document.body.classList.toggle("fold-" + name, on);
+    const box = document.querySelector('[data-fold="' + name + '"]');
+    if (box) box.classList.toggle("folded", on);
+  });
+}
+
+function setFold(name, on){
+  if (on) FOLDED[name] = true; else delete FOLDED[name];
+  try { localStorage.setItem(FOLD_KEY, Object.keys(FOLDED).join(",")); } catch(e){}
+  applyFold();
+}
+
+document.querySelectorAll('[data-fold]').forEach(function(box){
+  const name = box.dataset.fold;
+  const btn = box.querySelector(".fold");
+  if (btn) btn.onclick = function(e){ e.stopPropagation(); setFold(name, true); };
+  /* 畳んでいるときは、帯のどこを押しても戻ります */
+  box.addEventListener("click", function(e){
+    if (!box.classList.contains("folded")) return;
+    e.stopPropagation();
+    setFold(name, false);
+  });
+});
+applyFold();
+
 
 /* ================= ツールバー ================= */
 document.getElementById("prev").onclick = () => { anchor = add(anchor, -28); render(); };
