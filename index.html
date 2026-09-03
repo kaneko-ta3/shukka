@@ -55,6 +55,9 @@ body{
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums;}
 .wrap{max-width:1100px; margin:0 auto; padding:12px 12px 10px;
   height:100%; display:flex; flex-direction:column; min-height:0;}
+/* 月表示だけ横幅いっぱいに広げます。
+   日表示はカードを読む画面なので、横に伸びすぎないよう今の幅のままです */
+body.month .wrap{max-width:none}
 
 /* 月表示は画面ぴったり。日表示だけ中身をスクロールさせます */
 #app{flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
@@ -98,7 +101,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .dow div{padding:6px 4px; font-size:11.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-align:center; min-width:0;}
 .dow .sun{color:var(--danger)} .dow .sat{color:var(--sat)}
 
-/* 残りの高さを行数で割り切る。スクロールは出しません */
+/* 残りの高さを行数で割り切る。スクロールは出しません（スマホ） */
 .grid{flex:1 1 auto; min-height:0; grid-auto-rows:minmax(0, 1fr);}
 
 .cell{
@@ -144,6 +147,17 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 }
 .c-item.done{background:var(--surface-2); color:var(--muted); text-decoration:line-through;}
 .c-more{font-size:10.5px; color:var(--muted); padding-left:3px;}
+
+/* PCは、その日のタスクが全部見えるようにマスを縦に伸ばします。
+   画面に入りきらないぶんはカレンダーの中を縦スクロールします。
+   スマホは1画面に収める今の形のままです（マスが伸びると押しづらいため） */
+@media (min-width:761px){
+  .cal{overflow-y:auto; overflow-x:hidden;}
+  .grid{flex:0 0 auto; min-height:100%; grid-auto-rows:minmax(118px, auto);}
+  .dow{position:sticky; top:0; z-index:2;}
+  .cell{overflow:visible}
+  .c-list{overflow:visible; min-height:auto;}
+}
 
 /* ---- 日表示 ---- */
 .day-head{display:flex; align-items:baseline; gap:12px; margin-bottom:4px;}
@@ -359,7 +373,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v66";
+const BUILD = "v67";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -628,11 +642,24 @@ function jobsOn(date){
   });
 }
 
+/* 窓の幅や画面の向きが変わると、1マスに出せる件数が変わるので描き直します */
+let resizeTimer = 0;
+let lastW = window.innerWidth;
+window.addEventListener('resize', function(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){
+    if (Math.abs(window.innerWidth - lastW) < 30) return;
+    lastW = window.innerWidth;
+    if (!openDate) render();
+  }, 200);
+});
+
 /* ---------- 描画 ---------- */
 function render(){
   const y = app.scrollTop;
   app.innerHTML = "";
   app.className = openDate ? "view-day" : "view-month";
+  document.body.classList.toggle("month", !openDate);
   if (openDate) renderDay(); else renderMonth();
   app.scrollTop = openDate ? y : 0;
 }
@@ -678,7 +705,9 @@ function renderMonth(){
   const daysInMonth = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
   /* 1日の曜日と日数から、必要な行数だけ出します（余分な行を作らない） */
   const ROWS = Math.ceil((first.getDay() + daysInMonth) / 7);
-  const MAXI = 4;                       /* 1マスに出す件数。残りは「+○件」 */
+  /* 1マスに出す件数。残りは「+○件」。
+     PCはマスが伸びるので多めに、スマホは1画面に収めるため4件までです */
+  const MAXI = (window.innerWidth <= 760) ? 4 : 10;
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
