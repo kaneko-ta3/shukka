@@ -24,6 +24,8 @@
   --misc:#D0C7F4; --misc-ink:#221A47; --misc-soft:#2E2752;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
+  /* 曜日の見出しと日付の数字。日曜は明るい赤と濃い赤、土曜は明るい青と濃い青 */
+  --sat:#5DB1E5; --sat-ink:#5C8EAD;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.3);
   --radius:6px;
 }
@@ -49,7 +51,9 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
 
-.toolbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px;
+/* 右のボタン列は縮められると文字が切れるので、必要な幅を先に取らせます。
+   余った幅は左（見出しと月送り）が受け持ちます */
+.toolbar{display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:10px;
   padding:6px 9px; margin-bottom:9px;
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); flex:none;}
 .tb-left{display:flex; align-items:center; gap:10px; min-width:0;}
@@ -57,6 +61,10 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .month{display:flex; align-items:center; gap:3px;}
 .month .label{font-size:15px; font-weight:700; min-width:158px; text-align:center; white-space:nowrap;}
 .state{font-size:12.5px; color:var(--muted);}
+/* 上のバーは折り返さず、幅が足りないときは状態表示だけを縮めます */
+.tb-right{flex-wrap:nowrap}
+.tb-right .state{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tb-right button{flex:none}
 .state.busy{color:var(--accent); font-weight:500;}
 .state.err{color:var(--danger); font-weight:500;}
 button{font-family:inherit; font-size:13.5px; color:var(--ink); background:var(--surface);
@@ -89,10 +97,14 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
   background:var(--surface-2); position:sticky; top:0; z-index:3;}
 .dow div{padding:5px 8px; font-size:12px; font-weight:500; letter-spacing:.1em; color:var(--ink); border-right:1px solid var(--line-strong);}
 .dow div:last-child{border-right:0}
-.dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
+.dow .sun{color:var(--danger)} .dow .sat{color:var(--sat)}
 
+/* 週の高さは「その週でいちばん予定が多い日」で決まります。
+   flex で縮められると、バーを載せている枠（.week-bars）だけが短くなって、
+   バーが次の週にはみ出していました。縮めない指定にして、
+   入りきらないぶんはカレンダー自体を縦スクロールさせます */
 .week{position:relative; border-bottom:1px solid var(--line-strong);
-  flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
+  flex:1 0 auto; display:flex; flex-direction:column;}
 .week:last-child{border-bottom:0}
 .week-days{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); flex:1 1 auto;}
 .day{border-right:1px solid var(--line-strong); min-height:max(112px, calc(30px + var(--lanes,0) * 25px + 14px));
@@ -108,15 +120,18 @@ body.stale .app{opacity:.55; pointer-events:none; filter:saturate(.7);}
 .day .more{position:absolute; right:4px; bottom:3px; font-size:9.5px; font-weight:600;
   color:var(--muted); pointer-events:none;}
 .day-head{display:flex; align-items:center; justify-content:space-between; gap:4px; height:20px;}
-.dnum{font-size:13.5px; font-weight:500;}
-/* 休みの日は数字を暗い赤にして見分けやすくする */
+.dnum{font-size:13.5px; font-weight:500; white-space:nowrap; flex:none;}
+/* 休みの日は数字を暗い赤にして見分けやすくする。
+   土曜だけは見出しの「土」に合わせて青にします（7列ぶんの最後が土曜） */
 .day.off .dnum{color:var(--off-ink); font-weight:700;}
+.day.off:nth-child(7n):not(.today) .dnum{color:var(--sat-ink)}
 .day.today .dnum{
   background:var(--today-bg); color:var(--today-ink); font-weight:700;
   border-radius:999px; padding:0 7px; min-width:1.6em;
   display:inline-flex; align-items:center; justify-content:center;
 }
-.load{font-size:11px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);}
+.load{font-size:11px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);
+  white-space:nowrap; flex:none;}
 .load.lv2{background:var(--accent-soft); color:var(--accent); font-weight:500;}
 .load.lv3{background:var(--accent); color:var(--accent-ink); font-weight:600;}
 
@@ -330,6 +345,12 @@ body.resizing{cursor:col-resize; user-select:none;}
   .log{max-height:140px}
 }
 
+/* 見出しは飾りなので、幅が足りなくなったら先に省きます。
+   月送りとボタンが1行に収まるほうが大事です */
+@media (max-width:1350px){
+  .tb-left h1{display:none}
+}
+
 /* 幅が狭いときは、1画面に押し込まずに縦スクロールさせます。
    未配置の一覧は左、カレンダーは右のまま並べます */
 @media (max-width:1150px){
@@ -360,9 +381,7 @@ body.resizing{cursor:col-resize; user-select:none;}
   /* 狭い画面ではボタンの文字を短くして、1行に収めます */
   button .lg{display:none}
   button .sm{display:inline}
-  .tb-right{gap:4px; flex-wrap:nowrap;}
-  .tb-right .state{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .tb-right button{flex:none}
+  .tb-right{gap:4px}
 
   /* 上のバーは高さを半分くらいまで詰めます。空いた分はカレンダーが使います */
   .wrap{padding:6px 8px 8px}
@@ -379,15 +398,24 @@ body.resizing{cursor:col-resize; user-select:none;}
      日付の数字が入っている帯（.day-head）が、その日を開くためのタップ場所です。
      タスクが詰まっているとここが唯一の余白になるので、広めに取っています */
   .dow div{font-size:9.5px; padding:4px 5px;}
-  .day{padding:4px 4px 0; min-height:max(92px, calc(34px + var(--lanes,0) * 18px + 20px));}
+  .day{padding:4px 2px 0; min-height:max(92px, calc(34px + var(--lanes,0) * 18px + 20px));}
   .day-head{height:26px}
   .dnum{font-size:12.5px; font-weight:600;}
   .load{font-size:9px; padding:0 4px;}
+  /* マスが50px台しかないので、日付と件数が縦に並ばないよう中身を詰めます。
+     1日だけは「9/1」で3文字になるので、その日の数字だけ少し小さくします */
+  .day-head{gap:2px; overflow:hidden;}
+  .dnum.wide{font-size:10.5px}
+  .load{font-size:8.5px; padding:0 3px;}
+  .day.today .dnum{padding:0 4px; min-width:1.3em;}
+  .day.today .dnum.wide{padding:0 3px}
   .bar{top:calc(31px + var(--lane) * 18px); height:16px; font-size:9px;
        gap:3px; padding:0 4px; left:calc(var(--col) * (100% / 7) + 2px);
        width:calc(var(--span) * (100% / 7) - 4px);}
   /* 種別は色で分かるので、狭いマスでは「造」「出」の字を出しません。
      その分を案件名に回します */
+  /* 「…」に1文字ぶん取られるのがもったいないので、狭い画面では出しません */
+  .bar .nm{text-overflow:clip}
   .bar .tag{display:none}
   .bar .code{display:none}
   .bar{gap:0}
@@ -437,9 +465,9 @@ body.resizing{cursor:col-resize; user-select:none;}
 
     <div class="tb-right">
       <span class="state" id="state">読み込み中…</span>
-      <button type="button" class="misc-btn" id="misc-btn" title="Googleカレンダーの予定を出すかどうか">他予定</button>
+      <button type="button" class="misc-btn" id="misc-btn" title="Googleカレンダーの予定を出すかどうか">他 隠す</button>
       <button id="reload"><span class="lg">再読み込み</span><span class="sm">更新</span></button>
-      <button id="auto"><span class="lg">出荷日 自動配置</span><span class="sm">自動配置</span></button>
+      <button id="auto">出荷日 自動配置</button>
       <button id="undo" disabled><span class="lg">元に戻す</span><span class="sm">戻す</span></button>
     </div>
   </div>
@@ -514,7 +542,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v64";
+const BUILD = "v66";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -635,9 +663,10 @@ function miscTime(m){
 function syncMiscButton(){
   const b = document.getElementById("misc-btn");
   if (!b) return;
-  /* 文字は変えず、塗りで「出している状態」を示します。
-     ボタンの幅が変わらないので、上のバーが折り返しません */
+  /* 押すとどうなるかを書きます。どちらも4文字なので幅は変わらず、
+     上のバーが折り返しません */
   b.classList.toggle("on", MISC_ON);
+  b.textContent = MISC_ON ? "他 隠す" : "他 表示";
   b.title = MISC_ON ? "他予定を隠す" : "他予定を表示する";
 }
 let TODAY = null;
@@ -665,9 +694,14 @@ function pushHistory(){
 }
 
 /* ================= 通信状態 ================= */
+/* 狭い画面用の短い言い方。上のバーが1行に収まらなくなるためです */
+const STATE_SHORT = {"前回の内容を表示中／最新を取得しています…": "更新中…"};
 function setState(text, cls){
   const el = document.getElementById("state");
-  el.textContent = text + "　" + BUILD;
+  const t = (window.innerWidth <= 820)
+    ? (STATE_SHORT[text] || text.replace("最終更新 ", ""))
+    : text;
+  el.textContent = t + "　" + BUILD;
   el.className = "state" + (cls ? " " + cls : "");
 }
 function busy(on){
@@ -919,9 +953,12 @@ function renderCal(){
       cell.dataset.date = date;
       cell.style.setProperty("--lanes", lanesShown);
       const lv = n >= 6 ? " lv3" : (n >= 3 ? " lv2" : " lv1");
-      cell.innerHTML = '<div class="day-head"><span class="dnum mono">'
+      cell.innerHTML = '<div class="day-head"><span class="dnum mono'
+        + (dt.getDate() === 1 ? ' wide' : '') + '">'
         + (dt.getDate() === 1 ? (dt.getMonth()+1) + "/1" : dt.getDate())
-        + '</span>' + (n ? '<span class="load mono' + lv + '">' + n + '件</span>' : "") + '</div>';
+        + '</span>'
+        + (n ? '<span class="load mono' + lv + '">' + n + '<span class="u">件</span></span>' : "")
+        + '</div>';
       if (hidden[i]){
         const mo = document.createElement("div");
         mo.className = "more";
@@ -1371,7 +1408,10 @@ function renderDayView(){
   const ul = document.getElementById("dv-list");
   ul.innerHTML = "";
   if (!list.length && !other.length){
+    /* 他予定を隠しているだけの日もここに来ます。
+       表示に戻すボタンまで消えてしまわないよう、下のボタンは必ず出します */
     ul.innerHTML = '<div class="dv-empty">この日の予定はありません。</div>';
+    ul.appendChild(miscToggle());
     return;
   }
   list.forEach(t => ul.appendChild(dayRow(t)));
@@ -1388,6 +1428,11 @@ function renderDayView(){
   });
 
   /* 表示の切り替えはここからもできます */
+  ul.appendChild(miscToggle());
+}
+
+/* 他予定を出す・隠すボタン。上のバーのものと同じ設定を切り替えます */
+function miscToggle(){
   const wrap = document.createElement("div");
   wrap.style.cssText = "display:flex; justify-content:center; margin-top:6px;";
   const b = document.createElement("button");
@@ -1396,7 +1441,7 @@ function renderDayView(){
   b.textContent = MISC_ON ? "他予定を隠す" : "他予定を表示";
   b.onclick = function(e){ e.stopPropagation(); setMiscOn(!MISC_ON); };
   wrap.appendChild(b);
-  ul.appendChild(wrap);
+  return wrap;
 }
 
 document.getElementById("dv-close").onclick = closeDay;

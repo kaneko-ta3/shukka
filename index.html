@@ -19,6 +19,8 @@
   --today-bg:#FFFFFF; --today-ink:#131A18;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --off-ink:#A85F57; --ago-ink:#8CBBD4;
+  /* 曜日の見出しと日付の数字。日曜は明るい赤と濃い赤、土曜は明るい青と濃い青 */
+  --sat:#5DB1E5; --sat-ink:#5C8EAD;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.35);
   --radius:8px;
 }
@@ -94,7 +96,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .dow, .grid{display:grid; grid-template-columns:0.62fr repeat(5, 1fr) 0.62fr;}
 .dow{background:var(--surface-2); border-bottom:1px solid var(--line-strong); flex:none;}
 .dow div{padding:6px 4px; font-size:11.5px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-align:center; min-width:0;}
-.dow .sun{color:var(--danger)} .dow .sat{color:var(--accent)}
+.dow .sun{color:var(--danger)} .dow .sat{color:var(--sat)}
 
 /* 残りの高さを行数で割り切る。スクロールは出しません */
 .grid{flex:1 1 auto; min-height:0; grid-auto-rows:minmax(0, 1fr);}
@@ -125,7 +127,10 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
   border-radius:999px; padding:0 7px; min-width:1.6em; line-height:1.5;
   display:inline-flex; align-items:center; justify-content:center;
 }
-.cell.off .c-num{color:var(--off-ink); font-weight:700;}
+/* 休みの日の数字。土曜だけは見出しの「土」に合わせて青にします（7列ぶんの最後が土曜）。
+   本日の白い丸の中は、丸の中の文字色をそのまま使います */
+.cell.off:not(.today) .c-num{color:var(--off-ink); font-weight:700;}
+.cell.off:nth-child(7n):not(.today) .c-num{color:var(--sat-ink)}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
   background:var(--accent); color:var(--accent-ink); white-space:nowrap; flex:none;}
 .c-count.all-done{background:var(--surface-2); color:var(--muted);}
@@ -308,6 +313,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 }
 /* スマホ縦持ち：幅が狭いので、枠まわりをもう一段小さくします */
 @media (max-width:560px){
+  /* 「…」に1文字ぶん取られるのがもったいないので、狭い画面では出しません */
+  .c-item{text-overflow:clip}
   /* 案内文は読点で改行します。中途半端な位置で折り返すと読みにくいので */
   .hint .p1{display:block}
   .c-item{font-size:9.5px; padding:2px 3px; border-left-width:2px;}
@@ -352,7 +359,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v64";
+const BUILD = "v66";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -651,7 +658,8 @@ function renderMonth(){
   nav.querySelector("#rel").onclick = () => load(false);
   const mb = nav.querySelector("#mbtn");
   mb.classList.toggle('on', MISC_ON);
-  mb.textContent = '他予定';
+  /* 押すとどうなるかを書きます。どちらも4文字なので幅は変わりません */
+  mb.textContent = MISC_ON ? '他 隠す' : '他 表示';
   mb.title = MISC_ON ? '他予定を隠す' : '他予定を表示する';
   mb.onclick = () => setMiscOn(!MISC_ON);
 
@@ -761,6 +769,9 @@ function renderDay(){
     const e = el('div', 'empty-msg');
     e.textContent = 'この日の予定はありません。';
     app.appendChild(e);
+    /* 他予定を隠しているだけの日もここに来ます。
+       表示に戻すボタンまで消えてしまわないよう、下のボタンは必ず出します */
+    app.appendChild(miscSection(other));
     return;
   }
 
