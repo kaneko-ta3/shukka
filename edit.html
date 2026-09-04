@@ -358,6 +358,19 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-sku.busy{opacity:.5}
 .dv-skus .note{font-size:11.5px; color:var(--warn)}
 
+/* 資材。そのSKUを1箱作るのに要るもの。読むだけです */
+.dv-mats{margin:3px 0 0 25px; padding-left:8px; border-left:2px solid var(--line);
+  display:flex; flex-direction:column; gap:2px;}
+.dv-mats .head{font-size:10.5px; color:var(--muted); font-weight:600;}
+.dv-mat{display:flex; gap:7px; font-size:11.5px; line-height:1.4; align-items:baseline;}
+.dv-mat .c{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--muted);
+  flex:none; min-width:4.6em;}
+.dv-mat .n{color:var(--ink); min-width:0;}
+.dv-mat .q{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink);
+  flex:none; margin-left:auto; padding-left:8px;}
+.dv-mat .miss{color:var(--warn); font-weight:700;}
+.dv-mats .warn{font-size:11.5px; color:var(--warn); font-weight:700;}
+
 .dv-act{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .dv-act button{font-size:12px; padding:6px 12px;}
 .dv-empty{padding:26px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
@@ -605,7 +618,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v69";
+const BUILD = "v70";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1432,7 +1445,52 @@ function buildSkus(box, t){
 
     cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
     box.appendChild(row);
+
+    /* 資材。作らないものには出しません（取りに行く必要がないので）。
+       .dv-skus は縦並びなので、行の次の段として置きます。
+       出せなかったときは理由を出します。黙って空欄にすると
+       「資材が要らない」と読めてしまうためです */
+    if (!x.skip){
+      if ((x.mats || []).length) box.appendChild(matsEl(x.mats));
+      else if (x.matNote){
+        const w = document.createElement("div");
+        w.className = "dv-mats";
+        const n = document.createElement("div");
+        n.className = "warn";
+        n.textContent = x.matNote;
+        w.appendChild(n);
+        box.appendChild(w);
+      }
+    }
   });
+}
+
+/* 資材の一覧。数量は「1箱あたり」です（製造の方に見せる都合上、掛け算しません） */
+function matsEl(mats){
+  const box = document.createElement("div");
+  box.className = "dv-mats";
+  const h = document.createElement("div");
+  h.className = "head";
+  h.textContent = "資材（1箱あたり・SKUの標準）";
+  box.appendChild(h);
+  mats.forEach(function(m){
+    const r = document.createElement("div");
+    r.className = "dv-mat";
+    r.innerHTML = '<span class="c"></span><span class="n"></span><span class="q"></span>';
+    r.querySelector(".c").textContent = m.sku || "";
+    const n = r.querySelector(".n");
+    /* 在庫シートに行が無い資材。取り違えのもとなので黙って流しません。
+       モノでないSKU（作業費など）はGAS側で除いてあります */
+    if (m.name) n.textContent = m.name;
+    else {
+      n.textContent = "要確認：在庫シートに行がありません";
+      n.classList.add("miss");
+    }
+    r.querySelector(".q").textContent =
+      (m.qty === null || m.qty === undefined) ? "" : ("×" + m.qty);
+    box.appendChild(r);
+  });
+  return box;
 }
 
 function toggleNoMake(t, x, row, cb){

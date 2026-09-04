@@ -238,6 +238,20 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
 .t-skus .note{font-size:12px; color:var(--warn)}
 
+/* 資材。そのSKUを1箱作るのに要るもの。読むだけです。
+   案件によって標準と違うことがあるので、見出しでそう断っています */
+.t-mats{margin:3px 0 0 2px; padding-left:8px; border-left:2px solid var(--line);
+  display:flex; flex-direction:column; gap:2px;}
+.t-mats .head{font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.02em;}
+.t-mat{display:flex; gap:7px; font-size:12px; line-height:1.4; align-items:baseline;}
+.t-mat .c{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--muted);
+  flex:none; min-width:4.6em;}
+.t-mat .n{color:var(--ink); min-width:0;}
+.t-mat .q{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink);
+  flex:none; margin-left:auto; padding-left:8px;}
+.t-mat .miss{color:var(--warn); font-weight:700;}
+.t-mats .warn{font-size:12px; color:var(--warn); font-weight:700;}
+
 /* ほかの業務のカード。ボタンもスワイプも無い、読むだけのもの */
 .task.misc .task-card{border-left:3px solid var(--misc); cursor:default;}
 .task.misc .t-name{color:var(--misc)}
@@ -378,7 +392,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v69";
+const BUILD = "v70";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1059,8 +1073,47 @@ function buildSkus(box, j){
     row.querySelector('.lab').textContent = x.skip
       ? '在庫から消費 — 作らずに完了してください' : '';
 
+    /* 資材。作らないものには出しません（取りに行く必要がないので）。
+       出せなかったときは理由を出します。黙って空欄にすると
+       「資材が要らない」と読めてしまうためです */
+    if (!x.skip){
+      if ((x.mats || []).length) row.appendChild(matsEl(x.mats));
+      else if (x.matNote){
+        const w = el('div', 't-mats');
+        const n = el('div', 'warn');
+        n.textContent = x.matNote;
+        w.appendChild(n);
+        row.appendChild(w);
+      }
+    }
+
     box.appendChild(row);
   });
+}
+
+/* 資材の一覧。数量は「1箱あたり」です（製造の方に見せる都合上、掛け算しません） */
+function matsEl(mats){
+  const box = el('div', 't-mats');
+  const h = el('div', 'head');
+  h.textContent = '資材（1箱あたり・SKUの標準）';
+  box.appendChild(h);
+  mats.forEach(function(m){
+    const r = el('div', 't-mat');
+    r.innerHTML = '<span class="c"></span><span class="n"></span><span class="q"></span>';
+    r.querySelector('.c').textContent = m.sku || '';
+    const n = r.querySelector('.n');
+    /* 在庫シートに行が無い資材。取り違えのもとなので黙って流しません。
+       モノでないSKU（作業費など）はGAS側で除いてあります */
+    if (m.name) n.textContent = m.name;
+    else {
+      n.textContent = '要確認：在庫シートに行がありません';
+      n.classList.add('miss');
+    }
+    r.querySelector('.q').textContent =
+      (m.qty === null || m.qty === undefined) ? '' : ('×' + m.qty);
+    box.appendChild(r);
+  });
+  return box;
 }
 
 function commit(j, done){
