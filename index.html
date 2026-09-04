@@ -146,6 +146,12 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .c-item.done{background:var(--surface-2); color:var(--muted); text-decoration:line-through;}
+/* 複数日にまたがるタスク。
+   マスの左右の余白ぶんだけ外へ出して、隣のマスの帯と突き合わせます。
+   続きの日は左の色線と角丸を落とすので、1本の帯として読めます */
+.c-item.cont-l{margin-left:-5px; border-left:0; padding-left:7px;
+  border-top-left-radius:0; border-bottom-left-radius:0;}
+.c-item.cont-r{margin-right:-6px; border-top-right-radius:0; border-bottom-right-radius:0;}
 .c-more{font-size:10.5px; color:var(--muted); padding-left:3px;}
 
 /* PCは、その日のタスクが全部見えるようにマスを縦に伸ばします。
@@ -155,7 +161,6 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
   .cal{overflow-y:auto; overflow-x:hidden;}
   .grid{flex:0 0 auto; min-height:100%; grid-auto-rows:minmax(118px, auto);}
   .dow{position:sticky; top:0; z-index:2;}
-  .cell{overflow:visible}
   .c-list{overflow:visible; min-height:auto;}
 }
 
@@ -373,7 +378,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v68";
+const BUILD = "v69";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -636,6 +641,16 @@ function jobsOn(date){
     const end = add(j.start, j.days - 1);
     return j.start <= date && date <= end;
   }).sort((a,b) => {
+    /* 複数日にまたがるものを一番上に置きます。
+       どの日のマスでも同じ位置に来るので、日をまたいで1本につながって見えます。
+       またがるもの同士は「始まりが早い順」に固定し、
+       完了・種別では並べ替えません（日によって位置が変わってしまうため） */
+    const am = (a.days > 1) ? 0 : 1, bm = (b.days > 1) ? 0 : 1;
+    if (am !== bm) return am - bm;
+    if (am === 0){
+      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+      return a.row - b.row;
+    }
     if (a.done !== b.done) return a.done ? 1 : -1;      // 未完了が先
     if (a.kind !== b.kind) return a.kind === 'm' ? -1 : 1;  // 製造 → 出荷
     return a.row - b.row;
@@ -743,7 +758,13 @@ function renderMonth(){
        これで出荷や製造が押し出されません */
     let shown = 0;
     list.slice(0, MAXI).forEach(j => {
-      const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
+      /* またがるタスクの「続き」判定。
+         週の折り返し（日曜の列・土曜の列）では切ります */
+      const last  = add(j.start, j.days - 1);
+      const contL = (j.days > 1) && j.start < date && (i % 7 !== 0);
+      const contR = (j.days > 1) && last > date && (i % 7 !== 6);
+      const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : '')
+                    + (contL ? ' cont-l' : '') + (contR ? ' cont-r' : ''));
       /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
          代わりに背景色と左の線で見分けます */
       it.textContent = j.name;
