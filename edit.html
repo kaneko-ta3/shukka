@@ -618,7 +618,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v70";
+const BUILD = "v71";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1366,7 +1366,7 @@ function dayRow(t){
   if (t.kind === "s") kd.classList.add("k-s");
   el.querySelector(".dv-nmtxt").textContent = t.name;
   el.querySelector(".dv-sub").textContent =
-    [t.cust, t.to, t.qty, t.boxes ? t.boxes + "個口" : "", t.time, t.who, t.code]
+    [t.cust, t.to, t.qty, t.boxes ? t.boxes + "個口" : "", t.who, t.code]
       .filter(Boolean).join("　");
 
   const lim = el.querySelector(".dv-lim");
