@@ -23,6 +23,9 @@
   /* ほかの業務（Googleカレンダーの参考表示）＝ライラック */
   --misc:#D0C7F4; --misc-ink:#221A47; --misc-soft:#2E2752;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+  /* 出荷手配が要るのに未手配。期限切れの赤と「ラベル未発行」の橙の中間で、
+     赤に寄せた色。ラベル未発行より強く見せます */
+  --arr:#E17B55; --arr-soft:#3A1F14;
   --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
   /* 曜日の見出しと日付の数字。日曜は明るい赤と濃い赤、土曜は明るい青と濃い青 */
   --sat:#5DB1E5; --sat-ink:#5C8EAD;
@@ -178,6 +181,9 @@ body.fold-log{--w-log:28px}
 /* ラベル未発行の出荷は、案件名をオレンジにします。
    専用の印を足すと、狭いマスで案件名が押し出されてしまうため */
 .bar.nolabel .nm{color:var(--warn); font-weight:700;}
+/* 出荷手配が未のものは案件名を赤寄りの色に。
+   ラベル未発行より後に書いてあるので、両方あればこちらが勝ちます */
+.bar.arrange .nm{color:var(--arr); font-weight:700;}
 .bar.cont-l{border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed;}
 .bar.cont-r{border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed;}
 .grip{position:absolute; right:0; top:0; width:9px; height:100%; cursor:col-resize;}
@@ -255,6 +261,7 @@ body.resizing{cursor:col-resize; user-select:none;}
   padding:1px 5px; border-radius:3px; background:var(--surface-2); color:var(--ink); white-space:nowrap;}
 .chip .lim span.near{background:var(--warn-soft); color:var(--warn);}
 .chip .lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
+.chip .lim span.arrange{background:var(--arr-soft); color:var(--arr); font-weight:700;}
 .chip .lim span.over{background:var(--danger); color:#fff;}
 /* 完了したものは「遅れ」を出さないので、期限は控えめな表示にします */
 .chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
@@ -267,6 +274,9 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip .cs-row input{width:15px; height:15px; margin:0; flex:none; accent-color:var(--danger); cursor:pointer;}
 .chip .cs-row .t{color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;}
 .chip .cs-row.off .t{color:var(--danger); font-weight:700;}
+/* 出荷手配が未のチップ。在庫の「作らない」とは別の色にします */
+.chip .cs-row.arr input{accent-color:var(--arr)}
+.chip .cs-row.arr.off .t{color:var(--arr)}
 .chip .cs-row.busy{opacity:.5}
 
 .chip .foot{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:1px;}
@@ -342,6 +352,7 @@ body.resizing{cursor:col-resize; user-select:none;}
   padding:1px 6px; border-radius:3px; background:var(--surface-2); color:var(--muted); white-space:nowrap;}
 .dv-lim span.near{background:var(--warn-soft); color:var(--warn);}
 .dv-lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
+.dv-lim span.arrange{background:var(--arr-soft); color:var(--arr); font-weight:700;}
 .dv-lim span.over{background:var(--danger); color:#fff;}
 .dv-lim span.ago{background:var(--ago-soft); color:var(--ago-ink);}
 /* 在庫：SKUごとの「作らない」チェック */
@@ -353,6 +364,11 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-sku .nm{color:var(--muted)}
 .dv-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:600;}
 .dv-sku .lab{color:var(--muted)}
+/* 出荷手配。未のうちは赤寄りの色で目立たせます。
+   在庫の「作らない」行（赤）とは別の色にします */
+.dv-sku .t{cursor:pointer}
+.dv-sku.arr input{accent-color:var(--arr)}
+.dv-sku.arr.off .t{color:var(--arr); font-weight:700;}
 .dv-sku.off .code, .dv-sku.off .qty{color:var(--danger)}
 .dv-sku.off .lab{color:var(--danger); font-weight:700;}
 .dv-sku.busy{opacity:.5}
@@ -618,7 +634,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v71";
+const BUILD = "v72";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -921,15 +937,43 @@ function occupancy(){
 }
 
 const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
-/* 期限オーバーの判定。
-   ・自分の期限（製造なら出荷日、出荷なら納品日）を過ぎている
-   ・または、種別に関係なく納品日を過ぎている
-   どちらかに当てはまれば赤にします */
+/* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク */
+const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone;
+
+/* その出荷日に出した荷物が届く日。輸送は稼働日で数えます。
+   出荷日を決めるときの計算（shipDateFor）を逆にたどったものです */
+function arriveDate(t){
+  let d = t.start;
+  let n = Math.max(1, Number(t.lead) || 2);
+  while (n > 0){ d = add(d, 1); if (!isOff(d)) n--; }
+  return d;
+}
+
+/* 期限オーバーの判定。次のどれかに当てはまれば赤にします。
+     共通
+       ・自分の期限（製造なら出荷日、出荷なら納品日）を過ぎている
+       ・種別に関係なく納品日を過ぎている
+     製造
+       ・製造日・出荷日・納品日が全部同じ
+         （作った当日に出して当日に届く、は成り立ちません）
+     出荷
+       ・出荷日が納品日と同じか、それより後
+       ・その出荷日に出しても、輸送日数のぶん納品日に間に合わない
+   塗りは変えず枠だけ赤にします。中の色で製造／出荷を見分けるためです */
 const isLate = t => {
   if (!t.start) return false;
   const end = endOf(t);
   if (t.limit && end > t.limit) return true;
   if (t.due   && end > t.due)   return true;
+
+  if (t.kind === "m"){
+    if (t.due && t.ship && t.start === t.ship && t.ship === t.due) return true;
+    return false;
+  }
+
+  if (!t.due) return false;
+  if (t.start >= t.due) return true;          // 当日発送では当日に届きません
+  if (arriveDate(t) > t.due) return true;     // 輸送日数を足すと納品日を越えます
   return false;
 };
 
@@ -1070,6 +1114,7 @@ function renderCal(){
       const b = document.createElement("div");
       b.className = "bar k-" + t.kind + (late ? " late" : "")
         + (t.label === false ? " nolabel" : "")
+        + (needArrange(t) ? " arrange" : "")
         + (sg.contL ? " cont-l" : "") + (sg.contR ? " cont-r" : "")
         + (t._pending ? " pending" : "");
       b.style.setProperty("--col", sg.col);
@@ -1128,6 +1173,12 @@ function chipEl(t, done){
   el.querySelector(".sub").textContent = [t.cust, t.qty, t.who].filter(Boolean).join("　");
 
   const lim = el.querySelector(".lim");
+  if (needArrange(t)){
+    const ar = document.createElement("span");
+    ar.className = "arrange";
+    ar.textContent = "出荷手配:" + t.arrange;
+    lim.appendChild(ar);
+  }
   if (t.label === false){
     const nl = document.createElement("span");
     nl.className = "nolabel";
@@ -1148,7 +1199,48 @@ function chipEl(t, done){
 
   /* 製造だけ「在庫から消費」のチェックを出します */
   if (t.kind === "m") buildChipSkus(el, t);
+  /* 出荷手配の指示がある出荷は、済にするチェックを出します */
+  else if (t.arrange) el.appendChild(arrangeCheck(t, "cs", "cs-row"));
   return el;
+}
+
+/* 「出荷手配:〇〇」のチェック。
+   済にすると、カレンダーの文字色が普通に戻ります。
+   出荷指示シートの「出荷手配済」列に書きます */
+function arrangeCheck(t, boxCls, rowCls){
+  const box = document.createElement("div");
+  box.className = boxCls;
+  const row = document.createElement("div");
+  row.className = rowCls + " arr" + (t.arrangeDone ? "" : " off");
+  const id = "arr-" + t.row;
+  row.innerHTML = '<input type="checkbox" id="' + id + '">'
+                + '<label class="t" for="' + id + '"></label>';
+  const cb = row.querySelector("input");
+  cb.checked = !!t.arrangeDone;
+  row.querySelector(".t").textContent = "出荷手配:" + t.arrange;
+  cb.onchange = function(){ toggleArrange(t, row, cb); };
+  box.appendChild(row);
+  return box;
+}
+
+function toggleArrange(t, row, cb){
+  const on = cb.checked;
+  row.classList.add("busy");
+  busy(true);
+  call("setArrange", {row: t.row, on: on ? 1 : 0})
+    .then(function(r){
+      busy(false);
+      row.classList.remove("busy");
+      t.arrangeDone = !!r.arrangeDone;
+      log(r.message, "更新");
+      render();
+    })
+    .catch(function(e){
+      busy(false);
+      row.classList.remove("busy");
+      cb.checked = !on;                        // 書けなかったので戻します
+      log("出荷手配を変えられませんでした：" + e.message, "", true);
+    });
 }
 
 /* カードの中に出す、コンパクトな在庫チェック。
@@ -1370,6 +1462,12 @@ function dayRow(t){
       .filter(Boolean).join("　");
 
   const lim = el.querySelector(".dv-lim");
+  if (needArrange(t)){
+    const ar = document.createElement("span");
+    ar.className = "arrange";
+    ar.textContent = "出荷手配:" + t.arrange;
+    lim.appendChild(ar);
+  }
   if (t.label === false){
     const nl = document.createElement("span");
     nl.className = "nolabel";
@@ -1396,6 +1494,12 @@ function dayRow(t){
 
   /* 製造タスクだけ、在庫のSKU一覧と「作らない」チェックを出します */
   if (t.kind === "m") buildSkus(el.querySelector(".dv-skus"), t);
+  /* 出荷手配の指示がある出荷は、済にするチェックを出します */
+  else if (t.arrange){
+    const box = el.querySelector(".dv-skus");
+    box.hidden = false;
+    box.appendChild(arrangeCheck(t, "", "dv-sku"));
+  }
 
   const act = el.querySelector(".dv-act");
   const b1 = document.createElement("button");

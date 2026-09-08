@@ -389,7 +389,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v71";
+const BUILD = "v72";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -644,6 +644,11 @@ function setState(t, cls){
   el.textContent = t + "　" + BUILD;
   el.className = "state" + (cls ? " " + cls : "");
 }
+
+/* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク。
+   作業者ページは読むだけで、色も付けません（色の運用は編集者ページ側です）。
+   日付タッチ後のカードに「出荷手配:〇〇」と出すだけです */
+const needArrange = j => j.kind === 's' && !!j.arrange && !j.arrangeDone;
 
 /* ---------- 日付ごとの割り当て ---------- */
 function jobsOn(date){
@@ -948,14 +953,16 @@ function taskEl(j){
   const card = el('div', 'task-card');
   const left = j.due ? diff(TODAY, j.due) : null;
   /* 完了したものに「遅れ」は出しません。代わりに「何日前」を別の色で出します */
+  /* オレンジは3日以内。編集者ページと同じ基準にそろえています */
   const dueCls = j.done ? " ago"
-    : (left === null ? "" : (left < 0 ? " over" : (left <= 2 ? " near" : "")));
+    : (left === null ? "" : (left < 0 ? " over" : (left <= 3 ? " near" : "")));
 
   card.innerHTML =
     '<div class="t-row1"><span class="t-name"></span></div>'
     + '<div class="t-sub"></div>'
     + '<div class="t-meta">'
     +   (j.due ? '<span class="due' + dueCls + '"></span>' : '')
+    +   (needArrange(j) ? '<span class="arrange"></span>' : '')
     +   (j.label === false ? '<span class="nolabel">ラベル未発行</span>' : '')
     +   (j.qty ? '<span class="qty"></span>' : '')
     +   (j.boxes ? '<span class="boxes"></span>' : '')
@@ -968,6 +975,7 @@ function taskEl(j){
     /* バッジは漢字1文字に収めます（造・出・他） */
     '<span class="kind k-' + (j.kind || 'm') + '">' + (j.kind === 's' ? '出' : '造') + '</span>';
   card.querySelector('.t-name').appendChild(document.createTextNode(j.name));
+  if (needArrange(j)) card.querySelector('.arrange').textContent = '出荷手配:' + j.arrange;
   card.querySelector('.t-sub').textContent = [j.cust, j.to].filter(Boolean).join(' → ');
   if (j.due) card.querySelector('.due').textContent = j.done
     ? ('納品 ' + md(j.due) + '　' + agoText(j.start))
