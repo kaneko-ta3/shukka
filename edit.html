@@ -53,6 +53,10 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .stat .v{font-size:16px; font-weight:600; line-height:1.15; display:flex; align-items:baseline; gap:2px;}
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
+/* 押すと一覧が開く2つ（未配置3日以内・期限オーバー）だけ、
+   枠を濃いグレーにして見分けられるようにします */
+.stat.tap{cursor:pointer; box-shadow:inset 0 0 0 1px var(--line-strong);}
+.stat.tap:hover{background:var(--surface-2)}
 
 /* 右のボタン列は縮められると文字が切れるので、必要な幅を先に取らせます。
    余った幅は左（見出しと月送り）が受け持ちます */
@@ -390,6 +394,8 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-act{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .dv-act button{font-size:12px; padding:6px 12px;}
 .dv-empty{padding:26px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
+/* 期限オーバーの一覧で、赤くなった理由をカードの中に出します */
+.dv-why{font-size:11.5px; color:var(--danger); font-weight:700; margin-top:5px; line-height:1.45;}
 
 @media (max-width:820px){
   .dv{padding:8px}
@@ -542,7 +548,7 @@ body.resizing{cursor:col-resize; user-select:none;}
     <div class="summary">
       <div class="stat"><span class="k">製造 未配置</span><span class="v mono" id="s-pm">–</span></div>
       <div class="stat"><span class="k">出荷 未配置</span><span class="v mono" id="s-ps">–</span></div>
-      <div class="stat" id="st-soon"><span class="k">期限3日以内</span><span class="v mono" id="s-soon">–</span></div>
+      <div class="stat" id="st-soon"><span class="k">未配置3日以内</span><span class="v mono" id="s-soon">–</span></div>
       <div class="stat" id="st-late"><span class="k">期限オーバー</span><span class="v mono" id="s-late">–</span></div>
       <div class="stat"><span class="k">表示中の配置済</span><span class="v mono" id="s-set">–</span></div>
     </div>
@@ -634,7 +640,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v74";
+const BUILD = "v76";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -997,8 +1003,14 @@ const isLate = t => !!lateReason(t);
 function renderSummary(){
   const pm = tasks.filter(t => t.kind === "m" && !t.start && !t.done);
   const ps = tasks.filter(t => t.kind === "s" && !t.start && !t.done);
-  const soon = pm.concat(ps).filter(t => { const l = leftOf(t); return l !== null && l <= 3; }).length;
-  const late = tasks.filter(t => onCal(t) && isLate(t)).length;
+  const soonList = pm.concat(ps)
+    .filter(t => { const l = leftOf(t); return l !== null && l <= 3; })
+    .sort(byLimit);
+  const soon = soonList.length;
+  /* 期限オーバーは、数字にマウスを乗せると中身が読めるようにします */
+  const lateList = tasks.filter(t => onCal(t) && isLate(t))
+    .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
+  const late = lateList.length;
   const from = anchor, to = anchorEnd();
   const set = tasks.filter(t => onCal(t) && t.start >= from && t.start <= to).length;
 
@@ -1007,8 +1019,30 @@ function renderSummary(){
   document.getElementById("s-soon").innerHTML = soon + "<small>件</small>";
   document.getElementById("s-late").innerHTML = late + "<small>件</small>";
   document.getElementById("s-set").innerHTML = set + "<small>件</small>";
-  document.getElementById("st-soon").className = "stat" + (soon ? " is-warn" : "");
-  document.getElementById("st-late").className = "stat" + (late ? " is-danger" : "");
+  document.getElementById("st-soon").className = "stat" + (soon ? " is-warn tap" : "");
+  document.getElementById("st-soon").title = soon
+    ? "未配置3日以内 " + soon + "件" + "\n" + "\n"
+      + soonList.slice(0, 20).map(t =>
+          kindName(t.kind) + "　" + t.name
+          + "　" + limitChips(t).map(c =>
+              c.label + (c.left === null ? "" : "　" + remainText(c.left))
+            ).join("　")
+        ).join("\n")
+      + (soon > 20 ? "\n" + "\n" + "…ほか " + (soon - 20) + "件" : "")
+    : "期限が3日以内に迫っている未配置のタスクはありません";
+  document.getElementById("st-late").className = "stat" + (late ? " is-danger tap" : "");
+
+  /* 数字にマウスを乗せると中身が読めます。
+     指では乗せられないので、押しても開けるようにしてあります */
+  const CAP = 20;
+  document.getElementById("st-late").title = late
+    ? "期限オーバー " + late + "件\n\n"
+      + lateList.slice(0, CAP).map(t =>
+          md(t.start) + "　" + kindName(t.kind) + "　" + t.name
+          + "\n　　" + lateReason(t)
+        ).join("\n")
+      + (late > CAP ? "\n\n…ほか " + (late - CAP) + "件" : "")
+    : "期限を過ぎているタスクはありません";
   document.getElementById("pm-count").textContent = pm.length + "件";
   document.getElementById("ps-count").textContent = ps.length + "件";
   document.getElementById("pm-count2").textContent = pm.length + "件";
@@ -1456,11 +1490,98 @@ function tasksOn(date){
     });
 }
 
-function showDay(date){ openDay = date; renderDayView(); }
+function showDay(date){ openDay = date; statView = ""; renderDayView(); }
+
+/* 上のバーの数字を押して開く一覧。
+   指ではマウスを乗せられないので、押しても開けるようにしてあります。
+     'late' … 期限オーバー（配置済み）。日付を開いたときと同じカードなので、
+              その場で完了や配置解除ができます
+     'soon' … 未配置で期限が近いもの。まだ置いていないので読むだけです */
+let statView = "";
+function showStat(mode){
+  if (!statTasks(mode).length) return;
+  statView = mode; openDay = null;
+  renderDayView();
+}
+function statTasks(mode){
+  if (mode === "late"){
+    return tasks.filter(t => onCal(t) && isLate(t))
+      .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
+  }
+  return tasks.filter(t => !t.start && !t.done)
+    .filter(t => { const l = leftOf(t); return l !== null && l <= 3; })
+    .sort(byLimit);
+}
 
 function closeDay(){
-  openDay = null;
+  openDay = null; statView = "";
   document.getElementById("dayview").hidden = true;
+}
+
+/* 上のバーの数字から開く一覧。日付を開いたときと同じ枠を使い回します */
+function renderStatView(){
+  const box = document.getElementById("dayview");
+  const late = (statView === "late");
+  const list = statTasks(statView);
+  if (!list.length){ closeDay(); return; }
+
+  box.hidden = false;
+  document.getElementById("dv-date").textContent = late ? "期限オーバー" : "未配置3日以内";
+  document.getElementById("dv-w").textContent = list.length + "件";
+  document.getElementById("dv-counts").textContent = late
+    ? "日付の置き方に無理があるものです。カードの「配置を解除」で外せます"
+    : "まだカレンダーに置いていないものです。閉じてから左の枠からドラッグして置いてください";
+
+  const ul = document.getElementById("dv-list");
+  ul.innerHTML = "";
+  list.forEach(function(t){
+    if (!late){ ul.appendChild(poolRow(t)); return; }
+    const row = dayRow(t);
+    /* どの条件で赤くなったかを、カードの中に文字で出します */
+    const why = document.createElement("div");
+    why.className = "dv-why";
+    why.textContent = "⚠ " + lateReason(t);
+    row.insertBefore(why, row.querySelector(".dv-act"));
+    ul.appendChild(row);
+  });
+}
+
+/* 未配置のタスクを読むだけの行。
+   実施日がまだ無いので、日付を開いたときのカード（dayRow）は使えません */
+function poolRow(t){
+  const el = document.createElement("div");
+  el.className = "dv-row k-" + t.kind;
+  el.innerHTML = '<div class="dv-nm"><span class="dv-kind"></span><span class="dv-nmtxt"></span></div>'
+    + '<div class="dv-sub"></div><div class="dv-lim"></div>';
+
+  const kd = el.querySelector(".dv-kind");
+  kd.textContent = (t.kind === "m" ? "造" : "出");
+  if (t.kind === "s") kd.classList.add("k-s");
+  el.querySelector(".dv-nmtxt").textContent = t.name;
+  el.querySelector(".dv-sub").textContent =
+    [t.cust, t.to, t.qty, t.boxes ? t.boxes + "個口" : "", t.who, t.code]
+      .filter(Boolean).join("　");
+
+  const lim = el.querySelector(".dv-lim");
+  if (needArrange(t)){
+    const ar = document.createElement("span");
+    ar.className = "arrange";
+    ar.textContent = "出荷手配:" + t.arrange;
+    lim.appendChild(ar);
+  }
+  if (t.label === false){
+    const nl = document.createElement("span");
+    nl.className = "nolabel";
+    nl.textContent = "ラベル未発行";
+    lim.appendChild(nl);
+  }
+  limitChips(t).forEach(function(c){
+    const sp = document.createElement("span");
+    sp.textContent = c.label + (c.left === null ? "" : "　" + remainText(c.left));
+    if (c.left !== null) sp.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
+    lim.appendChild(sp);
+  });
+  return el;
 }
 
 function dayRow(t){
@@ -1637,6 +1758,7 @@ function toggleNoMake(t, x, row, cb){
 
 function renderDayView(){
   const box = document.getElementById("dayview");
+  if (statView){ renderStatView(); return; }
   if (!openDay){ box.hidden = true; return; }
   box.hidden = false;
 
@@ -1690,6 +1812,8 @@ function miscToggle(){
   return wrap;
 }
 
+document.getElementById("st-late").onclick = () => showStat("late");
+document.getElementById("st-soon").onclick = () => showStat("soon");
 document.getElementById("dv-close").onclick = closeDay;
 document.getElementById("dv-back").onclick = closeDay;
 
