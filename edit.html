@@ -634,7 +634,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v73";
+const BUILD = "v74";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -940,12 +940,20 @@ const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
 /* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク */
 const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone;
 
+/* 実際の輸送日数。
+   t.lead は「出荷日 自動配置」が使う日数で、1日ぶん余裕を持たせてあります
+   （関東〜兵庫は翌日着だけど2日、それ以西・東北・北海道は2日着だけど3日）。
+   赤の判定は余裕なしのぴったりで見たいので、1日引きます */
+function transitDays(t){
+  return Math.max(1, (Number(t.lead) || 2) - 1);
+}
+
 /* その出荷日に出した荷物が届く日。
    輸送は土日も進むので、暦の日数で数えます。
    出荷日を決める shipDateFor 側が稼働日で数えているのは
    「土日は出荷しない」ためで、数え方が違うのは意図的です */
 function arriveDate(t){
-  return add(t.start, Math.max(1, Number(t.lead) || 2));
+  return add(t.start, transitDays(t));
 }
 
 /* 赤くなる理由。当てはまらなければ空文字を返します。
@@ -975,7 +983,7 @@ function lateReason(t){
   if (t.start >= t.due){
     return "出荷日と納品日が同じ " + md(t.due) + "（当日には届かない）";
   }
-  const n = Math.max(1, Number(t.lead) || 2);
+  const n = transitDays(t);
   const arr = arriveDate(t);
   if (arr > t.due){
     return "出荷日 " + md(t.start) + " ＋ 輸送 " + n + "日 ＝ " + md(arr)
