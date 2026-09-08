@@ -634,7 +634,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v72";
+const BUILD = "v73";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -940,42 +940,51 @@ const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
 /* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク */
 const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone;
 
-/* その出荷日に出した荷物が届く日。輸送は稼働日で数えます。
-   出荷日を決めるときの計算（shipDateFor）を逆にたどったものです */
+/* その出荷日に出した荷物が届く日。
+   輸送は土日も進むので、暦の日数で数えます。
+   出荷日を決める shipDateFor 側が稼働日で数えているのは
+   「土日は出荷しない」ためで、数え方が違うのは意図的です */
 function arriveDate(t){
-  let d = t.start;
-  let n = Math.max(1, Number(t.lead) || 2);
-  while (n > 0){ d = add(d, 1); if (!isOff(d)) n--; }
-  return d;
+  return add(t.start, Math.max(1, Number(t.lead) || 2));
 }
 
-/* 期限オーバーの判定。次のどれかに当てはまれば赤にします。
-     共通
-       ・自分の期限（製造なら出荷日、出荷なら納品日）を過ぎている
-       ・種別に関係なく納品日を過ぎている
-     製造
-       ・製造日・出荷日・納品日が全部同じ
-         （作った当日に出して当日に届く、は成り立ちません）
-     出荷
-       ・出荷日が納品日と同じか、それより後
-       ・その出荷日に出しても、輸送日数のぶん納品日に間に合わない
+/* 赤くなる理由。当てはまらなければ空文字を返します。
    塗りは変えず枠だけ赤にします。中の色で製造／出荷を見分けるためです */
-const isLate = t => {
-  if (!t.start) return false;
+function lateReason(t){
+  if (!t.start) return "";
   const end = endOf(t);
-  if (t.limit && end > t.limit) return true;
-  if (t.due   && end > t.due)   return true;
+  const last = (t.days > 1 ? "作業の最終日 " : "実施日 ") + md(end);
 
-  if (t.kind === "m"){
-    if (t.due && t.ship && t.start === t.ship && t.ship === t.due) return true;
-    return false;
+  if (t.limit && end > t.limit){
+    return last + " が " + (t.kind === "m" ? "出荷日" : "納品日")
+         + " " + md(t.limit) + " より後";
+  }
+  if (t.due && end > t.due){
+    return last + " が 納品日 " + md(t.due) + " より後";
   }
 
-  if (!t.due) return false;
-  if (t.start >= t.due) return true;          // 当日発送では当日に届きません
-  if (arriveDate(t) > t.due) return true;     // 輸送日数を足すと納品日を越えます
-  return false;
-};
+  if (t.kind === "m"){
+    if (t.due && t.ship && t.start === t.ship && t.ship === t.due){
+      return "製造日・出荷日・納品日が全部 " + md(t.start)
+           + "（当日に作って当日に届くのは無理）";
+    }
+    return "";
+  }
+
+  if (!t.due) return "";
+  if (t.start >= t.due){
+    return "出荷日と納品日が同じ " + md(t.due) + "（当日には届かない）";
+  }
+  const n = Math.max(1, Number(t.lead) || 2);
+  const arr = arriveDate(t);
+  if (arr > t.due){
+    return "出荷日 " + md(t.start) + " ＋ 輸送 " + n + "日 ＝ " + md(arr)
+         + " で、納品日 " + md(t.due) + " に間に合わない";
+  }
+  return "";
+}
+
+const isLate = t => !!lateReason(t);
 
 function renderSummary(){
   const pm = tasks.filter(t => t.kind === "m" && !t.start && !t.done);
@@ -1124,7 +1133,8 @@ function renderCal(){
       b.dataset.id = t.id;
       b.title = "【" + kindName(t.kind) + "】" + t.name + "\n" + t.cust + (t.qty ? "　" + t.qty : "")
         + "\n実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "")
-        + (t.limit ? "\n期限 " + md(t.limit) + (late ? "　← 超過しています" : "") : "\n期限 未設定")
+        + (t.limit ? "\n期限 " + md(t.limit) : "\n期限 未設定")
+        + (late ? "\n\n⚠ 赤い理由：" + lateReason(t) : "")
         + (t.label === false ? "\nラベル未発行" : "")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
       /* バーの末尾には何も出しません。数量は日付を開けば読めます */
