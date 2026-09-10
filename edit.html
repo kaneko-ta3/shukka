@@ -308,6 +308,29 @@ body.resizing{cursor:col-resize; user-select:none;}
 .log li.err .m{color:var(--danger);}
 .log li.none{color:var(--muted); font-family:"Zen Kaku Gothic New",sans-serif;}
 
+/* ---- 発行済データの受け皿 ----
+   ふだんは出ません。ファイルを画面に持ってきた瞬間だけ出します。
+   タスクの移動はポインタ操作なので、ここには一切引っかかりません */
+.drop{position:fixed; inset:0; z-index:80; display:flex;
+  align-items:center; justify-content:center;
+  background:rgba(14,19,18,.82); backdrop-filter:blur(2px);}
+.drop-box{pointer-events:none; text-align:center; padding:34px 46px; border-radius:12px;
+  border:2px dashed var(--accent); background:var(--surface); box-shadow:var(--shadow);
+  max-width:min(78vw, 620px);}
+.drop-ttl{font-size:19px; font-weight:700; color:var(--accent); line-height:1.45;}
+.drop-sub{margin-top:8px; font-size:12.5px; color:var(--muted); line-height:1.6;
+  white-space:pre-line;}
+/* 読み込み中・成功・要確認・失敗で色を変えます */
+.drop.busy .drop-box{border-style:solid; border-color:var(--line-strong);}
+.drop.busy .drop-ttl{color:var(--ink)}
+.drop.ok .drop-box{border-style:solid; border-color:var(--accent); background:var(--accent-soft);}
+.drop.warn .drop-box{border-style:solid; border-color:var(--warn); background:var(--warn-soft);}
+.drop.warn .drop-ttl{color:var(--warn)}
+.drop.err .drop-box{border-style:solid; border-color:var(--danger); background:var(--danger-soft);}
+.drop.err .drop-ttl{color:var(--danger)}
+/* 押して閉じられる状態のときだけ、当たり判定を戻します */
+.drop.hold{cursor:pointer}
+
 .boot{padding:60px 20px; text-align:center; color:var(--muted); flex:none;}
 
 .gate{flex:1 1 auto; display:flex; align-items:center; justify-content:center; padding:20px;}
@@ -462,6 +485,8 @@ body.resizing{cursor:col-resize; user-select:none;}
   #done .pane-list{max-height:200px}
   /* 縦に積む幅では枠を畳む意味がないので、機能ごと隠します */
   .fold, .spine{display:none !important}
+  /* 発行済データの取り込みはPCだけです（ファイルをドラッグする操作なので） */
+  .drop{display:none !important}
   .pane-head{padding-right:10px}
   .log h3{margin-right:0}
   .folded > .pane-head, .folded > .pane-list,
@@ -589,6 +614,14 @@ body.resizing{cursor:col-resize; user-select:none;}
     </form>
   </div>
 
+  <!-- 発行済データの受け皿。ファイルを持ってきている間だけ出ます -->
+  <div id="drop" class="drop" hidden>
+    <div class="drop-box">
+      <div class="drop-ttl" id="drop-ttl">発行済データCSVをここにドロップ</div>
+      <div class="drop-sub" id="drop-sub">ヤマトB2から落としたファイルをそのまま投げてください</div>
+    </div>
+  </div>
+
   <div id="boot" class="boot">スプレッドシートを読み込んでいます…</div>
 
   <div id="dayview" class="dv" hidden>
@@ -657,7 +690,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v81";
+const BUILD = "v82";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -710,6 +743,27 @@ function call(api, params){
     if (params[n] !== undefined && params[n] !== null) u.searchParams.set(n, params[n]);
   });
   return fetch(u.toString(), {method:"GET", redirect:"follow"})
+    .then(function(r){
+      if (!r.ok) throw new Error("通信に失敗しました（" + r.status + "）");
+      return r.json();
+    })
+    .then(function(j){
+      if (j && j.error) throw new Error(j.error);
+      return j;
+    });
+}
+
+/* 本文に載せて送ります。発行済データCSVはURLに乗る長さを超えるためです。
+   Content-Type を text/plain にしておくと、事前確認（preflight）が走りません */
+function postText(api, text){
+  const u = new URL(API);
+  u.searchParams.set("api", api);
+  u.searchParams.set("k", KEY);
+  return fetch(u.toString(), {
+      method: "POST", redirect: "follow",
+      headers: {"Content-Type": "text/plain;charset=utf-8"},
+      body: text
+    })
     .then(function(r){
       if (!r.ok) throw new Error("通信に失敗しました（" + r.status + "）");
       return r.json();
@@ -2120,6 +2174,134 @@ document.querySelectorAll('[data-fold]').forEach(function(box){
   });
 });
 applyFold();
+
+
+/* ================= 発行済データの取り込み =================
+ *
+ * ヤマトB2から落としたCSVを、画面のどこかにドラッグして投げてもらいます。
+ * ファイルを持ってきている間だけ受け皿が出るので、ふだんの操作の邪魔をしません。
+ * 取り込みの中身（重複を飛ばす・対象外を除く）はGAS側でやります。
+ */
+const DROP_MIN_WIDTH = 1150;      // これ以下の幅では出しません（スマホ・タブレット）
+let dropDepth = 0;                // 入れ子の要素をまたぐと leave が何度も来るので数えます
+let dropHold = false;             // 押すまで消さない状態か
+
+function dropEl(){ return document.getElementById("drop"); }
+
+function dropUsable(){
+  if (window.innerWidth <= DROP_MIN_WIDTH) return false;
+  return !document.getElementById("app").hidden;   // 合言葉が通って中身が出ている時だけ
+}
+function hasFiles(e){
+  const t = e.dataTransfer && e.dataTransfer.types;
+  if (!t) return false;
+  return [].indexOf.call(t, "Files") >= 0;
+}
+
+function dropShow(cls, ttl, sub){
+  const el = dropEl();
+  el.hidden = false;
+  el.className = "drop" + (cls ? " " + cls : "");
+  document.getElementById("drop-ttl").textContent = ttl;
+  document.getElementById("drop-sub").textContent = sub || "";
+}
+function dropHide(){
+  dropDepth = 0; dropHold = false;
+  const el = dropEl();
+  el.hidden = true;
+  el.className = "drop";
+}
+
+/* 文字コードは自動で見分けます。
+   B2のCSVはShift_JISのはずですが、全列そのまま入れるので、
+   ここを外すと氏名や住所が化けたままシートに入ってしまいます */
+function decodeCsv(buf){
+  const sjis = new TextDecoder("shift_jis", {fatal:false}).decode(buf);
+  if (sjis.indexOf("\uFFFD") < 0) return sjis;
+  const utf = new TextDecoder("utf-8", {fatal:false}).decode(buf);
+  return (utf.indexOf("\uFFFD") < 0) ? utf : sjis;
+}
+
+function readIssued(file){
+  dropShow("busy", "読み込み中…", file.name);
+
+  const fr = new FileReader();
+  fr.onerror = function(){
+    dropHold = true;
+    dropShow("err hold", "ファイルを読めませんでした", "押すと閉じます");
+    log("発行済データを読めませんでした：" + file.name, "", true);
+  };
+  fr.onload = function(){
+    let text = "";
+    try { text = decodeCsv(fr.result); }
+    catch(e){
+      dropHold = true;
+      dropShow("err hold", "文字コードを判別できませんでした", "押すと閉じます");
+      log("発行済データの文字コードを判別できませんでした：" + e.message, "", true);
+      return;
+    }
+
+    postText("importIssued", text)
+      .then(function(r){
+        log(r.message, "取込");
+        if (r.out && r.outSamples && r.outSamples.length){
+          r.outSamples.forEach(function(x){
+            log("対象外 " + x + "（出荷指示に同じ自社番号の行がありません）", "");
+          });
+        }
+        if (r.out){
+          dropHold = true;
+          dropShow("warn hold",
+            "取り込みました " + r.added + "件",
+            "対象外が " + r.out + "件ありました。反映ログをご確認ください。\n押すと閉じます");
+        } else {
+          dropShow("ok", "取り込みました " + r.added + "件",
+            (r.dup ? "重なっていた " + r.dup + "件は飛ばしました" : ""));
+          setTimeout(function(){ if (!dropHold) dropHide(); }, 1200);
+        }
+        if (r.added) load(false);            // 追跡番号を画面にも反映させます
+      })
+      .catch(function(e){
+        dropHold = true;
+        dropShow("err hold", "取り込めませんでした", e.message + "\n押すと閉じます");
+        log("発行済データを取り込めませんでした：" + e.message, "", true);
+      });
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+window.addEventListener("dragenter", function(e){
+  if (!dropUsable() || !hasFiles(e)) return;
+  e.preventDefault();
+  dropDepth++;
+  if (dropHold) return;
+  dropShow("", "発行済データCSVをここにドロップ",
+           "ヤマトB2から落としたファイルをそのまま投げてください");
+});
+window.addEventListener("dragover", function(e){
+  if (!dropUsable() || !hasFiles(e)) return;
+  e.preventDefault();                        // これが無いとドロップできません
+});
+window.addEventListener("dragleave", function(e){
+  if (!dropUsable()) return;
+  dropDepth--;
+  if (dropDepth <= 0 && !dropHold) dropHide();
+});
+window.addEventListener("drop", function(e){
+  if (!dropUsable() || !hasFiles(e)) return;
+  e.preventDefault();
+  dropDepth = 0;
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f){ dropHide(); return; }
+  if (!/\.(csv|txt)$/i.test(f.name)){
+    dropHold = true;
+    dropShow("err hold", "CSVファイルではありません", f.name + "\n押すと閉じます");
+    return;
+  }
+  readIssued(f);
+});
+/* 要確認・失敗のときは押すまで残します */
+dropEl().addEventListener("click", function(){ if (dropHold) dropHide(); });
 
 
 /* ================= ツールバー ================= */
