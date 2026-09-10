@@ -388,7 +388,7 @@ body.resizing{cursor:col-resize; user-select:none;}
    右端の数量がどの行のものか分かるよう、1行おきに薄く敷いています */
 .dv-mat{display:flex; gap:7px; font-size:12.5px; line-height:1.45; align-items:baseline;
   padding:1px 5px; border-radius:2px;}
-.dv-mats .dv-mat:nth-child(2n){background:rgba(255,255,255,.05)}
+.dv-mats .dv-mat:nth-child(2n){background:rgba(255,255,255,.085)}
 .dv-mat .c{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--muted);
   flex:none; min-width:4.6em;}
 .dv-mat .n{color:var(--ink); min-width:0;}
@@ -657,7 +657,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v80";
+const BUILD = "v81";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";

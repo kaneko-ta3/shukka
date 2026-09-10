@@ -245,7 +245,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    右端の数量がどの行のものか分かるよう、1行おきに薄く敷いています */
 .t-mat{display:flex; gap:7px; font-size:13px; line-height:1.45; align-items:baseline;
   padding:2px 5px; border-radius:2px;}
-.t-mats .t-mat:nth-child(2n){background:rgba(255,255,255,.05)}
+.t-mats .t-mat:nth-child(2n){background:rgba(255,255,255,.085)}
 .t-mat .c{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--muted);
   flex:none; min-width:4.6em;}
 .t-mat .n{color:var(--ink); min-width:0;}
@@ -394,7 +394,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v80";
+const BUILD = "v81";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
