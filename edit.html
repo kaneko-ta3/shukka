@@ -396,6 +396,8 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-empty{padding:26px 10px; text-align:center; color:var(--muted); font-size:12.5px;}
 /* 期限オーバーの一覧で、赤くなった理由をカードの中に出します */
 .dv-why{font-size:11.5px; color:var(--danger); font-weight:700; margin-top:5px; line-height:1.45;}
+/* 未スケジュールのカードに出す置き方の案内 */
+.dv-act.dv-hint{font-size:11.5px; color:var(--muted); justify-content:flex-start;}
 
 @media (max-width:820px){
   .dv{padding:8px}
@@ -465,7 +467,10 @@ body.resizing{cursor:col-resize; user-select:none;}
   .app{grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;
        grid-template-rows:auto auto auto auto;
        grid-template-areas:"cal cal" "pm ps" "done done" "log log";}
-  .cal{min-height:400px}
+  /* カレンダーは中だけでスクロールさせます。
+     10行あるので画面には入りきりません。
+     ドラッグ中は端に近づけば自動で送られます（autoScroll） */
+  .cal{min-height:0; max-height:calc(100vh - 150px); overflow-y:auto;}
   #pool-m .pane-list, #pool-s .pane-list{max-height:320px}
 
   /* 狭い画面ではボタンの文字を短くして、1行に収めます */
@@ -640,7 +645,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v76";
+const BUILD = "v77";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -769,7 +774,9 @@ function syncMiscButton(){
 }
 let TODAY = null;
 let anchor = null;
-const WEEKS = 6, BACK_WEEKS = 2;
+/* カレンダーに出す週の数と、今日の週より前に出す週の数。
+   1（前）＋今日の週＋8（後）＝10行になります */
+const WEEKS = 10, BACK_WEEKS = 1;
 let selected = null;
 let history = [];
 let pending = 0;
@@ -1478,6 +1485,9 @@ function saveDays(t, prevDays){
 }
 
 /* ================= 日付をタップしたときの一覧 ================= */
+/* 製造タスクを何日まで伸ばせるか。GAS側の CONFIG.MAX_DAYS と合わせます */
+const MAX_DAYS = 60;
+
 const WD = ["日","月","火","水","木","金","土"];
 let openDay = null;
 
@@ -1490,7 +1500,7 @@ function tasksOn(date){
     });
 }
 
-function showDay(date){ openDay = date; statView = ""; renderDayView(); }
+function showDay(date){ openDay = date; statView = ""; focusId = null; renderDayView(); }
 
 /* 上のバーの数字を押して開く一覧。
    指ではマウスを乗せられないので、押しても開けるようにしてあります。
@@ -1498,12 +1508,24 @@ function showDay(date){ openDay = date; statView = ""; renderDayView(); }
               その場で完了や配置解除ができます
      'soon' … 未配置で期限が近いもの。まだ置いていないので読むだけです */
 let statView = "";
+let focusId = null;
 function showStat(mode){
   if (!statTasks(mode).length) return;
   statView = mode; openDay = null;
   renderDayView();
 }
+
+/* 1件だけの詳細。カードを押したときに開きます */
+function showTask(id){
+  if (!byId(id)) return;
+  focusId = id; statView = "one"; openDay = null;
+  renderDayView();
+}
 function statTasks(mode){
+  if (mode === "one"){
+    const t = byId(focusId);
+    return t ? [t] : [];
+  }
   if (mode === "late"){
     return tasks.filter(t => onCal(t) && isLate(t))
       .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
@@ -1514,74 +1536,41 @@ function statTasks(mode){
 }
 
 function closeDay(){
-  openDay = null; statView = "";
+  openDay = null; statView = ""; focusId = null;
   document.getElementById("dayview").hidden = true;
 }
 
 /* 上のバーの数字から開く一覧。日付を開いたときと同じ枠を使い回します */
 function renderStatView(){
   const box = document.getElementById("dayview");
-  const late = (statView === "late");
   const list = statTasks(statView);
   if (!list.length){ closeDay(); return; }
 
+  const head = {
+    late: {t: "期限オーバー",   c: "日付の置き方に無理があるものです。カードの「配置を解除」で外せます"},
+    soon: {t: "未配置3日以内", c: "まだカレンダーに置いていないものです。閉じてから枠からドラッグして置いてください"},
+    one:  {t: (list[0].kind === "m" ? "製造タスク" : "出荷タスク"), c: ""}
+  }[statView];
+
   box.hidden = false;
-  document.getElementById("dv-date").textContent = late ? "期限オーバー" : "未配置3日以内";
-  document.getElementById("dv-w").textContent = list.length + "件";
-  document.getElementById("dv-counts").textContent = late
-    ? "日付の置き方に無理があるものです。カードの「配置を解除」で外せます"
-    : "まだカレンダーに置いていないものです。閉じてから左の枠からドラッグして置いてください";
+  document.getElementById("dv-date").textContent = head.t;
+  document.getElementById("dv-w").textContent =
+    (statView === "one") ? (list[0].code || "") : list.length + "件";
+  document.getElementById("dv-counts").textContent = head.c;
 
   const ul = document.getElementById("dv-list");
   ul.innerHTML = "";
   list.forEach(function(t){
-    if (!late){ ul.appendChild(poolRow(t)); return; }
     const row = dayRow(t);
-    /* どの条件で赤くなったかを、カードの中に文字で出します */
-    const why = document.createElement("div");
-    why.className = "dv-why";
-    why.textContent = "⚠ " + lateReason(t);
-    row.insertBefore(why, row.querySelector(".dv-act"));
+    /* 赤くなった理由は、期限オーバーの一覧と1件表示のときに出します */
+    if (statView !== "soon" && isLate(t)){
+      const why = document.createElement("div");
+      why.className = "dv-why";
+      why.textContent = "⚠ " + lateReason(t);
+      row.insertBefore(why, row.querySelector(".dv-act"));
+    }
     ul.appendChild(row);
   });
-}
-
-/* 未配置のタスクを読むだけの行。
-   実施日がまだ無いので、日付を開いたときのカード（dayRow）は使えません */
-function poolRow(t){
-  const el = document.createElement("div");
-  el.className = "dv-row k-" + t.kind;
-  el.innerHTML = '<div class="dv-nm"><span class="dv-kind"></span><span class="dv-nmtxt"></span></div>'
-    + '<div class="dv-sub"></div><div class="dv-lim"></div>';
-
-  const kd = el.querySelector(".dv-kind");
-  kd.textContent = (t.kind === "m" ? "造" : "出");
-  if (t.kind === "s") kd.classList.add("k-s");
-  el.querySelector(".dv-nmtxt").textContent = t.name;
-  el.querySelector(".dv-sub").textContent =
-    [t.cust, t.to, t.qty, t.boxes ? t.boxes + "個口" : "", t.who, t.code]
-      .filter(Boolean).join("　");
-
-  const lim = el.querySelector(".dv-lim");
-  if (needArrange(t)){
-    const ar = document.createElement("span");
-    ar.className = "arrange";
-    ar.textContent = "出荷手配:" + t.arrange;
-    lim.appendChild(ar);
-  }
-  if (t.label === false){
-    const nl = document.createElement("span");
-    nl.className = "nolabel";
-    nl.textContent = "ラベル未発行";
-    lim.appendChild(nl);
-  }
-  limitChips(t).forEach(function(c){
-    const sp = document.createElement("span");
-    sp.textContent = c.label + (c.left === null ? "" : "　" + remainText(c.left));
-    if (c.left !== null) sp.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
-    lim.appendChild(sp);
-  });
-  return el;
 }
 
 function dayRow(t){
@@ -1613,8 +1602,11 @@ function dayRow(t){
     nl.textContent = "ラベル未発行";
     lim.appendChild(nl);
   }
+  /* 実施日。まだカレンダーに置いていないものはその旨を出します */
   const impl = document.createElement("span");
-  impl.textContent = "実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "");
+  impl.textContent = t.start
+    ? "実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "")
+    : "未スケジュール";
   lim.appendChild(impl);
 
   limitChips(t).forEach(function(c){
@@ -1624,7 +1616,7 @@ function dayRow(t){
     if (!t.done && c.left !== null) sp.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
     lim.appendChild(sp);
   });
-  if (t.done){
+  if (t.done && t.start){
     const ag = document.createElement("span");
     ag.className = "ago";
     ag.textContent = "✓ " + md(t.start) + "　" + agoText(t.start);
@@ -1641,6 +1633,14 @@ function dayRow(t){
   }
 
   const act = el.querySelector(".dv-act");
+  if (!t.start){
+    /* 未スケジュール。置いてからでないと完了も解除も意味がないので、
+       ボタンは出さずに置き方だけ案内します */
+    act.className = "dv-act dv-hint";
+    act.textContent = "カレンダーへドラッグすると実施日が入ります";
+    return el;
+  }
+
   const b1 = document.createElement("button");
   b1.textContent = t.done ? "完了を取り消す" : "完了にする";
   b1.onclick = () => { t.done ? markUndone(t.id) : markDone(t.id); };
@@ -1835,6 +1835,7 @@ function cancelDrag(){
   if (drag.el) drag.el.classList.remove("held");
   if (drag.ghost) drag.ghost.remove();
   drag = null;
+  stopAutoScroll();
   document.body.classList.remove("dragging");
   clearHints();
 }
@@ -1856,6 +1857,61 @@ function armDrag(){
   document.body.appendChild(g);
   drag.ghost = g;
   document.body.classList.add("dragging");
+}
+
+/* ドラッグ中、カレンダーの上端・下端に近づいたら自動でスクロールします。
+   10行あると画面に入りきらないので、これが無いと画面外の日付に置けません。
+   端から EDGE px の範囲で、近いほど速く動かします */
+const AUTOSCROLL_EDGE = 70;      // 端から何pxで効き始めるか
+const AUTOSCROLL_MS   = 16;      // 動かす間隔
+const AUTOSCROLL_MAX  = 16;      // 1回に動かす最大px
+let autoTimer = 0, autoY = 0;
+
+function scrollBox(){
+  const c = document.querySelector(".cal");
+  if (!c) return null;
+  return (c.scrollHeight > c.clientHeight + 1) ? c : null;
+}
+
+/* 指やマウスのY座標から、1回ぶんの移動量を出します。端から離れていれば0 */
+function autoStep(box){
+  const r = box.getBoundingClientRect();
+  if (autoY < r.top + AUTOSCROLL_EDGE){
+    const into = (r.top + AUTOSCROLL_EDGE) - autoY;
+    return -Math.ceil(Math.min(1, into / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX);
+  }
+  if (autoY > r.bottom - AUTOSCROLL_EDGE){
+    const into = autoY - (r.bottom - AUTOSCROLL_EDGE);
+    return Math.ceil(Math.min(1, into / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX);
+  }
+  return 0;
+}
+
+/* 動かしている間も見張り続けます。
+   端から離れたら止めずに0を返すだけにして、また近づいたときすぐ動くようにします */
+function autoScroll(y){
+  autoY = y;
+  if (autoTimer) return;
+  autoTimer = setInterval(function(){
+    const box = scrollBox();
+    if (!drag || !drag.armed || !box){ stopAutoScroll(); return; }
+
+    const d = autoStep(box);
+    if (!d) return;
+
+    const before = box.scrollTop;
+    box.scrollTop = before + d;
+    if (box.scrollTop === before) return;      // もう端まで来ています
+
+    /* 動いた先の日付に目印を付け替えます */
+    const t = hitTarget(drag.gx, drag.gy);
+    clearHints();
+    if (t) t.classList.add("drop-hint");
+  }, AUTOSCROLL_MS);
+}
+
+function stopAutoScroll(){
+  if (autoTimer){ clearInterval(autoTimer); autoTimer = 0; }
 }
 
 function hitTarget(x, y){
@@ -1913,8 +1969,10 @@ document.addEventListener("pointermove", e => {
 
   drag.moved = true;
   e.preventDefault();
+  drag.gx = e.clientX; drag.gy = e.clientY;
   drag.ghost.style.left = (e.clientX + 12) + "px";
   drag.ghost.style.top  = (e.clientY + 14) + "px";
+  autoScroll(e.clientY);
   const t = hitTarget(e.clientX, e.clientY);
   clearHints();
   if (t) t.classList.add("drop-hint");
@@ -1930,6 +1988,7 @@ document.addEventListener("pointerup", e => {
   if (!drag) return;
   const d = drag;
   drag = null;
+  stopAutoScroll();
   clearTimeout(d.timer);
   if (d.el) d.el.classList.remove("held");
   const t = (d.armed && d.moved) ? hitTarget(e.clientX, e.clientY) : null;
@@ -1959,10 +2018,15 @@ document.addEventListener("click", e => {
   if (suppressClick){ suppressClick = false; return; }
   if (e.target.closest(".cs")) return;       // 在庫チェックの操作
 
-  /* 日付を押したら、その日の一覧を出します。
-     カードをタップしても何も起きません（移動はドラッグのみ） */
+  /* 日付を押したら、その日の一覧を出します */
   const day = e.target.closest(".day");
-  if (day) showDay(day.dataset.date);
+  if (day){ showDay(day.dataset.date); return; }
+
+  /* カードを押したら、そのタスクの詳細を出します。
+     未スケジュールのままでも中身（SKU・資材・期限）が読めるようにするためです。
+     移動は今までどおりドラッグだけです */
+  const card = e.target.closest(".bar, .chip");
+  if (card && card.dataset.id) showTask(card.dataset.id);
 });
 
 document.addEventListener("keydown", e => {
@@ -1986,7 +2050,7 @@ document.addEventListener("pointerdown", e => {
 document.addEventListener("pointermove", e => {
   if (!rz) return;
   const delta = Math.round((e.clientX - rz.x0) / rz.dw);
-  const nd = Math.max(1, Math.min(14, rz.days0 + delta));
+  const nd = Math.max(1, Math.min(MAX_DAYS, rz.days0 + delta));
   if (nd !== rz.task.days){ rz.task.days = nd; suppressClick = true; renderCal(); renderSummary(); }
 });
 document.addEventListener("pointerup", () => {
