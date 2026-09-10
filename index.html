@@ -389,7 +389,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v77";
+const BUILD = "v78";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1078,10 +1078,14 @@ function buildSkus(box, j){
       ? '在庫から消費 — 作らずに完了してください' : '';
 
     /* 資材。作らないものには出しません（取りに行く必要がないので）。
+       作業費（fee）はモノではないので作業者には出しません。編集者だけです。
        出せなかったときは理由を出します。黙って空欄にすると
        「資材が要らない」と読めてしまうためです */
     if (!x.skip){
-      if ((x.mats || []).length) row.appendChild(matsEl(x.mats));
+      const all = x.mats || [];
+      const mats = all.filter(function(m){ return !m.fee; });
+      if (mats.length) row.appendChild(matsEl(mats));
+      else if (all.length){ /* 作業費だけ。取りに行くものが無いので何も出しません */ }
       else if (x.matNote){
         const w = el('div', 't-mats');
         const n = el('div', 'warn');
