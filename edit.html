@@ -26,8 +26,9 @@
   /* 出荷手配が要るのに未手配。期限切れの赤と「ラベル未発行」の橙の中間で、
      赤に寄せた色。ラベル未発行より強く見せます */
   --arr:#E17B55; --arr-soft:#3A1F14;
-  /* 作業費（sgh…）。モノではないので、資材の白とは分けてうぐいす色にします */
-  --fee:#B7C072;
+  /* 作業費（sgh…）。モノではないので、資材の白とは分けてうぐいす色にします。
+     「在庫引当済」も同じ色です。どちらも在庫まわりの、済んでいて安心な知らせです */
+  --fee:#B7C072; --fee-soft:#242813;
   --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
   /* 曜日の見出しと日付の数字。日曜は明るい赤と濃い赤、土曜は明るい青と濃い青 */
   --sat:#5DB1E5; --sat-ink:#5C8EAD;
@@ -268,6 +269,8 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip .lim span.near{background:var(--warn-soft); color:var(--warn);}
 .chip .lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
 .chip .lim span.arrange{background:var(--arr-soft); color:var(--arr); font-weight:700;}
+/* 在庫引当済。済んだ知らせなので、赤や橙と違って落ち着いた色にします */
+.chip .lim span.alloc{background:var(--fee-soft); color:var(--fee); font-weight:700;}
 .chip .lim span.over{background:var(--danger); color:#fff;}
 /* 完了したものは「遅れ」を出さないので、期限は控えめな表示にします */
 .chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
@@ -382,6 +385,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-lim span.near{background:var(--warn-soft); color:var(--warn);}
 .dv-lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
 .dv-lim span.arrange{background:var(--arr-soft); color:var(--arr); font-weight:700;}
+.dv-lim span.alloc{background:var(--fee-soft); color:var(--fee); font-weight:700;}
 .dv-lim span.over{background:var(--danger); color:#fff;}
 .dv-lim span.ago{background:var(--ago-soft); color:var(--ago-ink);}
 /* 在庫：SKUごとの「作らない」チェック */
@@ -690,7 +694,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v82";
+const BUILD = "v83";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1019,6 +1023,16 @@ const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
 /* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク */
 const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone;
 
+/* 完成品の在庫を引き終わった出荷。
+   在庫ブックの22時の処理が付けます。ボードからは変えられません。
+   alloc が null のときは出荷指示シートに列が無いので、何も出しません */
+const isAllocated = t => t.kind === "s" && t.alloc === true;
+
+/* 納品先が読み取れない出荷を赤くし始める日数。
+   出荷がこれより先なら、まだ埋まる余地があるので赤くしません。
+   納品先が読み取れている行には効きません（そちらは今まで通り赤くします） */
+const LEAD_UNKNOWN_GRACE = 14;
+
 /* 実際の輸送日数。
    t.lead は「出荷日 自動配置」が使う日数で、1日ぶん余裕を持たせてあります
    （関東〜兵庫は翌日着だけど2日、それ以西・東北・北海道は2日着だけど3日）。
@@ -1062,6 +1076,16 @@ function lateReason(t){
   if (t.start >= t.due){
     return "出荷日と納品日が同じ " + md(t.due) + "（当日には届かない）";
   }
+  /* 納品先が書かれておらず、輸送日数が出せないもの。
+     黙って遠方あつかいにすると、本当は近いのに赤くなって当てにならなくなるので、
+     「遅れている」ではなく「判定できていない」として赤くします。
+     ただし出荷が2週間より先なら急かしません。納品先は出荷までに埋まるので、
+     今の時点で赤くしても直しようがなく、赤が増えるだけです */
+  if (t.leadKnown === false){
+    if (t.start > add(TODAY, LEAD_UNKNOWN_GRACE)) return "";
+    return "住所からリードタイム判定不可";
+  }
+
   const n = transitDays(t);
   const arr = arriveDate(t);
   if (arr > t.due){
@@ -1309,6 +1333,12 @@ function chipEl(t, done){
     nl.className = "nolabel";
     nl.textContent = "ラベル未発行";
     lim.appendChild(nl);
+  }
+  if (isAllocated(t)){
+    const al = document.createElement("span");
+    al.className = "alloc";
+    al.textContent = "在庫引当済";
+    lim.appendChild(al);
   }
   limitChips(t).forEach(function(c){
     const s = document.createElement("span");
@@ -1667,6 +1697,12 @@ function dayRow(t){
     nl.className = "nolabel";
     nl.textContent = "ラベル未発行";
     lim.appendChild(nl);
+  }
+  if (isAllocated(t)){
+    const al = document.createElement("span");
+    al.className = "alloc";
+    al.textContent = "在庫引当済";
+    lim.appendChild(al);
   }
   /* 実施日。まだカレンダーに置いていないものはその旨を出します */
   const impl = document.createElement("span");
