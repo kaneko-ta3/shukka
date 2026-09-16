@@ -137,12 +137,11 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 /* 過ぎた日の状態を、日付の色で示します。今日と未来には付けません。
    「済」のバッジが別に出ているので、取り消し線は引きません。
 
-   done-past … その日のタスクが全部完了。曜日の色のまま暗くします
+   done-past … もう見なくていい日。全部完了した日と、タスクが無かった日
    overdue  … 作業の最終日が過ぎたのに終わっていないものがある
 
-   またぎタスクの途中の日には何も付けません。
-   最終日が来るまでは遅れているとは言えないためで、
-   色が付いていない＝いま判断することは無い、という意味になります */
+   まだ作業中のまたぎタスクが乗っている日だけ、白のまま残します。
+   暗い＝もう見なくていい、白＝まだ動いている、という読み方になります */
 .cell.done-past .c-num{opacity:.55}
 .cell.overdue .c-num{color:var(--warn)}
 .cell.overdue:nth-child(7n) .c-num{color:var(--warn)}
@@ -411,7 +410,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v88";
+const BUILD = "v89";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -716,16 +715,18 @@ function render(){
 }
 
 /* 過ぎた日に付ける印を決めます。今日と未来は何も付けません。
-   list は他予定を除いたタスクです（他予定だけの日には印が付きません）。
+   list は他予定を除いたタスクです。
 
    overdue  … 作業の最終日がその日で、まだ完了していないものがある＝遅れている
-   done-past … その日のタスクが全部完了している
-   どちらでもない … またぎの途中など。判断することが無いので何も付けません */
+   done-past … もう見なくていい日。全部完了した日も、タスクが無かった日も含みます
+   どちらでもない … まだ作業中のまたぎタスクが乗っている日。白のまま残します */
 function dayMark(date, list){
-  if (!list.length || date >= TODAY) return "";
+  if (date >= TODAY) return "";
   const overdue = list.some(j => !j.done && add(j.start, j.days - 1) === date);
   if (overdue) return " overdue";
-  return list.every(j => j.done) ? " done-past" : "";
+  /* まだ作業中のまたぎタスクが乗っている日は、そのまま（白）にします。
+     暗い＝もう見なくていい日、白＝まだ動いているものがある日、になります */
+  return list.some(j => !j.done) ? "" : " done-past";
 }
 
 function renderMonth(){

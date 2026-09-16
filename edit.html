@@ -110,7 +110,13 @@ body.fold-log{--w-log:28px}
 .cal{background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius);
   display:flex; flex-direction:column; min-height:0; overflow-y:auto; overflow-x:hidden;}
 #weeks{flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
-.dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-bottom:1px solid var(--line-strong);
+/* 列の幅。土日は使う頻度が低いので狭くして、そのぶん平日を広く取ります。
+   作業者ページと同じ 0.62 です。
+   ★この値を変えるときは、JS側の COL_W も同じに直してください。
+     帯（.bar）の位置はJSがこの割合から計算しています */
+.dow, .week-days{grid-template-columns:
+  minmax(0,.62fr) repeat(5, minmax(0,1fr)) minmax(0,.62fr);}
+.dow{display:grid; border-bottom:1px solid var(--line-strong);
   background:var(--surface-2); position:sticky; top:0; z-index:3;}
 .dow div{padding:5px 8px; font-size:12px; font-weight:500; letter-spacing:.1em; color:var(--ink); border-right:1px solid var(--line-strong);}
 .dow div:last-child{border-right:0}
@@ -123,7 +129,7 @@ body.fold-log{--w-log:28px}
 .week{position:relative; border-bottom:1px solid var(--line-strong);
   flex:1 0 auto; display:flex; flex-direction:column;}
 .week:last-child{border-bottom:0}
-.week-days{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); flex:1 1 auto;}
+.week-days{display:grid; flex:1 1 auto;}
 .day{border-right:1px solid var(--line-strong); min-height:max(112px, calc(30px + var(--lanes,0) * 25px + 14px));
   padding:5px 6px 0; position:relative; min-width:0;}
 .day:last-child{border-right:0}
@@ -154,7 +160,7 @@ body.fold-log{--w-log:28px}
 
 .week-bars{position:absolute; inset:0; pointer-events:none;}
 .bar{position:absolute; pointer-events:auto;
-  left:calc(var(--col) * (100% / 7) + 3px); width:calc(var(--span) * (100% / 7) - 6px);
+  left:calc(var(--l) + 3px); right:calc(var(--r) + 3px);
   top:calc(28px + var(--lane) * 25px); height:22px;
   display:flex; align-items:center; gap:5px; padding:0 6px;
   background:var(--mfg-soft); border:1px solid var(--mfg); border-left:3px solid var(--mfg);
@@ -546,8 +552,8 @@ body.resizing{cursor:col-resize; user-select:none;}
   .day.today .dnum{padding:0 4px; min-width:1.3em;}
   .day.today .dnum.wide{padding:0 3px}
   .bar{top:calc(31px + var(--lane) * 18px); height:16px; font-size:9px;
-       gap:3px; padding:0 4px; left:calc(var(--col) * (100% / 7) + 2px);
-       width:calc(var(--span) * (100% / 7) - 4px);}
+       gap:3px; padding:0 4px;
+       left:calc(var(--l) + 2px); right:calc(var(--r) + 2px);}
   /* 種別は色で分かるので、狭いマスでは「造」「出」の字を出しません。
      その分を案件名に回します */
   /* 「…」に1文字ぶん取られるのがもったいないので、狭い画面では出しません */
@@ -694,7 +700,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v83";
+const BUILD = "v89";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1146,6 +1152,28 @@ function renderSummary(){
   document.getElementById("ps-count2").textContent = ps.length + "件";
 }
 
+/* カレンダーの列幅の割合。日〜土の7つです。
+   土日を狭くして平日を広げています（作業者ページと同じ 0.62）。
+   ★CSSの .dow, .week-days の grid-template-columns と必ず同じにしてください。
+
+   帯（.bar）は7等分ではなくこの割合の上に乗るので、
+   ここから累積の境界（％）を出して、左端と右端を直接指定します。
+   計算を1か所にまとめてあるので、割合を変えれば帯も一緒に動きます */
+const COL_W = [0.62, 1, 1, 1, 1, 1, 0.62];
+const COL_EDGE = (function(){
+  const total = COL_W.reduce(function(a, b){ return a + b; }, 0);
+  const out = [0];
+  let x = 0;
+  COL_W.forEach(function(w){ x += w; out.push(x / total * 100); });
+  return out;                      // 長さ8。左端0％〜右端100％
+})();
+
+/* 帯の左右を、列番号とまたぐ列数から決めます */
+function barEdges(el, col, span){
+  el.style.setProperty("--l", COL_EDGE[col] + "%");
+  el.style.setProperty("--r", (100 - COL_EDGE[col + span]) + "%");
+}
+
 function renderCal(){
   /* スマホはマスの高さを揃えたいので、段数に上限を付けます。
      マスが縦に伸びるとドラッグの狙いが安定しないためです。
@@ -1248,8 +1276,7 @@ function renderCal(){
         const m = sg.m;
         const b = document.createElement("div");
         b.className = "bar misc";
-        b.style.setProperty("--col", sg.col);
-        b.style.setProperty("--span", sg.span);
+        barEdges(b, sg.col, sg.span);
         b.style.setProperty("--lane", sg.lane);
         b.title = m.name + "\n" + miscTime(m) + "\n（Googleカレンダーの予定）";
         b.innerHTML = '<span class="tag">他</span><span class="nm"></span>';
@@ -1265,8 +1292,7 @@ function renderCal(){
         + (needArrange(t) ? " arrange" : "")
         + (sg.contL ? " cont-l" : "") + (sg.contR ? " cont-r" : "")
         + (t._pending ? " pending" : "");
-      b.style.setProperty("--col", sg.col);
-      b.style.setProperty("--span", sg.span);
+      barEdges(b, sg.col, sg.span);
       b.style.setProperty("--lane", sg.lane);
       b.tabIndex = 0;
       b.dataset.id = t.id;
