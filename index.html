@@ -134,6 +134,15 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    本日の白い丸の中は、丸の中の文字色をそのまま使います */
 .cell.off:not(.today) .c-num{color:var(--off-ink); font-weight:700;}
 .cell.off:nth-child(7n):not(.today) .c-num{color:var(--sat-ink)}
+/* その日のタスクが全部終わったら、日付に取り消し線を引きます。
+   タスクが1件も無い日には引きません（他予定だけの日も同じです）。
+   文字色は触りません（日曜の赤・土曜の青・本日の白丸をそのまま残すため）。
+   線だけグレーにするので text-decoration-color を別に指定しています */
+.cell.done-all .c-num{
+  text-decoration:line-through;
+  text-decoration-color:var(--line-strong);
+  text-decoration-thickness:2px;
+}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
   background:var(--accent); color:var(--accent-ink); white-space:nowrap; flex:none;}
 .c-count.all-done{background:var(--surface-2); color:var(--muted);}
@@ -394,7 +403,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v82";
+const BUILD = "v86";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -761,6 +770,8 @@ function renderMonth(){
       + (isOff(date) ? ' off' : '')
       + (otherMonth ? ' other' : '')
       + (date === TODAY ? ' today' : '')
+      /* 他予定を除いたタスクが1件以上あって、全部完了していたら日付に取り消し線 */
+      + (list.length && !undone ? ' done-all' : '')
       + (list.length + other.length ? '' : ' empty');
     cell.dataset.date = date;
     if (!list.length && !other.length) cell.disabled = true;
