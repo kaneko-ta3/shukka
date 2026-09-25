@@ -89,13 +89,22 @@ label.fill.on{color:var(--accent); font-weight:700;}
 table.src tr.hid td{opacity:.4; text-decoration:line-through;}
 @media (max-width: 1000px){ .split{grid-template-columns:1fr;} .split-r{position:static;} .split-r .scroll{max-height:360px;} }
 
-/* 列の対応 */
-.maprow2{display:grid; grid-template-columns:120px minmax(0, 1fr); gap:10px; padding:6px 0; border-top:1px solid var(--line); align-items:center;}
-.maprow2.sub{border-top:none; padding-top:0;}
-.maprow2 .ms{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
-.maprow2 select{max-width:100%; min-width:0;}
-.need{font-size:10px; background:var(--danger); color:#fff; border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:middle;}
-.plus{color:var(--muted);}
+/* 列の対応。1項目1行に詰めます */
+.mr{display:grid; grid-template-columns:122px minmax(0, 1fr); gap:8px; padding:3px 0; border-top:1px solid var(--line); align-items:center;}
+.mr.sub{border-top:none; padding-top:0;}
+.mr .ml{font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.mr .ml[title]{cursor:help;}
+.mr .q{display:inline-grid; place-items:center; width:14px; height:14px; margin-left:4px; border-radius:50%; border:1px solid var(--line-strong); color:var(--muted); font-size:10px; vertical-align:1px;}
+.mr .ms{display:flex; flex-direction:column; gap:3px; min-width:0;}
+.mr .ms.inline{flex-direction:row; align-items:center;}
+.mr .ms.inline input[type=text]{flex:1; min-width:0;}
+.mr select, .mr input{padding:3px 6px; font-size:13px; width:100%; min-width:0;}
+.mr .ms.inline input.w4{width:4.5em; flex:none;}
+.need{font-size:10px; background:var(--danger); color:#fff; border-radius:3px; padding:0 4px; margin-left:4px; vertical-align:1px;}
+.plus{color:var(--muted); font-size:12px; white-space:nowrap;}
+details.morecols{border-top:1px solid var(--line); padding-top:4px;}
+details.morecols > summary{cursor:pointer; color:var(--muted); font-size:12px; padding:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+details.morecols[open] > summary{color:var(--ink);}
 
 /* 一覧 */
 .bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; background:var(--surface); padding:8px 0;}
@@ -131,7 +140,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 #toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:10px 18px; border-radius:8px; font-weight:700; z-index:50; box-shadow:0 6px 18px rgba(0,0,0,.5);}
 @media (max-width: 700px){
   main{padding:12px 16px 80px;}
-  .maprow2{grid-template-columns:1fr;}
+  .mr{grid-template-columns:90px minmax(0, 1fr);}
   .sender-row select{min-width:0; width:100%;}
 }
 </style>
@@ -142,7 +151,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v3</span>
+  <span class="ver">v4</span>
 </header>
 
 <main>
@@ -175,8 +184,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
     <div class="split">
       <div class="split-l">
         <div class="btns" style="margin-bottom:4px"><b>どの列が何か</b>
-          <button class="btn small" id="reguess">見出しから当て直す</button></div>
-        <div class="tiny muted" style="margin-bottom:6px">見出しから当ててあります。違うところだけ直してください。右の表の「使い道」に、選んだ項目が出ます。</div>
+          <span class="tiny muted" title="見出しから当ててあります。違うところだけ直してください。右の表の「使い道」に、選んだ項目が出ます">違うところだけ直す</span>
+          <button class="btn small" id="reguess" style="margin-left:auto">見出しから当て直す</button></div>
         <div id="mapBox"></div>
       </div>
       <div class="split-r">

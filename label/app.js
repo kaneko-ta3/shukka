@@ -383,7 +383,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null;
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null;
   detectHeader();
   guessMap();
   rebuild();
@@ -951,31 +951,37 @@ function renderMap() {
     return '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + colLetter(c) + '：' +
       esc((ht || '（見出しなし）').slice(0, 14)) + (sm ? '　例 ' + esc(sm.slice(0, 14)) : '') + '</option>';
   }).join('');
-  let h = '';
-  CFG.ITEMS.forEach(it => {
+  /* 1項目1行。説明は項目名に重ねると出ます。使う機会の少ない列は「その他の列」に畳みます */
+  const row = it => {
     const cols = S.map[it.key] || [];
     const slots = it.multi ? Math.min(3, cols.length + 1) : 1;
-    h += '<div class="maprow2"><div class="ml">' + esc(it.label) + (it.need ? '<span class="need">必須</span>' : '') +
-      (it.hint ? '<div class="tiny muted">' + esc(it.hint) + '</div>' : '') + '</div><div class="ms">';
+    let r = '<div class="mr"><div class="ml"' + (it.hint ? ' title="' + esc(it.hint) + '"' : '') + '>' + esc(it.label) +
+      (it.need ? '<span class="need">必須</span>' : '') + (it.hint ? '<span class="q">?</span>' : '') + '</div><div class="ms">';
     for (let i = 0; i < slots; i++) {
-      h += '<select data-map="' + it.key + '" data-i="' + i + '">' + opts(cols[i] == null ? -1 : cols[i]) + '</select>';
-      if (i < slots - 1) h += '<span class="plus">＋</span>';
+      r += '<select data-map="' + it.key + '" data-i="' + i + '">' + opts(cols[i] == null ? -1 : cols[i]) + '</select>';
     }
-    h += '</div></div>';
+    r += '</div></div>';
     if (it.key === 'qty1' || it.key === 'qty2') {
       const o = it.key === 'qty1' ? S.item1 : S.item2;
       const p = it.key === 'qty1' ? 'item1' : 'item2';
-      h += '<div class="maprow2 sub"><div class="ml">　└ 商品名と入数</div><div class="ms">' +
-        '<input type="text" data-item="' + p + '" data-f="name" value="' + esc(o.name) + '" placeholder="例：非常用トイレ" size="16">' +
-        '<span class="plus">1箱に</span><input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w5">' +
-        '<span class="plus">個</span><span class="tiny muted">ラベルには「' + esc(o.name || '商品名') + '(10)」の形で出ます</span></div></div>';
+      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数</div><div class="ms inline">' +
+        '<input type="text" data-item="' + p + '" data-f="name" value="' + esc(o.name) + '" placeholder="例：非常用トイレ">' +
+        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4"><span class="plus">個/箱</span></div></div>';
     }
     if (it.key === 'store') {
-      h += '<div class="maprow2 sub"><div class="ml">　└ 会社名（全行共通）</div><div class="ms">' +
-        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="例：株式会社△△（付けないなら空）" style="width:100%">' +
-        '<span class="tiny muted">入れると「名前」に会社名、「備考(住所4)」に店名が入ります</span></div></div>';
+      r += '<div class="mr sub"><div class="ml tiny muted" title="入れると「名前」に会社名、「備考(住所4)」に店名が入ります。空なら店名が「名前」に入ります">└ 会社名</div><div class="ms">' +
+        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="全行共通。例：株式会社△△（付けないなら空）"></div></div>';
     }
-  });
+    return r;
+  };
+  const MORE = ['qty2', 'boxes', 'ship', 'time', 'memo2'];
+  const main = CFG.ITEMS.filter(it => !MORE.includes(it.key));
+  const more = CFG.ITEMS.filter(it => MORE.includes(it.key));
+  const used = more.filter(it => (S.map[it.key] || []).length).map(it => it.label);
+  if (S.moreOpen == null) S.moreOpen = used.length > 0 || !!S.item2.name;
+  let h = main.map(row).join('');
+  h += '<details class="morecols" id="moreCols"' + (S.moreOpen ? ' open' : '') + '><summary>その他の列（' +
+    (used.length ? '使用中：' + esc(used.join('・')) : more.map(it => it.label).join('・')) + '）</summary>' + more.map(row).join('') + '</details>';
   $('#mapBox').innerHTML = h;
 }
 
@@ -1173,6 +1179,7 @@ function bindEvents() {
     if (t) { e.preventDefault(); readPaste(t); e.target.value = ''; toast('貼り付けた表を読みました'); }
   });
   $('#sheetSel').addEventListener('change', e => { S.sheet = e.target.value; loadSheet(); });
+  document.addEventListener('toggle', e => { if (e.target.id === 'moreCols') S.moreOpen = e.target.open; }, true);
 
   /* 見出し */
   document.addEventListener('click', e => {
