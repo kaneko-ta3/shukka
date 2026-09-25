@@ -23,6 +23,7 @@ body{margin:0; background:var(--ground); color:var(--ink);
 header{padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;}
 header h1{font-size:18px; margin:0;}
 header .tiny{margin-left:auto;}
+header .ver{font-size:13px; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:0 8px;}
 main{padding:16px 20px 80px; max-width:1800px; margin:0 auto;}
 section{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:16px;}
 h2{font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:8px;}
@@ -140,6 +141,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <h1>複数宛先ラベル</h1>
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
+  <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
+  <span class="ver">v3</span>
 </header>
 
 <main>
