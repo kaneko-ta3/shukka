@@ -89,7 +89,7 @@ const S = {
   item2: {name: '', per: ''},
   rows: [],                 // 組み立てた行
   edits: {},                // 元の行番号 -> {項目: 手で入れた値}
-  include: {},              // 元の行番号 -> true/false（手で含める／外す）
+  include: {},              // 元の行番号 -> true/false（手で発行する／外す）
   sel: new Set(),           // 選択中の元の行番号
   lastClick: null,
   checks: {},               // `${〒}|${住所}` -> 照合結果
@@ -1034,7 +1034,7 @@ function renderRows() {
 
   const showQ2 = (S.map.qty2 || []).length || S.item2.name;
   let h = '<table class="rows"><thead><tr>' +
-    '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc">含める</th>' +
+    '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
     '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>指定日</th><th>出荷日</th><th>時間</th><th>記事</th>' +
     '</tr></thead><tbody>';
