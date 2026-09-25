@@ -741,8 +741,10 @@ async function importSenders(file) {
   try { text = new TextDecoder('utf-8', {fatal: true}).decode(buf); }
   catch (e) { text = new TextDecoder('shift_jis').decode(buf); }
   const grid = parseDelimited(text, /\t/.test(text.split(/\r?\n/)[0]) ? '\t' : ',');
-  if (grid.length < 2) throw new Error('中身がありません（1行目が見出し、2行目から依頼主）');
+  if (grid.length < 2) throw new Error('中身がありません（1行目が見出し、2行目から）');
   const head = grid[0].map(h => String(h).trim());
+  /* 請求先の設定CSV（見出しに「顧客コード」がある）は請求先として読みます */
+  if (head.some(h => h.indexOf('顧客コード') >= 0)) return {accounts: Issued.importAccounts(grid)};
   const idx = {};
   SENDER_COLS.forEach(([k, words]) => {
     idx[k] = head.findIndex(h => words.some(w => h === w)) ;
@@ -817,6 +819,8 @@ function downloadCsv() {
   const d = new Date();
   const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
   download('ラベル_' + stamp + '.csv', text);
+  /* 発行済データと照合するための控え（〒・名前・店名・出荷日だけ）。このブラウザに保存します */
+  Issued.saveBatch('ラベル_' + stamp + '.csv', S.rows.filter(included).map(r => r.out));
   toast('CSVを保存しました（' + rows.length + '件）');
 }
 
@@ -847,7 +851,7 @@ function renderSender() {
   if (!S.senders.length) {
     box.innerHTML =
       '<div class="notice warn">依頼主がまだ設定されていません。最初に1回だけ、依頼主設定のCSVを読み込んでください。</div>' +
-      '<div class="btns"><label class="btn primary">依頼主設定CSVを読み込む<input type="file" accept=".csv,.txt" id="senderFile" hidden></label>' +
+      '<div class="btns"><label class="btn primary">設定CSVを読み込む（依頼主・請求先）<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
       '<button class="btn" id="senderNew">手で入力する</button></div>';
   } else {
     const p = senderProblems(s);
@@ -855,8 +859,9 @@ function renderSender() {
       '<div class="sender-row"><select id="senderSel">' + opts + '<option value="__new">＋ 新しく入力する（取引先が依頼主の場合など）</option></select>' +
       '<button class="btn small" id="senderEdit">直す</button>' +
       '<details class="more"><summary>設定ファイル</summary><div class="btns">' +
-      '<label class="btn small">CSVを読み込む<input type="file" accept=".csv,.txt" id="senderFile" hidden></label>' +
-      '<button class="btn small" id="senderExport">CSVに書き出す</button>' +
+      '<label class="btn small">CSVを読み込む（依頼主・請求先）<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
+      '<button class="btn small" id="senderExport">依頼主を書き出す</button>' +
+      '<button class="btn small" id="acctExport">請求先を書き出す</button>' +
       '<button class="btn small danger" id="senderDel">この依頼主を消す</button></div></details></div>' +
       '<div class="sender-detail">' + esc(s.code ? 'コード ' + s.code + '　' : 'コード なし　') +
       esc(normZip(s.zip)) + '　' + esc(s.addr) + ' ' + esc(s.bldg || '') + '　' + esc(s.tel) + '</div>' +
@@ -1242,9 +1247,19 @@ function bindEvents() {
       S.senderId = t.value; saveSenders(); renderSender(); renderRows(); return;
     }
     if (t.id === 'senderFile') {
-      const f = t.files[0];
-      if (f) importSenders(f).then(r => { toast('依頼主を読み込みました（追加 ' + r.added + '・更新 ' + r.updated + '）'); renderSender(); renderRows(); })
-        .catch(err => toast('読めませんでした：' + err.message));
+      const fs = Array.from(t.files || []);
+      (async () => {
+        const msg = [];
+        for (const f of fs) {
+          try {
+            const r = await importSenders(f);
+            msg.push(r.accounts != null ? '請求先 ' + r.accounts + '件' : '依頼主（追加 ' + r.added + '・更新 ' + r.updated + '）');
+          } catch (err) { msg.push(f.name + ' は読めませんでした：' + err.message); }
+        }
+        toast('読み込みました：' + msg.join(' ／ '));
+        renderSender(); renderRows();
+      })();
+      t.value = '';
       return;
     }
   });
@@ -1283,6 +1298,7 @@ function bindEvents() {
     if (t.id === 'senderNew') { openSenderDialog(null); return; }
     if (t.id === 'senderEdit') { openSenderDialog(currentSender()); return; }
     if (t.id === 'senderExport') { exportSenders(); return; }
+    if (t.id === 'acctExport') { Issued.exportAccounts(); return; }
     if (t.id === 'senderDel') {
       const s = currentSender();
       if (s && confirm('「' + s.name + '」をこのブラウザから消しますか')) {
@@ -1332,6 +1348,7 @@ function init() {
   if (it) { S.item1 = Object.assign(S.item1, it.item1 || {}); S.item2 = Object.assign(S.item2, it.item2 || {}); }
   $('#vTime').innerHTML = CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();
+  Issued.bind();
   renderAll();
   loadAddrMaster().then(() => { if (S.rows.length) { S.checks = {}; recompute(); } });
   Addr.loadIndex().then(() => { $('#dataVer').textContent = Addr.ver ? '郵便番号データ ' + Addr.ver + ' 版' : ''; })

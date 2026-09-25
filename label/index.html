@@ -104,6 +104,15 @@ table.src tr.hid td{opacity:.4; text-decoration:line-through;}
 .plus{color:var(--muted); font-size:12px; white-space:nowrap;}
 /* 必須で空の欄。入れたら普通の色に戻ります */
 .req-empty, .mr select.req-empty, .mr input.req-empty{background:var(--danger-soft); border-color:rgba(228,105,92,.55);}
+/* 返却用 */
+.drop.small{padding:12px; text-align:left;}
+.stats{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+label.pick{display:inline-flex; gap:4px; align-items:center; background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:2px 8px; cursor:pointer;}
+.ours{border:1px dashed var(--line-strong); border-radius:6px; padding:8px 10px; margin:8px 0;}
+.acct{display:inline-block; font-weight:700; padding:3px 12px; border-radius:6px; margin-bottom:6px;}
+.acct.ok{background:var(--accent-soft); color:var(--accent);}
+.acct.ng{background:var(--danger-soft); color:var(--danger);}
+table.ours-t td{max-width:360px;}
 details.morecols{border-top:1px solid var(--line); padding-top:4px;}
 details.morecols > summary{cursor:pointer; color:var(--muted); font-size:12px; padding:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 details.morecols[open] > summary{color:var(--ink);}
@@ -154,7 +163,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v7</span>
+  <span class="ver">v9</span>
 </header>
 
 <main>
@@ -230,6 +239,14 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
       <div class="scroll" id="csvPreview" style="margin-top:6px"></div>
     </details>
   </section>
+
+  <section id="step5">
+    <h2><span class="n">5</span>発行済データから返却用ファイル</h2>
+    <p class="tiny muted" style="margin:0 0 8px">B2で発行したあと、発行済データをここに入れると、取引先に返す一覧（1宛先1行、全口の伝票番号つき）を作ります。ほかの案件の行が混ざっていても、このブラウザで作ったCSVと照合して今回の分だけを拾います。</p>
+    <div class="drop small" id="issuedDrop">発行済データ（CSV・Excel）をここにドラッグ　または
+      <label class="btn small">ファイルを選ぶ<input type="file" id="issuedFile" accept=".csv,.txt,.xlsx,.xls" hidden></label></div>
+    <div id="issuedBody"></div>
+  </section>
 </main>
 
 <dialog id="senderDlg">
@@ -251,5 +268,6 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="addr.js"></script>
 <script src="app.js"></script>
+<script src="issued.js"></script>
 </body>
 </html>
