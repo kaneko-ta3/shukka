@@ -1028,7 +1028,8 @@ function renderRows() {
   $('#dlWhy').textContent = block.join('　／　');
 
   /* 選択中の行への一括操作 */
-  $('#selInfo').textContent = S.sel.size ? '選択中 ' + S.sel.size + '行' : '行番号の左の □ で選択（Shiftを押しながらで範囲）';
+  /* 幅は固定。選んでも右のボタンが動かないように、文字の長さを変えません */
+  $('#selInfo').textContent = '選択 ' + S.sel.size + '行';
   $('#bulk').classList.toggle('dim', !S.sel.size);
 
   const showQ2 = (S.map.qty2 || []).length || S.item2.name;

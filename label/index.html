@@ -113,6 +113,7 @@ details.morecols[open] > summary{color:var(--ink);}
 .stat{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:3px 10px;}
 #bulk{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:var(--surface-2); border-radius:6px; margin:6px 0 10px;}
 #bulk.dim .btn, #bulk.dim input, #bulk.dim select{opacity:.55;}
+#bulk .selcount{display:inline-block; width:6.5em; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap;}
 #bulk .sep{width:1px; height:22px; background:var(--line); margin:0 4px;}
 table.rows{font-size:13px; width:100%;}
 table.rows th{background:var(--surface-2); position:sticky; top:0; z-index:2; font-weight:700; text-align:left; padding:5px 4px; border-bottom:1px solid var(--line-strong); white-space:nowrap;}
@@ -153,7 +154,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v5</span>
+  <span class="ver">v6</span>
 </header>
 
 <main>
@@ -202,7 +203,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
     <h2><span class="n">3</span>確認・手直し</h2>
     <div class="bar" id="summary"></div>
     <div id="bulk">
-      <span id="selInfo" class="tiny"></span>
+      <span id="selInfo" class="selcount"></span>
       <span class="sep"></span>
       指定日 <input type="date" id="vDue"> <button class="btn small" id="bDue">入れる</button>
       <span class="sep"></span>
@@ -215,7 +216,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
       <button class="btn small" id="bIncl">含める</button>
       <button class="btn small" id="bClear">選択を外す</button>
     </div>
-    <p class="tiny muted" style="margin:0 0 8px">セルはそのまま書き換えられます（Enterで確定）。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します（灰色）。</p>
+    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます（Shiftを押しながらで範囲）。セルはそのまま書き換えられます（Enterで確定）。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します（灰色）。</p>
     <div class="scroll" id="rowsTable" style="max-height:70vh"></div>
   </section>
 
