@@ -102,6 +102,8 @@ table.src tr.hid td{opacity:.4; text-decoration:line-through;}
 .mr .ms.inline input.w4{width:4.5em; flex:none;}
 .need{font-size:10px; background:var(--danger); color:#fff; border-radius:3px; padding:0 4px; margin-left:4px; vertical-align:1px;}
 .plus{color:var(--muted); font-size:12px; white-space:nowrap;}
+/* 必須で空の欄。入れたら普通の色に戻ります */
+.req-empty, .mr select.req-empty, .mr input.req-empty{background:var(--danger-soft); border-color:rgba(228,105,92,.55);}
 details.morecols{border-top:1px solid var(--line); padding-top:4px;}
 details.morecols > summary{cursor:pointer; color:var(--muted); font-size:12px; padding:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 details.morecols[open] > summary{color:var(--ink);}
@@ -151,7 +153,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v4</span>
+  <span class="ver">v5</span>
 </header>
 
 <main>

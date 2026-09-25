@@ -20,8 +20,8 @@ const CFG = {
   ITEMS: [
     {key: 'store', label: '店名・宛先名', need: true, multi: true,
      hint: '会社名を入れたときは「備考(住所4)」へ、空のときは「名前」へ入ります'},
-    {key: 'tel',   label: '電話'},
-    {key: 'zip',   label: '〒',  hint: '住所の列に〒が入っているなら空でOK'},
+    {key: 'tel',   label: '電話', need: true, hint: '行ごとに電話が空のときは「0」で出し、保存のときに知らせます'},
+    {key: 'zip',   label: '〒', need: true, hint: '住所の列に〒が入っているなら空でOK'},
     {key: 'addr',  label: '住所', need: true, multi: true, hint: '2〜3列に分かれていれば全部選ぶとつなげます'},
     {key: 'qty1',  label: '商品1の数量'},
     {key: 'qty2',  label: '商品2の数量'},
@@ -615,7 +615,8 @@ function computeRow(row) {
   const q2 = String(val(row, 'qty2') || '').trim();
   const item = (it, q, label) => {
     const nm = it.name.trim();
-    if (!q) return nm && !(S.map[label === '商品1' ? 'qty1' : 'qty2'] || []).length ? nm : '';
+    /* 数量の列を選んでいないとき、商品1は名前だけを出します。商品2は出しません（名前が残っていても） */
+    if (!q) return label === '商品1' && nm && !(S.map.qty1 || []).length ? nm : '';
     const n = num(q);
     if (isNaN(n)) { err.push(label + 'の数量が数字ではありません（' + q + '）'); return nm; }
     if (!nm) { err.push(label + 'の商品名を上の欄に入れてください'); return ''; }
@@ -954,18 +955,21 @@ function renderMap() {
   /* 1項目1行。説明は項目名に重ねると出ます。使う機会の少ない列は「その他の列」に畳みます */
   const row = it => {
     const cols = S.map[it.key] || [];
+    const emptyReq = it.need && !cols.length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip));
     const slots = it.multi ? Math.min(3, cols.length + 1) : 1;
     let r = '<div class="mr"><div class="ml"' + (it.hint ? ' title="' + esc(it.hint) + '"' : '') + '>' + esc(it.label) +
       (it.need ? '<span class="need">必須</span>' : '') + (it.hint ? '<span class="q">?</span>' : '') + '</div><div class="ms">';
     for (let i = 0; i < slots; i++) {
-      r += '<select data-map="' + it.key + '" data-i="' + i + '">' + opts(cols[i] == null ? -1 : cols[i]) + '</select>';
+      r += '<select data-map="' + it.key + '" data-i="' + i + '"' + (i === 0 && emptyReq ? ' class="req-empty"' : '') + '>' + opts(cols[i] == null ? -1 : cols[i]) + '</select>';
     }
     r += '</div></div>';
     if (it.key === 'qty1' || it.key === 'qty2') {
       const o = it.key === 'qty1' ? S.item1 : S.item2;
       const p = it.key === 'qty1' ? 'item1' : 'item2';
-      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数</div><div class="ms inline">' +
-        '<input type="text" data-item="' + p + '" data-f="name" value="' + esc(o.name) + '" placeholder="例：非常用トイレ">' +
+      /* 商品1の名前はいつも必須。商品2は数量の列を選んだときだけ必須 */
+      const nameNeed = p === 'item1' || cols.length > 0;
+      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
+        '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !o.name.trim() ? ' class="req-empty"' : '') + '>' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4"><span class="plus">個/箱</span></div></div>';
     }
     if (it.key === 'store') {
@@ -1011,6 +1015,11 @@ function renderRows() {
 
   const block = [];
   if (!inc.length) block.push('宛先が0件です');
+  CFG.ITEMS.forEach(it => {
+    if (it.need && !(S.map[it.key] || []).length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip))) block.push('「' + it.label + '」の列を選んでください');
+  });
+  if (!S.item1.name.trim()) block.push('商品1の商品名を入れてください');
+  if ((S.map.qty2 || []).length && !S.item2.name.trim()) block.push('商品2の商品名を入れてください');
   sp.forEach(p => block.push(p));
   if (nErr) block.push('直すところが残っています（赤い行）');
   if (nPending) block.push('住所の照合が終わっていません');
@@ -1179,6 +1188,10 @@ function bindEvents() {
     if (t) { e.preventDefault(); readPaste(t); e.target.value = ''; toast('貼り付けた表を読みました'); }
   });
   $('#sheetSel').addEventListener('change', e => { S.sheet = e.target.value; loadSheet(); });
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset && t.dataset.item && t.dataset.f === 'name') t.classList.toggle('req-empty', !!t.dataset.need && !t.value.trim());
+  });
   document.addEventListener('toggle', e => { if (e.target.id === 'moreCols') S.moreOpen = e.target.open; }, true);
 
   /* 見出し */
