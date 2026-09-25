@@ -81,11 +81,18 @@ label.fill.on{color:var(--accent); font-weight:700;}
 .chip{display:inline-block; background:var(--accent); color:var(--accent-ink); border-radius:4px; padding:0 5px; margin:1px; font-size:11px;}
 .headbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;}
 
+/* 見出しと列：左に対応、右に別紙。右は画面に貼り付けて、左を下にたどっても見えたままにします */
+.split{display:grid; grid-template-columns:minmax(360px, 440px) minmax(0, 1fr); gap:18px; align-items:start;}
+.split-r{position:sticky; top:8px;}
+.split-r .scroll{max-height:calc(100vh - 110px);}
+table.src tr.hid td{opacity:.4; text-decoration:line-through;}
+@media (max-width: 1000px){ .split{grid-template-columns:1fr;} .split-r{position:static;} .split-r .scroll{max-height:360px;} }
+
 /* 列の対応 */
-.maprow2{display:grid; grid-template-columns:230px 1fr; gap:10px; padding:6px 0; border-top:1px solid var(--line); align-items:center;}
+.maprow2{display:grid; grid-template-columns:120px minmax(0, 1fr); gap:10px; padding:6px 0; border-top:1px solid var(--line); align-items:center;}
 .maprow2.sub{border-top:none; padding-top:0;}
 .maprow2 .ms{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
-.maprow2 select{max-width:330px;}
+.maprow2 select{max-width:100%; min-width:0;}
 .need{font-size:10px; background:var(--danger); color:#fff; border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:middle;}
 .plus{color:var(--muted);}
 
@@ -158,16 +165,23 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
     <h2><span class="n">2</span>見出しと列</h2>
     <div class="headbar">
       <span id="headInfo"></span>
-      <span class="tiny muted">違っていたら、見出しの行の<b>行番号</b>を押してください</span>
+      <span class="tiny muted">違っていたら、右の表で見出しの行の<b>行番号</b>を押してください</span>
       <button class="btn small" id="noHead">見出しなし</button>
       <label class="tiny">中身の開始行 <input type="number" id="dataFrom" min="1" class="w5"></label>
     </div>
-    <div class="scroll" id="srcTable" style="max-height:360px"></div>
-    <p class="tiny muted">支店名などが最初の行にしか無い列は、上の「埋める」を入れると、空欄が全部上の値で埋まります。</p>
-
-    <div class="btns" style="margin:14px 0 4px"><b>どの列が何か</b><span class="tiny muted">見出しから当ててあります。違うところだけ直してください</span>
-      <button class="btn small" id="reguess">見出しから当て直す</button></div>
-    <div id="mapBox"></div>
+    <div class="split">
+      <div class="split-l">
+        <div class="btns" style="margin-bottom:4px"><b>どの列が何か</b>
+          <button class="btn small" id="reguess">見出しから当て直す</button></div>
+        <div class="tiny muted" style="margin-bottom:6px">見出しから当ててあります。違うところだけ直してください。右の表の「使い道」に、選んだ項目が出ます。</div>
+        <div id="mapBox"></div>
+      </div>
+      <div class="split-r">
+        <div class="tiny muted" style="margin-bottom:4px">別紙　<span id="hiddenInfo" class="warn-ink"></span></div>
+        <div class="scroll" id="srcTable"></div>
+        <p class="tiny muted" style="margin:6px 0 0">支店名などが最初の行にしか無い列は「埋める」を入れると、空欄が全部上の値で埋まります。</p>
+      </div>
+    </div>
   </section>
 
   <section id="step3" hidden>

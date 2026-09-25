@@ -289,7 +289,7 @@ async function readFile(file) {
     catch (e) { text = new TextDecoder('shift_jis').decode(buf); }
     S.book = {[file.name]: parseDelimited(text, /\t/.test(text.split(/\r?\n/)[0]) ? '\t' : ',')};
   } else {
-    wb = XLSX.read(buf, {type: 'array', cellNF: true, cellDates: false});
+    wb = XLSX.read(buf, {type: 'array', cellNF: true, cellDates: false, cellStyles: true});
     S.book = {};
     wb.SheetNames.forEach(n => { S.book[n] = sheetToGrid(wb.Sheets[n]); });
   }
@@ -306,7 +306,8 @@ function readPaste(text) {
   loadSheet();
 }
 
-/* Excelのシートを [行][列] にします。結合セルは結合範囲の全部に同じ値を入れます */
+/* Excelのシートを [行][列] にします。結合セルは結合範囲の全部に同じ値を入れます。
+   Excelで非表示にしている列と行は grid.hc / grid.hr に覚えておきます（列の記号はExcelと同じに保つため、消さずに隠します） */
 function sheetToGrid(ws) {
   if (!ws || !ws['!ref']) return [];
   const rg = XLSX.utils.decode_range(ws['!ref']);
@@ -326,7 +327,12 @@ function sheetToGrid(ws) {
       if (grid[r]) grid[r][c] = (typeof v === 'object' && v) ? Object.assign({merged: true}, v) : v;
     }
   });
-  return trimGrid(grid);
+  const g = trimGrid(grid);
+  g.hc = new Set();
+  g.hr = new Set();
+  (ws['!cols'] || []).forEach((c, i) => { if (c && c.hidden) g.hc.add(i); });
+  (ws['!rows'] || []).forEach((r, i) => { if (r && r.hidden) g.hr.add(i); });
+  return g;
 }
 
 function cellValue(cell) {
@@ -375,6 +381,8 @@ function parseDelimited(text, sep) {
 
 function loadSheet() {
   S.grid = S.book[S.sheet] || [];
+  S.hc = S.grid.hc || new Set();
+  S.hr = S.grid.hr || new Set();
   S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null;
   detectHeader();
   guessMap();
@@ -387,14 +395,19 @@ function loadSheet() {
 function allWords() {
   return [].concat(...Object.values(CFG.GUESS), ['お届け先', '届け先', 'No', 'NO', '№', '番号', '氏名', '名前', '担当']);
 }
+/* Excelで見えている列の値だけ */
+function vis(row) { return row.filter((_, c) => !S.hc.has(c)); }
+function visCols() { const a = []; for (let c = 0; c < ncols(); c++) if (!S.hc.has(c)) a.push(c); return a; }
+
 function rowScore(row) {
+  row = vis(row);
   const words = allWords();
   return row.filter(v => { const t = cellText(v); return t && t.length <= 20 && words.some(w => t.indexOf(w) >= 0); }).length;
 }
 
 /* 中身の行らしいか。〒・電話・日付・数字・県から始まる住所のどれかがあれば中身とみなします */
 function rowLooksData(row) {
-  return row.some(v => {
+  return vis(row).some(v => {
     if (v && typeof v === 'object') return true;                 // 日付
     const t = cellText(v).normalize('NFKC');
     if (!t) return false;
@@ -406,7 +419,7 @@ function rowLooksData(row) {
 }
 /* 値が1つしかない行（「〇〇納品先一覧」のようなタイトル）。見出しには含めません */
 function rowIsTitle(row) {
-  return new Set(row.map(cellText).filter(Boolean)).size <= 1;
+  return new Set(vis(row).map(cellText).filter(Boolean)).size <= 1;
 }
 function headerish(row) {
   return row && rowScore(row) > 0 && !rowLooksData(row) && !rowIsTitle(row);
@@ -462,7 +475,7 @@ function guessMap() {
     const words = CFG.GUESS[k] || [];
     const it = CFG.ITEMS.find(x => x.key === k);
     for (let c = 0; c < n; c++) {
-      if (used.has(c)) continue;
+      if (used.has(c) || S.hc.has(c)) continue;
       const h = headText(c);
       if (!h || !words.some(w => h.indexOf(w) >= 0)) continue;
       /* 「お届け先住所」を住所に、「お届け先名」を宛先名に。電話の列の「TEL」も住所には当てません */
@@ -473,7 +486,8 @@ function guessMap() {
   });
   /* 住所が2列に分かれていて、2列目の見出しが「建物名」などの場合 */
   if (S.map.addr.length === 1) {
-    const c = S.map.addr[0] + 1;
+    let c = S.map.addr[0] + 1;
+    while (c < n && S.hc.has(c)) c++;                  // Excelで非表示の列は飛ばします
     if (c < n && !used.has(c) && /建物|ビル|マンション|番地|住所2/.test(headText(c))) { S.map.addr.push(c); used.add(c); }
   }
 }
@@ -486,7 +500,7 @@ function pickRaw(row, key) {
 }
 
 function isTotalRow(row) {
-  return row.some(v => /^(合\s*計|小\s*計|総\s*計|計)$|合計|小計|総計/.test(cellText(v)));
+  return vis(row).some(v => /^(合\s*計|小\s*計|総\s*計|計)$|合計|小計|総計/.test(cellText(v)));
 }
 
 /**
@@ -502,8 +516,10 @@ function rebuild() {
   for (let r = S.dataFrom; r < g.length; r++) {
     const raw = g[r].slice();
     const total = isTotalRow(raw);
+    const hidden = S.hr.has(r);
     const filled = new Set();
-    if (!total) {
+    /* 埋める元にも埋める先にも、Excelで非表示の行は使いません（画面で見えている上の値で埋めるため） */
+    if (!total && !hidden) {
       S.fill.forEach(c => {
         const t = cellText(raw[c]);
         if (t) last[c] = raw[c];
@@ -527,7 +543,8 @@ function rebuild() {
     CFG.ITEMS.forEach(it => { if ((S.map[it.key] || []).some(c => filled.has(c))) filledKeys.add(it.key); });
 
     let why = '';
-    if (total && !auto.zip) why = '合計の行';
+    if (hidden) why = 'Excelで非表示の行';
+    else if (total && !auto.zip) why = '合計の行';
     else if (!auto.zip && !auto.addr) why = '〒も住所もない行';
     rows.push({src: r, raw, auto, filledKeys, autoExclude: why});
   }
@@ -875,21 +892,25 @@ function renderSource() {
     : '見出しは<b>' + (S.headTop + 1) + (S.headTop !== S.headBottom ? '〜' + (S.headBottom + 1) : '') + '行目</b>、中身は<b>' + (S.dataFrom + 1) + '行目</b>から';
   $('#dataFrom').value = S.dataFrom + 1;
 
-  /* 別紙の先頭を表で見せます。行番号を押すとそこを見出しにします */
-  const n = ncols();
+  /* 別紙を表で見せます。行番号を押すとそこを見出しにします。Excelで非表示の列は出しません */
+  const cols = visCols();
+  const hiddenCols = [];
+  for (let c = 0; c < ncols(); c++) if (S.hc.has(c)) hiddenCols.push(colLetter(c));
+  $('#hiddenInfo').textContent = (hiddenCols.length ? 'Excelで非表示の列（' + hiddenCols.join('・') + '）は出していません。' : '') +
+    (S.hr.size ? 'Excelで非表示の行が ' + S.hr.size + '行あります（一覧では除外）。' : '');
   const mapped = {};
   CFG.ITEMS.forEach(it => (S.map[it.key] || []).forEach(c => { (mapped[c] || (mapped[c] = [])).push(it.label); }));
-  const showTo = Math.min(S.grid.length, Math.max(S.dataFrom + 6, 12));
+  const showTo = Math.min(S.grid.length, 300);
   let h = '<table class="src"><thead><tr><th class="rn"></th>';
-  for (let c = 0; c < n; c++) h += '<th>' + colLetter(c) + '</th>';
+  cols.forEach(c => { h += '<th>' + colLetter(c) + '</th>'; });
   h += '</tr><tr class="fillrow"><th class="rn" title="空欄を上の値で埋める">上で埋める</th>';
-  for (let c = 0; c < n; c++) {
+  cols.forEach(c => {
     const warnFirst = S.fill.has(c) && S.fillFirstEmpty && S.fillFirstEmpty.has(c);
     h += '<th><label class="fill' + (S.fill.has(c) ? ' on' : '') + '" title="この列の空欄を上の値で埋める"><input type="checkbox" data-fill="' + c + '"' +
       (S.fill.has(c) ? ' checked' : '') + '>埋める</label>' + (warnFirst ? '<div class="tiny warn-ink">先頭が空</div>' : '') + '</th>';
-  }
+  });
   h += '</tr><tr class="maprow"><th class="rn">使い道</th>';
-  for (let c = 0; c < n; c++) h += '<th>' + (mapped[c] ? mapped[c].map(l => '<span class="chip">' + esc(l) + '</span>').join('') : '') + '</th>';
+  cols.forEach(c => { h += '<th>' + (mapped[c] ? mapped[c].map(l => '<span class="chip">' + esc(l) + '</span>').join('') : '') + '</th>'; });
   h += '</tr></thead><tbody>';
 
   /* 上で埋めた値も薄く見せます */
@@ -898,7 +919,7 @@ function renderSource() {
     const last = {};
     for (let r = S.dataFrom; r < showTo; r++) {
       const row = S.grid[r];
-      if (isTotalRow(row)) continue;
+      if (isTotalRow(row) || S.hr.has(r)) continue;
       S.fill.forEach(c => {
         if (cellText(row[c])) last[c] = row[c];
         else if (c in last) filledAt[r + ':' + c] = cellText(last[c]);
@@ -906,9 +927,9 @@ function renderSource() {
     }
   }
   for (let r = 0; r < showTo; r++) {
-    const cls = (r >= S.headTop && r <= S.headBottom) ? 'head' : (r < S.dataFrom ? 'above' : '');
-    h += '<tr class="' + cls + '"><th class="rn"><button class="rnbtn" data-head="' + r + '" title="この行を見出しにする">' + (r + 1) + '</button></th>';
-    for (let c = 0; c < n; c++) {
+    const cls = (r >= S.headTop && r <= S.headBottom) ? 'head' : (r < S.dataFrom ? 'above' : (S.hr.has(r) ? 'hid' : ''));
+    h += '<tr class="' + cls + '"' + (S.hr.has(r) ? ' title="Excelで非表示の行"' : '') + '><th class="rn"><button class="rnbtn" data-head="' + r + '" title="この行を見出しにする">' + (r + 1) + '</button></th>';
+    for (const c of cols) {
       const t = cellText(S.grid[r][c]);
       const f = filledAt[r + ':' + c];
       h += f != null ? '<td class="filled">' + esc(f.slice(0, 24)) + '</td>'
@@ -924,11 +945,11 @@ function renderSource() {
 /* ---- 列の対応 ---- */
 function renderMap() {
   if (!S.grid.length) return;
-  const n = ncols();
-  const opts = sel => '<option value="">―</option>' + Array.from({length: n}, (_, c) => {
+  /* 選べるのはExcelで見えている列だけ（すでに選ばれている非表示の列は残します） */
+  const opts = sel => '<option value="">―</option>' + visCols().concat(sel >= 0 && S.hc.has(sel) ? [sel] : []).map(c => {
     const ht = headText(c), sm = sampleText(c);
     return '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + colLetter(c) + '：' +
-      esc((ht || '（見出しなし）').slice(0, 16)) + (sm ? '　例 ' + esc(sm.slice(0, 16)) : '') + '</option>';
+      esc((ht || '（見出しなし）').slice(0, 14)) + (sm ? '　例 ' + esc(sm.slice(0, 14)) : '') + '</option>';
   }).join('');
   let h = '';
   CFG.ITEMS.forEach(it => {
@@ -951,7 +972,7 @@ function renderMap() {
     }
     if (it.key === 'store') {
       h += '<div class="maprow2 sub"><div class="ml">　└ 会社名（全行共通）</div><div class="ms">' +
-        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="例：株式会社△△（付けないなら空）" size="30">' +
+        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="例：株式会社△△（付けないなら空）" style="width:100%">' +
         '<span class="tiny muted">入れると「名前」に会社名、「備考(住所4)」に店名が入ります</span></div></div>';
     }
   });
