@@ -1019,6 +1019,8 @@ function renderMap() {
 function renderRows() {
   if (!S.grid.length) return;
   const focus = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.cell;
+  const ae = document.activeElement;
+  const focusSel = focus && ae.selectionStart != null ? [ae.selectionStart, ae.selectionEnd] : null;
 
   const inc = S.rows.filter(included);
   const nErr = inc.filter(r => r.err.length).length;
@@ -1122,11 +1124,25 @@ function renderRows() {
   const all = $('#selAll');
   if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
 
-  if (focus) {
+  if (S.pendingFocus) focusCell(S.pendingFocus);
+  else if (focus) {
+    /* 描き直しても、入っていたセルと選んでいた範囲はそのままにします */
     const el = document.querySelector('[data-cell="' + focus + '"]');
-    if (el) el.focus();
+    if (el) {
+      el.focus();
+      if (focusSel && el.setSelectionRange) { try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch (e) { /* 選べない欄 */ } }
+    }
   }
   renderPreview();
+}
+
+/* 表のセルに入ります。中身を選んだ状態にするので、そのまま打てば上書きできます */
+function focusCell(id) {
+  const el = document.querySelector('[data-cell="' + id + '"]');
+  if (!el) return;
+  S.pendingFocus = '';
+  el.focus();
+  if (el.select) el.select();
 }
 
 /* 〒と住所がずれている行の、選ぶところ */
@@ -1285,9 +1301,34 @@ function bindEvents() {
       return;
     }
   });
-  /* 表の中は Enter で確定 */
+  /* 表の中は Enter で下、Tab で右（Shift を押しながらで上・左）。行の右端の Tab は次の行の左端へ */
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.cell) { e.preventDefault(); e.target.blur(); }
+    const t = e.target;
+    if (!t.dataset || !t.dataset.cell) return;
+    if (e.key !== 'Enter' && e.key !== 'Tab') return;
+    e.preventDefault();
+    const [src, key] = t.dataset.cell.split(':');
+    const cells = Array.from(document.querySelectorAll('table.rows [data-cell]'));
+    const keys = [], srcs = [];
+    cells.forEach(c => {
+      const [s, k] = c.dataset.cell.split(':');
+      if (!keys.includes(k)) keys.push(k);
+      if (!srcs.includes(s)) srcs.push(s);
+    });
+    let si = srcs.indexOf(src), ki = keys.indexOf(key);
+    if (e.key === 'Enter') si += e.shiftKey ? -1 : 1;
+    else {
+      ki += e.shiftKey ? -1 : 1;
+      if (ki >= keys.length) { ki = 0; si++; }
+      if (ki < 0) { ki = keys.length - 1; si--; }
+    }
+    const next = (si >= 0 && si < srcs.length) ? srcs[si] + ':' + keys[ki] : '';
+    /* 値を変えていれば確定（表を描き直すので、描き直したあとに移り先へ入ります） */
+    S.pendingFocus = next;
+    const changed = t.tagName === 'SELECT' ? false : t.value !== t.defaultValue;
+    if (changed) commitCell(t);
+    if (S.pendingFocus) focusCell(S.pendingFocus);
+    if (!next) t.blur();
   });
 
   /* 行の選択（Shiftで範囲） */

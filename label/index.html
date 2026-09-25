@@ -163,7 +163,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v11</span>
+  <span class="ver">v12</span>
 </header>
 
 <main>
@@ -225,7 +225,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
       <button class="btn small" id="bIncl">発行</button>
       <button class="btn small" id="bClear">選択を外す</button>
     </div>
-    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます（Shiftを押しながらで範囲）。セルはそのまま書き換えられます（Enterで確定）。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します（灰色）。</p>
+    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます（Shiftを押しながらで範囲）。セルはそのまま書き換えられます（Enterで下、Tabで右へ。Shiftを押しながらで上・左）。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します（灰色）。</p>
     <div class="scroll" id="rowsTable" style="max-height:70vh"></div>
   </section>
 
@@ -267,8 +267,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=11"></script>
-<script src="app.js?v=11"></script>
-<script src="issued.js?v=11"></script>
+<script src="addr.js?v=12"></script>
+<script src="app.js?v=12"></script>
+<script src="issued.js?v=12"></script>
 </body>
 </html>
