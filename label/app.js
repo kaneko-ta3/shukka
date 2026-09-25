@@ -743,8 +743,23 @@ async function importSenders(file) {
   const grid = parseDelimited(text, /\t/.test(text.split(/\r?\n/)[0]) ? '\t' : ',');
   if (grid.length < 2) throw new Error('中身がありません（1行目が見出し、2行目から）');
   const head = grid[0].map(h => String(h).trim());
-  /* 請求先の設定CSV（見出しに「顧客コード」がある）は請求先として読みます */
+  /* 1つにまとめた設定ファイル。「種類」の列で依頼主と請求先を分けて読みます */
+  const ti = head.indexOf('種類');
+  if (ti >= 0) {
+    const pick = w => [grid[0]].concat(grid.slice(1).filter(r => String(r[ti] || '').indexOf(w) >= 0));
+    const sg = pick('依頼主'), ag = pick('請求先');
+    const res = sg.length > 1 ? importSenderGrid(sg) : {added: 0, updated: 0};
+    res.accounts = ag.length > 1 ? Issued.importAccounts(ag) : 0;
+    res.combined = true;
+    return res;
+  }
+  /* 前の形（依頼主だけ／請求先だけのファイル）もそのまま読めます */
   if (head.some(h => h.indexOf('顧客コード') >= 0)) return {accounts: Issued.importAccounts(grid)};
+  return importSenderGrid(grid);
+}
+
+function importSenderGrid(grid) {
+  const head = grid[0].map(h => String(h).trim());
   const idx = {};
   SENDER_COLS.forEach(([k, words]) => {
     idx[k] = head.findIndex(h => words.some(w => h === w)) ;
@@ -765,11 +780,14 @@ async function importSenders(file) {
   return {added, updated};
 }
 
-function exportSenders() {
-  const head = ['依頼主コード', '依頼主名', '依頼主電話', '依頼主〒', '依頼主住所', '依頼主建物マンション名'];
-  const lines = [head].concat(S.senders.map(s => [s.code, s.name, s.tel, s.zip, s.addr, s.bldg]));
+/* 依頼主と請求先を1つのファイルに書き出します。ほかのPCにはこれ1つを渡せば済みます */
+function exportSettings() {
+  const head = ['種類', '依頼主コード', '名前', '電話', '郵便番号', '住所', '建物名', '請求先顧客コード', '分類コード', 'メイン'];
+  const lines = [head]
+    .concat(S.senders.map(s => ['依頼主', s.code, s.name, s.tel, s.zip, s.addr, s.bldg, '', '', '']))
+    .concat(Issued.accounts().map(a => ['請求先', '', a.name, '', '', '', '', a.code, a.cls, a.main ? '○' : '']));
   /* Excelで開いても文字化けしないよう、この設定ファイルだけBOMを付けます */
-  download('依頼主設定.csv', '﻿' + lines.map(csvLine).join('\r\n') + '\r\n');
+  download('ラベル設定.csv', '﻿' + lines.map(csvLine).join('\r\n') + '\r\n');
 }
 
 
@@ -851,7 +869,7 @@ function renderSender() {
   if (!S.senders.length) {
     box.innerHTML =
       '<div class="notice warn">依頼主がまだ設定されていません。最初に1回だけ、依頼主設定のCSVを読み込んでください。</div>' +
-      '<div class="btns"><label class="btn primary">設定CSVを読み込む（依頼主・請求先）<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
+      '<div class="btns"><label class="btn primary">設定CSVを読み込む<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
       '<button class="btn" id="senderNew">手で入力する</button></div>';
   } else {
     const p = senderProblems(s);
@@ -859,9 +877,8 @@ function renderSender() {
       '<div class="sender-row"><select id="senderSel">' + opts + '<option value="__new">＋ 新しく入力する（取引先が依頼主の場合など）</option></select>' +
       '<button class="btn small" id="senderEdit">直す</button>' +
       '<details class="more"><summary>設定ファイル</summary><div class="btns">' +
-      '<label class="btn small">CSVを読み込む（依頼主・請求先）<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
-      '<button class="btn small" id="senderExport">依頼主を書き出す</button>' +
-      '<button class="btn small" id="acctExport">請求先を書き出す</button>' +
+      '<label class="btn small">設定CSVを読み込む<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
+      '<button class="btn small" id="senderExport" title="依頼主と請求先を1つのファイルに書き出します。ほかのPCにはこれを渡してください">設定を書き出す</button>' +
       '<button class="btn small danger" id="senderDel">この依頼主を消す</button></div></details></div>' +
       '<div class="sender-detail">' + esc(s.code ? 'コード ' + s.code + '　' : 'コード なし　') +
       esc(normZip(s.zip)) + '　' + esc(s.addr) + ' ' + esc(s.bldg || '') + '　' + esc(s.tel) + '</div>' +
@@ -1253,7 +1270,8 @@ function bindEvents() {
         for (const f of fs) {
           try {
             const r = await importSenders(f);
-            msg.push(r.accounts != null ? '請求先 ' + r.accounts + '件' : '依頼主（追加 ' + r.added + '・更新 ' + r.updated + '）');
+            msg.push(r.combined ? '依頼主 ' + (r.added + r.updated) + '件・請求先 ' + r.accounts + '件'
+                     : r.accounts != null ? '請求先 ' + r.accounts + '件' : '依頼主（追加 ' + r.added + '・更新 ' + r.updated + '）');
           } catch (err) { msg.push(f.name + ' は読めませんでした：' + err.message); }
         }
         toast('読み込みました：' + msg.join(' ／ '));
@@ -1297,8 +1315,7 @@ function bindEvents() {
     }
     if (t.id === 'senderNew') { openSenderDialog(null); return; }
     if (t.id === 'senderEdit') { openSenderDialog(currentSender()); return; }
-    if (t.id === 'senderExport') { exportSenders(); return; }
-    if (t.id === 'acctExport') { Issued.exportAccounts(); return; }
+    if (t.id === 'senderExport') { exportSettings(); return; }
     if (t.id === 'senderDel') {
       const s = currentSender();
       if (s && confirm('「' + s.name + '」をこのブラウザから消しますか')) {

@@ -301,5 +301,5 @@ const Issued = (() => {
     });
   }
 
-  return {bind, read, saveBatch, importAccounts, exportAccounts, get state() { return st; }, selected, outRows};
+  return {bind, read, saveBatch, importAccounts, accounts, get state() { return st; }, selected, outRows};
 })();
