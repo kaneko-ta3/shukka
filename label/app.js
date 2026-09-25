@@ -706,6 +706,10 @@ async function runChecks() {
 
 function loadSenders() {
   S.senders = lsGet(CFG.LS_SENDERS, []) || [];
+  /* 住所の無いものは依頼主として使えません。前の版で請求先の行が紛れ込んだものも、ここで外します */
+  const before = S.senders.length;
+  S.senders = S.senders.filter(s => s && s.name && s.addr);
+  if (S.senders.length !== before) lsSet(CFG.LS_SENDERS, S.senders);
   S.senderId = lsGet(CFG.LS_SENDER_SEL, '') || '';
   if (!S.senders.find(s => s.id === S.senderId)) S.senderId = S.senders.length ? S.senders[0].id : '';
 }
@@ -770,7 +774,7 @@ function importSenderGrid(grid) {
   grid.slice(1).forEach(r => {
     const s = {};
     SENDER_COLS.forEach(([k]) => { s[k] = idx[k] >= 0 ? String(r[idx[k]] || '').trim() : ''; });
-    if (!s.name) return;
+    if (!s.name || !s.addr) return;                  // 住所の無い行（請求先の行など）は依頼主にしません
     const old = S.senders.find(x => x.name === s.name && normTel(x.tel) === normTel(s.tel));
     if (old) { Object.assign(old, s); updated++; }
     else { s.id = newId(); S.senders.push(s); added++; }
