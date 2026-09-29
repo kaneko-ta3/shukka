@@ -1,6 +1,7 @@
 /* ===================================================================
-   送り状 余白書き換え  v2   (hinmei/app.js)
+   送り状 余白書き換え  v3   (hinmei/app.js)
 
+   v3  できるPDFの名前を 〜_アテンション.pdf から 〜_余白書き換え.pdf に
    v2  名前を「送り状 品名でかく」から「送り状 余白書き換え」に（URLは hinmei/ のまま）
        注意書きを天地無用のほか7つから選べるように（帯下は1つ、帯のみは2つまで）。
        「記事欄から」で送り状の記事欄の注意書きを拾う。自由入力も1つ
@@ -879,7 +880,7 @@ async function buildPdf(plan) {
 
 function outName() {
   const base = S.src.name.replace(/\.pdf$/i, '');
-  return base + '_アテンション.pdf';
+  return base + '_余白書き換え.pdf';
 }
 
 async function make() {
