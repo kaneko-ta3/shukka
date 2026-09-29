@@ -83,6 +83,12 @@ table.rows input.auto{color:var(--muted); background:var(--surface-2);}
 table.rows :disabled{opacity:.55;}
 table.rows tr.keep textarea{opacity:.4;}
 .c-keep{text-align:center;}
+/* 入数で割るとき（任意）。使わない行も多いので、薄く・区切って右に寄せる */
+table.rows .opt-l{border-left:1px dashed var(--line-strong); padding-left:12px;}
+table.rows th.c-opt{text-align:left; color:var(--muted);}
+table.rows input.opt{border-style:dashed; background:transparent;}
+table.rows input.opt:not(:placeholder-shown){border-style:solid; background:var(--ground);}
+table.rows input.opt::placeholder{color:var(--line-strong);}
 .c-det{min-width:230px; font-size:13px;}
 button.x{background:none; border:1px solid var(--line); color:var(--muted); border-radius:5px; cursor:pointer; width:26px; height:26px;}
 button.x:hover{border-color:var(--danger); color:var(--danger);}
@@ -103,7 +109,7 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v3</span>
+  <span class="ver">v4</span>
 </header>
 
 <main>
@@ -154,8 +160,8 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
     <details class="help">
       <summary>入れ方</summary>
       <ul>
-        <li>1箱の入数と総数を入れると、端数の箱を頭に、満箱を自動で割り出します。枚数も自動で決まります。例）入数24・総数90 → 商品A(18)×1枚、商品A(24)×3枚</li>
-        <li>入数と総数を空にすれば、文字と枚数を直接指定できます。枠の中でEnterを押すと改行します</li>
+        <li>ふつうは商品名と枚数だけ入れれば作れます。枠の中でEnterを押すと改行します。Tabで 商品名 → 枚数 → 次の行 と進みます</li>
+        <li>入数で割りたいときだけ、右の「1箱の入数」と「総数」を入れます。端数の箱を頭に、満箱を自動で割り出して、枚数も自動で決まります。例）入数24・総数90 → 商品A(18)×1枚、商品A(24)×3枚</li>
         <li>文字を空のまま枚数だけ入れると「白紙」（手書き用）になります</li>
         <li>「そのまま」にチェックを入れると、その枚数はヤマトのロゴを残します</li>
         <li>品名の文字の大きさは、大＝47・42・36・30pt、中＝36・30pt、小＝30pt から、枠に入る一番大きいものを自動で選びます。30ptに収まらない長さは作れません</li>
@@ -183,7 +189,7 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="config.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

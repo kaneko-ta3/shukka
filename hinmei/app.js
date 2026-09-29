@@ -1,5 +1,8 @@
 /* ===================================================================
-   送り状 余白書き換え  v3   (hinmei/app.js)
+   送り状 余白書き換え  v4   (hinmei/app.js)
+
+   v4  品名の表の並びを 商品名→枚数→そのまま｜入数で割るとき（任意）入数・総数 に。
+       ふつうは商品名と枚数だけでよいと分かるように。Tabは 商品名→枚数→次の行
 
    v3  できるPDFの名前を 〜_アテンション.pdf から 〜_余白書き換え.pdf に
    v2  名前を「送り状 品名でかく」から「送り状 余白書き換え」に（URLは hinmei/ のまま）
@@ -533,8 +536,11 @@ function renderGroups() {
       (addr.trim() ? '<div class="ga tiny muted">' + esc(addr) + '</div>' : '') +
       '<div class="gs" hidden></div>' +
       '<table class="rows"><thead><tr>' +
-      '<th class="c-name">商品名 / 入れたい文字列</th><th class="c-num">1箱の入数</th><th class="c-num">総数</th>' +
-      '<th class="c-num">枚数</th><th class="c-keep">そのまま</th><th class="c-det">内訳</th><th class="c-del"></th>' +
+      '<th class="c-name" rowspan="2">商品名 / 入れたい文字列</th><th class="c-num" rowspan="2">枚数</th>' +
+      '<th class="c-keep" rowspan="2">そのまま</th>' +
+      '<th class="c-opt opt-l" colspan="2">入数で割るとき（任意）</th>' +
+      '<th class="c-det" rowspan="2">内訳</th><th class="c-del" rowspan="2"></th></tr><tr>' +
+      '<th class="c-num opt-l">1箱の入数</th><th class="c-num">総数</th>' +
       '</tr></thead><tbody></tbody></table>' +
       '<div class="gf"><button class="btn small" data-act="add">＋ 入力欄を追加</button>' +
       '<span class="total"></span></div>';
@@ -553,12 +559,12 @@ function renderRows(gi) {
     tr.dataset.ri = ri;
     tr.innerHTML =
       '<td class="c-name"><textarea rows="2" data-f="name" placeholder="例) 商品A">' + esc(r.name) + '</textarea></td>' +
-      '<td class="c-num"><input type="text" inputmode="numeric" data-f="per" value="' + esc(r.per) + '"></td>' +
-      '<td class="c-num"><input type="text" inputmode="numeric" data-f="total" value="' + esc(r.total) + '"></td>' +
       '<td class="c-num"><input type="text" inputmode="numeric" data-f="count" value="' + esc(r.count) + '"></td>' +
-      '<td class="c-keep"><input type="checkbox" data-f="keep"' + (r.keep ? ' checked' : '') + '></td>' +
+      '<td class="c-keep"><input type="checkbox" data-f="keep" tabindex="-1"' + (r.keep ? ' checked' : '') + '></td>' +
+      '<td class="c-num opt-l"><input type="text" inputmode="numeric" data-f="per" class="opt" placeholder="入数" value="' + esc(r.per) + '"></td>' +
+      '<td class="c-num"><input type="text" inputmode="numeric" data-f="total" class="opt" placeholder="総数" value="' + esc(r.total) + '"></td>' +
       '<td class="c-det"><span class="det"></span></td>' +
-      '<td class="c-del"><button class="x" data-act="del" title="この行を消す">×</button></td>';
+      '<td class="c-del"><button class="x" data-act="del" title="この行を消す" tabindex="-1">×</button></td>';
     tb.appendChild(tr);
   });
   refreshGroup(gi);
@@ -651,6 +657,27 @@ function onInput(e) {
   r[f] = (f === 'keep') ? el.checked : el.value;
   refreshGroup(gi);
   invalidateOut();
+}
+
+/** Tab：商品名 → 枚数 → 次の行の商品名。入数・総数は使う行だけ（枚数が自動の行は 商品名 → 入数 → 総数） */
+function onKey(e) {
+  if (e.key !== 'Tab') return;
+  const el = e.target;
+  const tr = el.closest && el.closest('tbody tr');
+  if (!tr) return;
+  const all = $$('#groups tbody tr');
+  const i = all.indexOf(tr);
+  if (!e.shiftKey && el.dataset.f === 'count') {
+    const next = all[i + 1];
+    if (next) { e.preventDefault(); $('textarea', next).focus(); }
+  } else if (e.shiftKey && el.dataset.f === 'name') {
+    const prev = all[i - 1];
+    if (prev) {
+      e.preventDefault();
+      const c = $('[data-f="count"]', prev);
+      (c.disabled ? $('[data-f="total"]', prev) : c).focus();
+    }
+  }
 }
 
 function onClick(e) {
@@ -991,6 +1018,7 @@ function wire() {
   $('#groups').addEventListener('input', onInput);
   $('#groups').addEventListener('change', onInput);
   $('#groups').addEventListener('click', onClick);
+  $('#groups').addEventListener('keydown', onKey);
   $('#autoBtn').addEventListener('click', () => autofill());
   $('#makeBtn').addEventListener('click', make);
   $('#openBtn').addEventListener('click', () => { if (S.out) window.open(S.out.url, '_blank'); });
