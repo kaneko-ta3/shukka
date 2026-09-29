@@ -1,5 +1,11 @@
 /* ===================================================================
-   送り状 品名でかく  v1   (hinmei/app.js)
+   送り状 余白書き換え  v2   (hinmei/app.js)
+
+   v2  名前を「送り状 品名でかく」から「送り状 余白書き換え」に（URLは hinmei/ のまま）
+       注意書きを天地無用のほか7つから選べるように（帯下は1つ、帯のみは2つまで）。
+       「記事欄から」で送り状の記事欄の注意書きを拾う。自由入力も1つ
+       品名の文字の大きさを 大・中・小 から選べるように（大＝今まで通り）
+   v1  初版
 
    ヤマトの送り状PDF（B2・A5）の左下パネル（ヤマトのロゴが入っている枠）に、
    品名や「天地無用」を大きく入れる。
@@ -15,7 +21,8 @@
 
 /* ---------------- 決まり（Python版と同じ値） ---------------- */
 const MARGIN = 8;                        // 枠の内側の余白(pt)
-const SIZE_STEPS = [47, 42, 36, 30];     // 文字の大きさはこのどれかに固定する
+// 品名の文字の大きさはこのどれかに固定する。大＝Python版と同じ。中・小は上限を下げるだけ
+const SIZE_SET = {L: [47, 42, 36, 30], M: [36, 30], S: [30]};
 const MIN_SIZE = 30;                     // 下限。送り状の上の仕分けコードの数字(27.8pt)より少し大きい
 const MAX_LINES = 3;                     // 30ptを守れるのは3行まで
 const LH = 1.22, BL = 0.88;              // 行の高さ、ベースラインの位置（文字の大きさに対する比）
@@ -23,12 +30,23 @@ const LH = 1.22, BL = 0.88;              // 行の高さ、ベースラインの
 // 右上の貼付票の「お届け先」と「品名」。左上の配達票は、子伝票だと住所が載らないので使わない
 const HARI_TODOKE = [330, 28, 540, 110];
 const HIN_FIELD = [340, 162, 520, 184];
+const KIJI_FIELD = [340, 186, 520, 216];   // 貼付票の記事欄
 const ADDR_LINE = /[都道府県市区町村郡]|様|御中|\d{2,4}-\d{2,4}-\d{3,4}|\d{3}-\d{4}/;
 const ITEM = /^(.+?)\s*[(（]\s*(\d+)\s*[)）]$/;
 
-// 天地無用
-const BAND = {h: 30, text: '天地無用　この面を上に'};              // 帯下
-const ONLY = {inset: 6, frame: 5, l1: '天地無用', l2: 'この面を上に', ratio: 0.62};  // 帯のみ
+// 注意書き。帯下に入れる文と、帯のみのときの文
+const MARKS = [
+  {key: 'tenchi', label: '天地無用', band: '天地無用　この面を上に'},
+  {key: 'ware', label: 'ワレモノ注意'},
+  {key: 'toriatsukai', label: '取扱注意'},
+  {key: 'shitazumi', label: '下積厳禁'},
+  {key: 'mizunure', label: '水濡厳禁'},
+  {key: 'seimitsu', label: '精密機器'},
+  {key: 'juryo', label: '重量物注意'},
+];
+const MARK_LIMIT = {band: 1, only: 2};                              // 帯下は1つ、帯のみは2つまで
+const BAND = {h: 30, min: 12};                                      // 帯下の帯の高さ。帯の文字はこれより小さくしない
+const ONLY = {inset: 6, frame: 5, sub: 'この面を上に', ratio: 0.62}; // 帯のみ（白地に黒文字＋太枠）
 
 const KEEP = 'keep', BLANK = 'blank', TEXT = 'text';
 
@@ -37,7 +55,10 @@ const S = {
   src: null,        // {name, bytes, pages:[{w,h,view,rotate,items,images,zone,dest,hin}], groups:[...]}
   fontBytes: null,
   mfont: null,      // 測る用のフォント（pdf-lib）
-  kind: 'name',     // name=品名だけ / band=品名＋天地無用(帯下) / only=天地無用だけ(帯のみ)
+  kind: 'name',     // name=品名だけ / band=品名＋注意書き(帯下) / only=注意書きだけ(帯のみ)
+  marks: ['tenchi'],// 選んだ注意書き（選んだ順）。'free' は自由入力
+  free: '',
+  size: 'L',        // 品名の大きさ L=大 / M=中 / S=小
   out: null,        // できたPDF {bytes, name, url}
 };
 
@@ -65,12 +86,15 @@ function splitEvenly(text, n) {
   return out;
 }
 
-function snap(raw) {
-  for (const s of SIZE_STEPS) if (raw >= s) return s;
+function snap(raw, steps) {
+  for (const s of steps) if (raw >= s) return s;
   return raw;                            // 下限にも届かない。使う側で止める
 }
 
-function layout(text, rect) {
+/** 品名の折り方と大きさ。steps を省くと画面で選んでいる大中小 */
+function layout(text, rect, steps) {
+  steps = steps || SIZE_SET[S.size] || SIZE_SET.L;
+  const snapTo = raw => snap(raw, steps);
   const w = rect[2] - rect[0] - MARGIN * 2;
   const h = rect[3] - rect[1] - MARGIN * 2;
   const raw = lines => {
@@ -83,7 +107,7 @@ function layout(text, rect) {
   };
   if (text.indexOf('\n') >= 0) {                       // 自分で改行した場合はその通りに
     const given = text.split('\n').map(s => s.trim()).filter(Boolean);
-    if (given.length) return {lines: given, size: snap(raw(given))};
+    if (given.length) return {lines: given, size: snapTo(raw(given))};
   }
   const cands = [[text]];
   const m = text.match(/^(.+?)\s*([(（].*[)）])$/);      // 「品名」と「(数量)」で折る
@@ -95,10 +119,75 @@ function layout(text, rect) {
   // 段階に落としたサイズが最大のもの。同じなら行数が少ないほう（先に出たほう）
   let best = null, bk = null;
   for (const ls of cands) {
-    const k = [snap(raw(ls)), -ls.length];
+    const k = [snapTo(raw(ls)), -ls.length];
     if (!best || k[0] > bk[0] || (k[0] === bk[0] && k[1] > bk[1])) { best = ls; bk = k; }
   }
-  return {lines: best, size: snap(raw(best))};
+  return {lines: best, size: snapTo(raw(best))};
+}
+
+
+/* ================================================================
+   注意書き（帯下・帯のみ）
+   ================================================================ */
+/** 選んでいる注意書き（選んだ順）。自由入力は空なら数えない */
+function selectedMarks() {
+  return S.marks.map(k => {
+    if (k === 'free') {
+      const t = S.free.replace(/\s+/g, ' ').trim();
+      return t ? {key: 'free', label: t} : null;
+    }
+    return MARKS.find(m => m.key === k) || null;
+  }).filter(Boolean);
+}
+
+/** 帯下：帯に入れる文と大きさ */
+function bandLayout(zone) {
+  const m = selectedMarks()[0];
+  if (!m) return null;
+  const text = m.band || m.label;
+  const band = [zone[0], zone[3] - BAND.h, zone[2], zone[3]];
+  const size = Math.min((band[2] - band[0] - 16) / width(text, 1), BAND.h * 0.68);
+  return {band: band, text: text, size: size, base: band[1] + (BAND.h + size * 0.72) / 2};
+}
+
+/** 帯のみ：枠と、行ごとの文・大きさ・ベースライン */
+function onlyLayout(zone) {
+  const ms = selectedMarks();
+  const edge = ONLY.inset + ONLY.frame / 2;
+  const box = [zone[0] + edge, zone[1] + edge, zone[2] - edge, zone[3] - edge];
+  const pad = ONLY.frame / 2 + 8;
+  const body = [box[0] + pad, box[1] + pad - 2, box[2] - pad, box[3] - pad + 2];
+  const bw = body[2] - body[0], bh = body[3] - body[1];
+  let lines;
+  if (ms.length === 1 && ms[0].key === 'tenchi') {        // 天地無用だけのときは「この面を上に」を添える
+    const s1 = Math.min(bw / width(ms[0].label, 1), bh / (1.12 + ONLY.ratio * 1.12));
+    const s2 = Math.min(s1 * ONLY.ratio, bw / width(ONLY.sub, 1));
+    lines = [{text: ms[0].label, size: s1, main: true}, {text: ONLY.sub, size: s2}];
+  } else {                                                // 1つ1行、同じ大きさで積む
+    let s = bh / (1.12 * Math.max(ms.length, 1));
+    ms.forEach(m => { s = Math.min(s, bw / width(m.label, 1)); });
+    lines = ms.map(m => ({text: m.label, size: s, main: true}));
+  }
+  let y = body[1] + (bh - lines.reduce((a, l) => a + l.size * 1.12, 0)) / 2;
+  lines.forEach(l => { l.base = y + l.size * 0.90; y += l.size * 1.12; });
+  return {box: box, body: body, lines: lines};
+}
+
+/** 注意書きの問題。無ければ null */
+function marksProblem(zone) {
+  if (S.kind === 'name') return null;
+  const ms = selectedMarks();
+  if (!ms.length) return '注意書きを1つ以上選んでください';
+  if (ms.length > MARK_LIMIT[S.kind]) return '注意書きは' + (S.kind === 'band' ? '帯下では1つ' : '帯のみでは2つ') + 'までです';
+  if (S.kind === 'band') {
+    const b = bandLayout(zone);
+    if (b.size < BAND.min) return '帯の注意書き「' + b.text + '」が長すぎます（' + Math.round(b.size) + 'ptになります）';
+  } else {
+    const o = onlyLayout(zone);
+    const small = o.lines.find(l => l.main && l.size < MIN_SIZE);
+    if (small) return '注意書き「' + small.text + '」が長すぎます（' + Math.round(small.size) + 'pt。' + MIN_SIZE + 'pt以上にしたいので短くしてください）';
+  }
+  return null;
 }
 
 function fitProblem(lines) {
@@ -243,6 +332,14 @@ function readHin(pg) {
   return {items: items, junk: junk};
 }
 
+/** 貼付票の記事欄。見出しの「記」「事」と、数字だけの行は除く */
+function readKiji(pg) {
+  return linesIn(pg.items, KIJI_FIELD)
+    .filter(s => ['記', '事', '記事', '記 事'].indexOf(s) < 0 && !/^[\d\s]+$/.test(s));
+}
+
+const normMark = s => String(s).normalize('NFKC').replace(/[\s　]/g, '');
+
 /** 届け先ごとにページをまとめる。読めないページは直前と同じ届け先 */
 function groupPages(pages) {
   const groups = [], byKey = {};
@@ -299,6 +396,7 @@ async function openPdf(bytes, name) {
       if (!pg.zone) noZone.push(i + 1);
       pg.dest = readDestination(pg);
       pg.hin = readHin(pg);
+      pg.kiji = readKiji(pg);
     });
     if (noZone.length) {
       throw new Error(noZone.join('・') + '枚目に、左下のヤマトのロゴ（色付きの枠）が見つかりません。' +
@@ -329,7 +427,80 @@ function showSteps() {
   $('#secKind').hidden = !has;
   $('#secRows').hidden = !has || S.kind === 'only';
   $('#secMake').hidden = !has;
+  $('#marksBox').hidden = !(has && S.kind !== 'name');
   $('#onlyNote').hidden = !(has && S.kind === 'only');
+  renderMarks();
+}
+
+
+/* ================================================================
+   画面：2 注意書きの選び方
+   ================================================================ */
+function limitMarks() {
+  const lim = MARK_LIMIT[S.kind];
+  if (!lim) return;
+  while (S.marks.length > lim) S.marks.shift();            // 上限を超えたら古いほうから外す
+}
+
+function renderMarks() {
+  $('#markLimit').textContent = S.kind === 'band' ? '帯下は1つだけ（選び直すと入れ替わります）' : '帯のみは2つまで（3つ目を選ぶと、先に選んだほうが外れます）';
+  $$('#marksBox input[data-mark]').forEach(el => { el.checked = S.marks.indexOf(el.dataset.mark) >= 0; });
+  const f = $('#freeText');
+  if (f.value !== S.free) f.value = S.free;
+  const z = S.src ? S.src.pages[0].zone : null;
+  const p = z ? marksProblem(z) : null;
+  const note = $('#markMsg');
+  if (p) { note.textContent = p; note.className = 'tiny err-ink'; }
+  else if (S.kind !== 'name' && z) {
+    const ms = selectedMarks();
+    note.className = 'tiny muted';
+    if (S.kind === 'band') { const b = bandLayout(z); note.textContent = '帯：「' + b.text + '」' + Math.round(b.size) + 'pt'; }
+    else note.textContent = onlyLayout(z).lines.map(l => l.text + ' ' + Math.round(l.size) + 'pt').join('　／　');
+  } else note.textContent = '';
+}
+
+function onMarkInput(e) {
+  const el = e.target;
+  if (el.dataset.mark) {
+    const k = el.dataset.mark;
+    S.marks = S.marks.filter(x => x !== k);
+    if (el.checked) S.marks.push(k);
+  } else if (el.id === 'freeText') {
+    S.free = el.value;
+    S.marks = S.marks.filter(x => x !== 'free');
+    if (S.free.trim()) S.marks.push('free');           // 書いたら自由入力を選んだことにする
+  } else return;
+  limitMarks();
+  renderMarks();
+  invalidateOut();
+}
+
+/** 記事欄にある注意書きに印を付ける */
+function marksFromKiji() {
+  const s = S.src;
+  if (!s) return;
+  const seen = [];
+  s.pages.forEach(pg => pg.kiji.forEach(t => { if (seen.indexOf(t) < 0) seen.push(t); }));
+  const hit = [], other = [];
+  seen.forEach(t => {
+    const m = MARKS.find(x => normMark(x.label) === normMark(t) || normMark(t).indexOf(normMark(x.label)) === 0);
+    if (m) { if (hit.indexOf(m.key) < 0) hit.push(m.key); }
+    else other.push(t);
+  });
+  const lim = MARK_LIMIT[S.kind] || 2;
+  const msg = [];
+  if (!seen.length) msg.push('記事欄に何も入っていませんでした');
+  if (hit.length) {
+    S.marks = hit.slice(0, lim);
+    if (hit.length > lim) msg.push('記事欄の注意書きが ' + hit.length + ' つあります。上限の ' + lim + ' つだけ選びました');
+  }
+  if (other.length) msg.push('記事欄には「' + other.join('」「') + '」もあります。入れるなら自由入力へ');
+  renderMarks();
+  const note = $('#kijiMsg');
+  note.textContent = hit.length ? '記事欄から選びました：' + hit.map(k => MARKS.find(m => m.key === k).label).join('・') + (msg.length ? '。' + msg.join('。') : '')
+                                : msg.join('。');
+  note.hidden = false;
+  invalidateOut();
 }
 
 function setMsg(sel, text, cls) {
@@ -615,6 +786,8 @@ async function autofill(masterOverride) {
 function makePlan() {
   const s = S.src;
   const plan = new Array(s.pages.length).fill(null);
+  const mp = marksProblem(s.pages[0].zone);
+  if (mp) throw new Error(mp);
   if (S.kind === 'only') return plan.map(() => ({mode: 'only'}));
 
   const multi = s.groups.length > 1;
@@ -681,26 +854,17 @@ async function buildPdf(plan) {
     rect(zone, {color: WHITE});                          // ロゴの枠を白く塗る
 
     if (p.mode === 'only') {                              // 帯のみ：白地に黒文字＋太枠
-      const edge = ONLY.inset + ONLY.frame / 2;
-      const bx = [zone[0] + edge, zone[1] + edge, zone[2] - edge, zone[3] - edge];
-      rect(bx, {borderColor: BLACK, borderWidth: ONLY.frame});
-      const pad = ONLY.frame / 2 + 8;
-      const body = [bx[0] + pad, bx[1] + pad - 2, bx[2] - pad, bx[3] - pad + 2];
-      const bw = body[2] - body[0], bh = body[3] - body[1];
-      const s1 = Math.min(bw / font.widthOfTextAtSize(ONLY.l1, 1), bh / (1.12 + ONLY.ratio * 1.12));
-      const s2 = Math.min(s1 * ONLY.ratio, bw / font.widthOfTextAtSize(ONLY.l2, 1));
-      const top = body[1] + (bh - (s1 + s2) * 1.12) / 2;
-      center(ONLY.l1, body, s1, top + s1 * 0.90, BLACK);
-      center(ONLY.l2, body, s2, top + s1 * 1.12 + s2 * 0.90, BLACK);
+      const o = onlyLayout(zone);
+      rect(o.box, {borderColor: BLACK, borderWidth: ONLY.frame});
+      o.lines.forEach(l => center(l.text, o.body, l.size, l.base, BLACK));
       return;
     }
 
     let nr = zone;
-    if (S.kind === 'band') {                              // 帯下：下に黒帯、白抜きで天地無用
-      const band = [zone[0], zone[3] - BAND.h, zone[2], zone[3]];
-      rect(band, {color: BLACK});
-      const bs = Math.min((band[2] - band[0] - 16) / font.widthOfTextAtSize(BAND.text, 1), BAND.h * 0.68);
-      center(BAND.text, band, bs, band[1] + (BAND.h + bs * 0.72) / 2, WHITE);
+    if (S.kind === 'band') {                              // 帯下：下に黒帯、注意書きは白抜き
+      const b = bandLayout(zone);
+      rect(b.band, {color: BLACK});
+      center(b.text, b.band, b.size, b.base, WHITE);
       nr = nameRect(zone);
     }
     if (p.mode === TEXT) {                                // 品名（Python版 stamp と同じ置き方）
@@ -771,7 +935,9 @@ async function renderPreview(bytes, plan) {
     c.height = cut[3] - cut[1];
     c.getContext('2d').drawImage(full, cut[0], cut[1], c.width, c.height, 0, 0, c.width, c.height);
     const p = plan[i - 1] || {mode: KEEP};
-    const lab = p.mode === 'only' ? '天地無用' : p.mode === KEEP ? 'ロゴのまま' : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
+    const marks = selectedMarks().map(m => m.label).join('・');
+    let lab = p.mode === 'only' ? marks : p.mode === KEEP ? 'ロゴのまま' : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
+    if (S.kind === 'band' && p.mode !== KEEP) lab += '＋' + marks;
     const fig = document.createElement('figure');
     fig.innerHTML = '<figcaption><b>' + i + '</b>　' + esc(lab) + '</figcaption>';
     fig.insertBefore(c, fig.firstChild);
@@ -805,10 +971,22 @@ function wire() {
 
   $$('input[name="kind"]').forEach(el => el.addEventListener('change', () => {
     S.kind = $('input[name="kind"]:checked').value;
+    limitMarks();
     showSteps();
     if (S.src) S.src.groups.forEach((g, gi) => refreshGroup(gi));
     invalidateOut();
   }));
+  $$('input[name="size"]').forEach(el => el.addEventListener('change', () => {
+    S.size = $('input[name="size"]:checked').value;
+    if (S.src) S.src.groups.forEach((g, gi) => refreshGroup(gi));
+    invalidateOut();
+  }));
+  // 注意書きの候補
+  $('#markChecks').innerHTML = MARKS.map(m =>
+    '<label class="mk"><input type="checkbox" data-mark="' + m.key + '">' + esc(m.label) + '</label>').join('');
+  $('#marksBox').addEventListener('change', onMarkInput);
+  $('#freeText').addEventListener('input', onMarkInput);
+  $('#kijiBtn').addEventListener('click', marksFromKiji);
   $('#groups').addEventListener('input', onInput);
   $('#groups').addEventListener('change', onInput);
   $('#groups').addEventListener('click', onClick);
@@ -823,6 +1001,9 @@ loadFont().catch(e => setMsg('#fileInfo', e.message || String(e), 'err'));
 // 確かめる用（画面の動きには関係しない）
 window.HINMEI = {
   open: openPdf, autofill: autofill, makePlan: makePlan, build: buildPdf, layout: layout,
-  state: S, setKind: k => { $('input[name="kind"][value="' + k + '"]').click(); }
+  bandLayout: bandLayout, onlyLayout: onlyLayout, marksFromKiji: marksFromKiji,
+  state: S, setKind: k => { $('input[name="kind"][value="' + k + '"]').click(); },
+  setSize: k => { $('input[name="size"][value="' + k + '"]').click(); },
+  setMarks: (keys, free) => { S.marks = keys.slice(); S.free = free || ''; limitMarks(); renderMarks(); }
 };
 })();

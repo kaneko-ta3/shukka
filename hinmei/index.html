@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>送り状 品名でかく</title>
+<title>送り状 余白書き換え</title>
 <style>
 /* 出荷ボード・複数宛先ラベルと同じ色。いつもダークで表示します */
 :root{
@@ -56,6 +56,14 @@ label.kind{display:flex; flex-direction:column; gap:2px; min-width:180px; paddin
 label.kind input{margin:0 0 4px;}
 label.kind:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
 
+.marks{margin-top:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); display:flex; flex-direction:column; gap:8px;}
+.mks{display:flex; flex-wrap:wrap; gap:6px;}
+label.mk{display:inline-flex; gap:5px; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:6px; cursor:pointer; background:var(--ground);}
+label.mk:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
+.freetext{background:var(--ground); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:5px 8px; font:inherit; width:16em;}
+.sizes{margin-left:auto; display:inline-flex; gap:10px; align-items:center; font-size:13px;}
+.sizes label{display:inline-flex; gap:3px; align-items:center; cursor:pointer;}
+
 /* 3 品名と枚数 */
 .group{border-top:1px solid var(--line); padding:12px 0 6px; margin-top:10px;}
 .group:first-child{border-top:none; margin-top:0;}
@@ -92,10 +100,10 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
 </head>
 <body>
 <header>
-  <h1>送り状 品名でかく</h1>
+  <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v1</span>
+  <span class="ver">v2</span>
 </header>
 
 <main>
@@ -113,10 +121,21 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
     <h2><span class="n">2</span>入れるもの</h2>
     <div class="kinds">
       <label class="kind"><input type="radio" name="kind" value="name" checked><b>品名だけ</b><span class="tiny muted">帯なし</span></label>
-      <label class="kind"><input type="radio" name="kind" value="band"><b>品名＋天地無用</b><span class="tiny muted">帯下（下に黒帯で「天地無用 この面を上に」）</span></label>
-      <label class="kind"><input type="radio" name="kind" value="only"><b>天地無用だけ</b><span class="tiny muted">帯のみ（品名は入れない）</span></label>
+      <label class="kind"><input type="radio" name="kind" value="band"><b>品名＋注意書き</b><span class="tiny muted">帯下（下の黒帯に注意書きを1つ）</span></label>
+      <label class="kind"><input type="radio" name="kind" value="only"><b>注意書きだけ</b><span class="tiny muted">帯のみ（品名は入れない。2つまで）</span></label>
     </div>
-    <div id="onlyNote" class="tiny muted" style="margin-top:8px" hidden>全部の送り状に「天地無用 この面を上に」を大きく入れます。品名の入力はいりません。</div>
+    <div id="marksBox" class="marks" hidden>
+      <div class="tiny muted">注意書き　<span id="markLimit"></span></div>
+      <div id="markChecks" class="mks"></div>
+      <div class="btns">
+        <label class="mk free"><input type="checkbox" data-mark="free">自由に書く</label>
+        <input type="text" id="freeText" class="freetext" placeholder="例) 横積み禁止">
+        <button class="btn small" id="kijiBtn" type="button">記事欄から</button>
+      </div>
+      <div id="kijiMsg" class="tiny warn-ink" hidden></div>
+      <div id="markMsg" class="tiny muted"></div>
+    </div>
+    <div id="onlyNote" class="tiny muted" style="margin-top:8px" hidden>全部の送り状に、選んだ注意書きを大きく入れます。品名の入力はいりません。</div>
   </section>
 
   <section id="secRows" hidden>
@@ -124,6 +143,11 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
     <div class="btns">
       <button class="btn" id="autoBtn">アテンション自動判別</button>
       <span class="tiny muted">品名欄の「商品名(総数)」と入数マスタから、下の表を埋めます</span>
+      <span class="sizes">文字の大きさ
+        <label><input type="radio" name="size" value="L" checked>大</label>
+        <label><input type="radio" name="size" value="M">中</label>
+        <label><input type="radio" name="size" value="S">小</label>
+      </span>
     </div>
     <div id="autoMsg" class="notice" hidden></div>
     <div id="groups"></div>
@@ -134,7 +158,7 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
         <li>入数と総数を空にすれば、文字と枚数を直接指定できます。枠の中でEnterを押すと改行します</li>
         <li>文字を空のまま枚数だけ入れると「白紙」（手書き用）になります</li>
         <li>「そのまま」にチェックを入れると、その枚数はヤマトのロゴを残します</li>
-        <li>文字の大きさは 47・42・36・30pt の4段階で自動。30ptに収まらない長さは作れません</li>
+        <li>品名の文字の大きさは、大＝47・42・36・30pt、中＝36・30pt、小＝30pt から、枠に入る一番大きいものを自動で選びます。30ptに収まらない長さは作れません</li>
       </ul>
     </details>
   </section>
@@ -159,7 +183,7 @@ button.x:hover{border-color:var(--danger); color:var(--danger);}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="config.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
