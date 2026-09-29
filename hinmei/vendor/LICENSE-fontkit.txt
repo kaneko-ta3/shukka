@@ -1,0 +1,3 @@
+@pdf-lib/fontkit 1.1.1
+License: MIT (package.json の license 欄。パッケージにライセンス文は同梱されていない)
+Source: https://github.com/Hopding/fontkit (foliojs/fontkit のフォーク。元も MIT)

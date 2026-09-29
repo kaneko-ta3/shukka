@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>送り状 品名でかく</title>
+<style>
+/* 出荷ボード・複数宛先ラベルと同じ色。いつもダークで表示します */
+:root{
+  color-scheme: dark;
+  --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#9FB0AA;
+  --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
+  --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+  --radius:8px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important;}
+body{margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif; font-size:14px; line-height:1.5;}
+header{padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;}
+header h1{font-size:18px; margin:0;}
+header .ver{margin-left:auto; font-size:13px; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:0 8px;}
+main{padding:16px 20px 80px; max-width:1200px; margin:0 auto;}
+section{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:16px;}
+h2{font-size:15px; margin:0 0 10px; display:flex; align-items:center; gap:8px;}
+h2 .n{display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-size:12px;}
+.tiny{font-size:12px;} .muted{color:var(--muted);}
+.err-ink{color:var(--danger);} .ok-ink{color:var(--accent);} .warn-ink{color:var(--warn);}
+.btn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:6px; border:1px solid var(--line-strong);
+  background:var(--surface-2); color:var(--ink); cursor:pointer; font:inherit; white-space:nowrap; text-decoration:none;}
+.btn:hover{border-color:var(--accent);}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700;}
+.btn.big{font-size:16px; padding:10px 22px;}
+.btn.small{padding:3px 10px; font-size:12px;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.btns{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+.notice{padding:8px 12px; border-radius:6px; margin:8px 0;}
+.notice:empty{display:none;}
+.notice.warn{background:var(--warn-soft); color:var(--warn);}
+.notice.err{background:var(--danger-soft); color:var(--danger);}
+.notice.ok{background:var(--accent-soft); color:var(--accent);}
+.notice.muted{padding-left:0;}
+
+/* 1 PDF */
+.drop{border:2px dashed var(--line-strong); border-radius:var(--radius); padding:26px; text-align:center; color:var(--muted);}
+.drop.over{border-color:var(--accent); background:var(--accent-soft); color:var(--ink);}
+.drop .or{margin:8px 0;}
+.fileline{margin-top:10px; font-size:15px;}
+.fileline .big{font-size:18px; color:var(--accent);}
+
+/* 2 入れるもの */
+.kinds{display:flex; gap:10px; flex-wrap:wrap;}
+label.kind{display:flex; flex-direction:column; gap:2px; min-width:180px; padding:10px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer;}
+label.kind input{margin:0 0 4px;}
+label.kind:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
+
+/* 3 品名と枚数 */
+.group{border-top:1px solid var(--line); padding:12px 0 6px; margin-top:10px;}
+.group:first-child{border-top:none; margin-top:0;}
+.gh{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; font-size:15px;}
+.gh .cnt{color:var(--accent); font-weight:700;}
+.ga{margin:2px 0 6px;}
+.gf{display:flex; gap:16px; align-items:center; margin-top:6px;}
+.total{font-weight:700;}
+table.rows{border-collapse:collapse; margin-top:4px;}
+table.rows th{font-weight:400; font-size:12px; color:var(--muted); text-align:left; padding:2px 6px; white-space:nowrap;}
+table.rows td{padding:4px 6px; vertical-align:middle;}
+table.rows textarea, table.rows input[type=text]{background:var(--ground); color:var(--ink); border:1px solid var(--line); border-radius:5px; font:inherit;}
+table.rows textarea{width:240px; height:48px; padding:4px 7px; resize:vertical; line-height:1.35;}
+table.rows input[type=text]{width:4.6em; padding:5px 6px; text-align:center;}
+table.rows textarea:focus, table.rows input:focus{outline:2px solid var(--accent); outline-offset:-1px;}
+table.rows input.auto{color:var(--muted); background:var(--surface-2);}
+table.rows :disabled{opacity:.55;}
+table.rows tr.keep textarea{opacity:.4;}
+.c-keep{text-align:center;}
+.c-det{min-width:230px; font-size:13px;}
+button.x{background:none; border:1px solid var(--line); color:var(--muted); border-radius:5px; cursor:pointer; width:26px; height:26px;}
+button.x:hover{border-color:var(--danger); color:var(--danger);}
+.help{margin-top:12px;}
+.help summary{cursor:pointer; color:var(--muted); font-size:12px;}
+.help ul{margin:6px 0 0; padding-left:20px; color:var(--muted); font-size:12px;}
+
+/* 4 PDFを作る */
+.preview{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; margin-top:12px;}
+.preview figure{margin:0; background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:6px;}
+.preview canvas{width:100%; height:auto; display:block; background:#fff; border-radius:3px;}
+.preview figcaption{font-size:12px; margin-top:4px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.preview figcaption b{color:var(--ink);}
+</style>
+</head>
+<body>
+<header>
+  <h1>送り状 品名でかく</h1>
+  <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
+  <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
+  <span class="ver">v1</span>
+</header>
+
+<main>
+  <section>
+    <h2><span class="n">1</span>送り状PDF</h2>
+    <div class="drop" id="drop">
+      送り状のPDFをここにドロップ
+      <div class="or tiny">または</div>
+      <label class="btn">ファイルを選ぶ<input type="file" id="file" accept="application/pdf,.pdf" hidden></label>
+    </div>
+    <div id="fileInfo" class="notice" hidden></div>
+  </section>
+
+  <section id="secKind" hidden>
+    <h2><span class="n">2</span>入れるもの</h2>
+    <div class="kinds">
+      <label class="kind"><input type="radio" name="kind" value="name" checked><b>品名だけ</b><span class="tiny muted">帯なし</span></label>
+      <label class="kind"><input type="radio" name="kind" value="band"><b>品名＋天地無用</b><span class="tiny muted">帯下（下に黒帯で「天地無用 この面を上に」）</span></label>
+      <label class="kind"><input type="radio" name="kind" value="only"><b>天地無用だけ</b><span class="tiny muted">帯のみ（品名は入れない）</span></label>
+    </div>
+    <div id="onlyNote" class="tiny muted" style="margin-top:8px" hidden>全部の送り状に「天地無用 この面を上に」を大きく入れます。品名の入力はいりません。</div>
+  </section>
+
+  <section id="secRows" hidden>
+    <h2><span class="n">3</span>品名と枚数</h2>
+    <div class="btns">
+      <button class="btn" id="autoBtn">アテンション自動判別</button>
+      <span class="tiny muted">品名欄の「商品名(総数)」と入数マスタから、下の表を埋めます</span>
+    </div>
+    <div id="autoMsg" class="notice" hidden></div>
+    <div id="groups"></div>
+    <details class="help">
+      <summary>入れ方</summary>
+      <ul>
+        <li>1箱の入数と総数を入れると、端数の箱を頭に、満箱を自動で割り出します。枚数も自動で決まります。例）入数24・総数90 → 商品A(18)×1枚、商品A(24)×3枚</li>
+        <li>入数と総数を空にすれば、文字と枚数を直接指定できます。枠の中でEnterを押すと改行します</li>
+        <li>文字を空のまま枚数だけ入れると「白紙」（手書き用）になります</li>
+        <li>「そのまま」にチェックを入れると、その枚数はヤマトのロゴを残します</li>
+        <li>文字の大きさは 47・42・36・30pt の4段階で自動。30ptに収まらない長さは作れません</li>
+      </ul>
+    </details>
+  </section>
+
+  <section id="secMake" hidden>
+    <h2><span class="n">4</span>PDFを作る</h2>
+    <div class="btns">
+      <button class="btn primary big" id="makeBtn">PDFを作る</button>
+    </div>
+    <div id="makeMsg" class="notice" hidden></div>
+    <div id="result" hidden>
+      <div class="btns">
+        <a class="btn" id="dlLink" href="#">ダウンロード</a>
+        <button class="btn" id="openBtn">開いて印刷</button>
+        <span class="tiny muted" id="outName"></span>
+      </div>
+      <div class="preview" id="preview"></div>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
+<script src="config.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
