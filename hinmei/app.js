@@ -1,5 +1,8 @@
 /* ===================================================================
-   送り状 余白書き換え  v4   (hinmei/app.js)
+   送り状 余白書き換え  v5   (hinmei/app.js)
+
+   v5  入力中に、1枚ずつの見本をその場で描いて見せる（PDFは作らない。同じ計算・同じフォント）。
+       「そのまま」はロゴのまま、まだ入れていない枚は「未入力」と薄く出す
 
    v4  品名の表の並びを 商品名→枚数→そのまま｜入数で割るとき（任意）入数・総数 に。
        ふつうは商品名と枚数だけでよいと分かるように。Tabは 商品名→枚数→次の行
@@ -408,9 +411,11 @@ async function openPdf(bytes, name) {
     }
     S.src = {name: name, bytes: bytes, pages: pages, groups: groupPages(pages)};
     S.src.groups.forEach(g => { g.rows = [blankRow(), blankRow()]; g.status = null; });
+    S.logo = null;
     renderFile();
     renderGroups();
     showSteps();
+    prepSketch().catch(() => { /* 見本が出なくても作るのには困らない */ });
   } catch (e) {
     S.src = null;
     showSteps();
@@ -461,6 +466,7 @@ function renderMarks() {
     if (S.kind === 'band') { const b = bandLayout(z); note.textContent = '帯：「' + b.text + '」' + Math.round(b.size) + 'pt'; }
     else note.textContent = onlyLayout(z).lines.map(l => l.text + ' ' + Math.round(l.size) + 'pt').join('　／　');
   } else note.textContent = '';
+  sketchAll();
 }
 
 function onMarkInput(e) {
@@ -543,7 +549,9 @@ function renderGroups() {
       '<th class="c-num opt-l">1箱の入数</th><th class="c-num">総数</th>' +
       '</tr></thead><tbody></tbody></table>' +
       '<div class="gf"><button class="btn small" data-act="add">＋ 入力欄を追加</button>' +
-      '<span class="total"></span></div>';
+      '<span class="total"></span></div>' +
+      '<details class="sk" open><summary class="tiny muted">見本（入力に合わせてすぐ変わります。最後はPDFを作ったあとのプレビューで確かめてください）</summary>' +
+      '<div class="skgrid"></div></details>';
     box.appendChild(el);
     renderRows(gi);
     if (!multi) el.classList.add('single');
@@ -644,6 +652,7 @@ function refreshGroup(gi) {
   else if (total === need) { t.textContent = '合計 ' + total + ' / ' + need + ' 枚　OK'; t.classList.add('ok-ink'); }
   else if (total < need) { t.textContent = '合計 ' + total + ' / ' + need + ' 枚　※あと ' + (need - total) + '枚 足りません'; t.classList.add('err-ink'); }
   else { t.textContent = '合計 ' + total + ' / ' + need + ' 枚　※' + (total - need) + '枚 多いです'; t.classList.add('err-ink'); }
+  sketchLater(gi);
 }
 
 function onInput(e) {
@@ -699,6 +708,167 @@ function onClick(e) {
     renderRows(gi);
   }
   invalidateOut();
+}
+
+/* ================================================================
+   見本（入力中）。PDFは作らず、同じ計算・同じフォントで画面に描く
+   ================================================================ */
+const SK_W = 190;                       // 見本1枚の幅(px)
+
+/** フォントを画面用にも読み込み、元のロゴの絵を1枚だけ取っておく（「そのまま」「未入力」用） */
+async function prepSketch() {
+  if (!S.face && S.fontBytes) {
+    S.face = new FontFace('HinmeiBIZ', S.fontBytes.buffer.slice(0));
+    await S.face.load();
+    document.fonts.add(S.face);
+  }
+  const s = S.src;
+  if (s && !S.logo) {
+    const zone = s.pages[0].zone;
+    const dpr = window.devicePixelRatio || 1;
+    const k = SK_W / (zone[2] - zone[0]) * dpr;
+    const pdf = await pdfjsLib.getDocument({data: s.bytes.slice(0)}).promise;
+    const page = await pdf.getPage(1);
+    const c = document.createElement('canvas');
+    c.width = Math.round((zone[2] - zone[0]) * k);
+    c.height = Math.round((zone[3] - zone[1]) * k);
+    await page.render({canvasContext: c.getContext('2d'), viewport: page.getViewport({scale: k}),
+                       transform: [1, 0, 0, 1, -zone[0] * k, -zone[1] * k]}).promise;
+    await pdf.destroy();
+    if (S.src === s) S.logo = c;
+  }
+  sketchAll();
+}
+
+/** 届け先ひとつ分の「何枚目に何が入るか」。止めずに、足りない枚は未入力、おかしい行は注意で返す */
+function sketchSeq(gi) {
+  const g = S.src.groups[gi];
+  if (S.kind === 'only') return g.pages.map(() => ({mode: 'only'}));
+  const seq = [];
+  for (const r of g.rows) {
+    const info = rowInfo(r);
+    if (info.kind === 'empty') continue;
+    if (info.kind === 'err') { seq.push({mode: 'err', msg: info.msg}); continue; }
+    if (info.kind === 'auto') info.boxes.forEach(b => { for (let k = 0; k < b[1]; k++) seq.push({mode: TEXT, text: b[0]}); });
+    else if (info.kind === TEXT) for (let k = 0; k < info.count; k++) seq.push({mode: TEXT, text: info.text});
+    else for (let k = 0; k < info.count; k++) seq.push({mode: info.kind});
+  }
+  return seq;
+}
+
+/** 1枚ぶんを描く。戻り値は問題の文（無ければ ''） */
+function drawSketch(cv, zone, e) {
+  const dpr = window.devicePixelRatio || 1;
+  const zw = zone[2] - zone[0], zh = zone[3] - zone[1];
+  const k = SK_W / zw;
+  cv.width = Math.round(SK_W * dpr);
+  cv.height = Math.round(zh * k * dpr);
+  cv.style.aspectRatio = zw + ' / ' + zh;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (e.mode === KEEP || e.mode === 'empty' || e.mode === 'err') {
+    if (S.logo) ctx.drawImage(S.logo, 0, 0, cv.width, cv.height);
+    return '';
+  }
+  ctx.setTransform(k * dpr, 0, 0, k * dpr, -zone[0] * k * dpr, -zone[1] * k * dpr);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(zone[0], zone[1], zw, zh);
+  ctx.textBaseline = 'alphabetic';
+  const text = (str, r, size, base, color) => {
+    ctx.font = size + 'px HinmeiBIZ';
+    ctx.fillStyle = color;
+    ctx.fillText(str, r[0] + (r[2] - r[0] - width(str, size)) / 2, base);
+  };
+  let problem = '';
+  if (e.mode === 'only') {
+    const o = onlyLayout(zone);
+    ctx.lineWidth = ONLY.frame;
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(o.box[0], o.box[1], o.box[2] - o.box[0], o.box[3] - o.box[1]);
+    o.lines.forEach(l => text(l.text, o.body, l.size, l.base, '#000'));
+    return marksProblem(zone) || '';
+  }
+  let nr = zone;
+  if (S.kind === 'band') {
+    const b = bandLayout(zone);
+    if (b) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(b.band[0], b.band[1], b.band[2] - b.band[0], b.band[3] - b.band[1]);
+      text(b.text, b.band, b.size, b.base, '#fff');
+    }
+    problem = marksProblem(zone) || '';
+    nr = nameRect(zone);
+  }
+  if (e.mode === TEXT) {
+    const f = layout(e.text, nr);
+    const top = nr[1] + (nr[3] - nr[1] - f.size * LH * f.lines.length) / 2;
+    f.lines.forEach((ln, i) => text(ln, nr, f.size, top + f.size * LH * i + f.size * BL, '#000'));
+    if (f.size < MIN_SIZE) problem = fitProblem(f.lines);
+  }
+  return problem;
+}
+
+function sketchGroup(gi) {
+  const s = S.src;
+  if (!s || !S.face) return;
+  const g = s.groups[gi];
+  const box = $('.group[data-gi="' + gi + '"] .skgrid');
+  if (!box) return;
+  const seq = sketchSeq(gi);
+  const cards = g.pages.map((p, j) => seq[j] || {mode: 'empty'});
+  // 描き直すたびに作り直さず、枚数が変わったときだけ入れ物を足し引きする
+  while (box.children.length > cards.length) box.lastChild.remove();
+  while (box.children.length < cards.length) {
+    const fig = document.createElement('figure');
+    fig.innerHTML = '<canvas></canvas><figcaption></figcaption>';
+    box.appendChild(fig);
+  }
+  cards.forEach((e, j) => {
+    const fig = box.children[j];
+    const problem = drawSketch($('canvas', fig), s.pages[g.pages[j]].zone, e);
+    const marks = selectedMarks().map(m => m.label).join('・');
+    let lab = e.mode === TEXT ? e.text.replace(/\n/g, ' / ') : e.mode === BLANK ? '白紙' : e.mode === KEEP ? 'ロゴのまま' :
+              e.mode === 'only' ? marks : e.mode === 'err' ? e.msg : '未入力';
+    if (S.kind === 'band' && (e.mode === TEXT || e.mode === BLANK)) lab += '＋' + marks;
+    fig.className = e.mode === 'empty' ? 'empty' : (e.mode === 'err' || problem) ? 'bad' : '';
+    $('figcaption', fig).innerHTML = '<b>' + (g.pages[j] + 1) + '</b>　' + esc(problem ? problem : lab);
+  });
+  const over = seq.length - g.pages.length;
+  let extra = box.parentNode.querySelector('.skover');
+  if (over > 0) {
+    if (!extra) { extra = document.createElement('div'); extra.className = 'skover tiny err-ink'; box.parentNode.appendChild(extra); }
+    extra.textContent = '入力が送り状より ' + over + '枚 多いので、あふれた分は入りません';
+  } else if (extra) extra.remove();
+}
+
+let skTimer = null;
+const skDirty = new Set();
+function sketchLater(gi) {
+  skDirty.add(gi);
+  if (skTimer) return;
+  skTimer = requestAnimationFrame(() => {
+    skTimer = null;
+    skDirty.forEach(i => sketchGroup(i));
+    skDirty.clear();
+  });
+}
+function sketchAll() {
+  if (!S.src) return;
+  S.src.groups.forEach((g, gi) => sketchLater(gi));
+  sketchOnly();
+}
+
+/** 帯のみのときは表が無いので、注意書きの欄に見本を1枚出す */
+function sketchOnly() {
+  const fig = $('#onlySketch');
+  if (!fig) return;
+  const on = !!(S.src && S.face && S.kind === 'only');
+  fig.hidden = !on;
+  if (!on) return;
+  const problem = drawSketch($('canvas', fig), S.src.pages[0].zone, {mode: 'only'});
+  fig.className = problem ? 'bad' : '';
+  $('figcaption', fig).textContent = problem || ('全' + S.src.pages.length + '枚ともこの見た目');
 }
 
 function invalidateOut() {
@@ -1031,6 +1201,7 @@ loadFont().catch(e => setMsg('#fileInfo', e.message || String(e), 'err'));
 window.HINMEI = {
   open: openPdf, autofill: autofill, makePlan: makePlan, build: buildPdf, layout: layout,
   bandLayout: bandLayout, onlyLayout: onlyLayout, marksFromKiji: marksFromKiji,
+  sketchAll: sketchAll, sketchGroup: sketchGroup,
   state: S, setKind: k => { $('input[name="kind"][value="' + k + '"]').click(); },
   setSize: k => { $('input[name="size"][value="' + k + '"]').click(); },
   setMarks: (keys, free) => { S.marks = keys.slice(); S.free = free || ''; limitMarks(); renderMarks(); }
