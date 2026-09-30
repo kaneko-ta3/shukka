@@ -67,7 +67,7 @@ tr.gtop td{border-top:2px solid var(--line-strong);}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSVを作ります。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v2</span>
+  <span class="ver">v3</span>
 </header>
 
 <main>
@@ -106,11 +106,12 @@ tr.gtop td{border-top:2px solid var(--line-strong);}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v1
+   追跡番号出力  v3
 
    B2の発行済データから、選んだ列だけのCSVを作る。最初は 伝票番号（D列）とお届け先名（P列）。
    ・1行目の見出しは残す
-   ・ファイル名は お届け先名の2行目（最初のお届け先名）。お届け先が複数なら「〇〇 他」
+   ・ファイル名は お届け先名の2行目（最初のお届け先名）。名前の後ろに「様」。お届け先が複数なら「〇〇様 他」
+     （名前がもとから「様」で終わるときは足さない）
      お届け先は 郵便番号＋お届け先名＋部門名２（店名）で見分ける（同じ所への送り状が2つあっても1か所）
    ・グループ … 送り状ごとの番号。親番号（複数口くくりキー）が同じ行は同じ番号（1,1,1,2,2…）
    ・商品名 … 品名１と品名２を一緒に出す。品名２が全部空なら品名２の列は出さない
@@ -324,7 +325,8 @@ function build() {
   }
 
   const first = cell(st.body[0], iName).trim();
-  st.name = (safeName(first) || '発行済データ') + (dests.size > 1 ? ' 他' : '') + '.csv';
+  const base = safeName(first);
+  st.name = (base ? base.replace(/様$/, '') + '様' : '発行済データ') + (dests.size > 1 ? ' 他' : '') + '.csv';
   const out = [cols.map(c => c.head)].concat(st.body.map((r, n) => cols.map(c => c.val(r, n))));
   st.text = out.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 
