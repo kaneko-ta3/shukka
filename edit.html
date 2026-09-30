@@ -4,6 +4,8 @@
 <base target="_top">
 <meta charset="utf-8">
 <title>カレンダー編集</title>
+<!-- タブのマーク（カレンダーに割り付けのペン）。ファイルを増やさないようページに直接書いている -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='10' width='52' height='48' rx='7' fill='%23ffffff' stroke='%231D2523' stroke-width='3'/%3E%3Cpath d='M6 17 Q6 10 13 10 L51 10 Q58 10 58 17 L58 24 L6 24 Z' fill='%237FAAF2'/%3E%3Crect x='17' y='4' width='6' height='12' rx='3' fill='%231D2523'/%3E%3Crect x='41' y='4' width='6' height='12' rx='3' fill='%231D2523'/%3E%3Cpath d='M22 50 L24 42 L42 24 L48 30 L30 48 Z' fill='%237FAAF2'/%3E%3Cpath d='M22 50 L24 42 L30 48 Z' fill='%231D2523'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -701,7 +703,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v90";
+const BUILD = "v91";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
