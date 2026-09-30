@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>追跡番号出力</title>
+<!-- タブのマーク（バーコードの付いた紙）。ファイルを増やさないようページに直接書いている -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M12 6 L42 6 L54 18 L54 58 L12 58 Z' fill='%23ffffff' stroke='%231D2523' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M42 6 L42 18 L54 18' fill='none' stroke='%231D2523' stroke-width='3' stroke-linejoin='round'/%3E%3Crect x='19' y='26' width='3' height='20' fill='%231D2523'/%3E%3Crect x='24' y='26' width='2' height='20' fill='%231D2523'/%3E%3Crect x='28' y='26' width='4' height='20' fill='%231D2523'/%3E%3Crect x='34' y='26' width='2' height='20' fill='%231D2523'/%3E%3Crect x='38' y='26' width='3' height='20' fill='%231D2523'/%3E%3Crect x='43' y='26' width='2' height='20' fill='%231D2523'/%3E%3Crect x='19' y='49' width='28' height='4' rx='2' fill='%2348BFA6'/%3E%3C/svg%3E">
+<style>
+/* 出荷ボード・複数宛先ラベルと同じ色。いつもダークで表示します */
+:root{
+  color-scheme: dark;
+  --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#9FB0AA;
+  --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
+  --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+  --radius:8px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important;}
+body{margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif; font-size:14px; line-height:1.5;}
+header{padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;}
+header h1{font-size:18px; margin:0;}
+header .ver{margin-left:auto; font-size:13px; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:0 8px;}
+main{padding:16px 20px 80px; max-width:1100px; margin:0 auto;}
+section{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:16px;}
+h2{font-size:15px; margin:0 0 10px;}
+.tiny{font-size:12px;} .muted{color:var(--muted);}
+.drop{border:2px dashed var(--line-strong); border-radius:var(--radius); padding:26px; text-align:center; color:var(--muted);}
+.drop.over{border-color:var(--accent); background:var(--accent-soft); color:var(--ink);}
+.drop .or{margin:8px 0;}
+.btn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:6px; border:1px solid var(--line-strong);
+  background:var(--surface-2); color:var(--ink); cursor:pointer; font:inherit; white-space:nowrap;}
+.btn:hover{border-color:var(--accent);}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; font-size:16px; padding:10px 22px;}
+.btn.small{padding:3px 10px; font-size:12px;}
+.notice{padding:8px 12px; border-radius:6px; margin:8px 0;}
+.notice.warn{background:var(--warn-soft); color:var(--warn);}
+.notice.err{background:var(--danger-soft); color:var(--danger);}
+.notice.ok{background:var(--accent-soft); color:var(--accent);}
+.facts{display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:4px 0 12px;}
+.facts dt{color:var(--muted);} .facts dd{margin:0;}
+.fname{font-size:16px; font-weight:700; color:var(--accent); word-break:break-all;}
+/* 列えらび */
+.picks{display:flex; flex-wrap:wrap; gap:6px;}
+label.pk{display:inline-flex; gap:5px; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:6px; cursor:pointer; background:var(--ground);}
+label.pk:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
+label.pk .col{color:var(--muted); font-size:11px;}
+label.pk.empty{opacity:.55;}
+details.more{margin-top:10px;}
+details.more summary{cursor:pointer; color:var(--muted); font-size:12px;}
+details.more .picks{margin-top:8px;}
+/* 表 */
+.scroll{overflow:auto; max-height:520px; margin-top:10px; border:1px solid var(--line); border-radius:6px;}
+table{border-collapse:collapse; font-size:13px;}
+th, td{border-bottom:1px solid var(--line); padding:3px 10px; text-align:left; white-space:nowrap;}
+th{background:var(--surface-2); color:var(--muted); font-weight:400; position:sticky; top:0;}
+td.rn{color:var(--muted); text-align:right;}
+tr.g1 td{background:rgba(72,191,166,.07);}
+tr.gtop td{border-top:2px solid var(--line-strong);}
+</style>
+</head>
+<body>
+<header>
+  <h1>追跡番号出力</h1>
+  <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSVを作ります。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
+  <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
+  <span class="ver">v1</span>
+</header>
+
+<main>
+  <section>
+    <div class="drop" id="drop">
+      B2の発行済データ（CSV）をここにドロップ
+      <div class="or tiny">または</div>
+      <label class="btn">ファイルを選ぶ<input type="file" id="file" accept=".csv,.txt,.tsv,.xlsx,.xls" hidden></label>
+    </div>
+    <div id="msg" class="notice" hidden></div>
+  </section>
+
+  <section id="pickSec" hidden>
+    <h2>出す列</h2>
+    <div class="picks" id="picks"></div>
+    <details class="more">
+      <summary>ほかの列（<span id="moreCount"></span>）</summary>
+      <div class="picks" id="morePicks"></div>
+    </details>
+    <div class="tiny muted" style="margin-top:8px">CSVの列は、この並びの上から順に出ます。選んだ列はこのブラウザが覚えておきます。
+      <button class="btn small" id="resetPick" type="button">最初の選び方に戻す</button></div>
+  </section>
+
+  <section id="out" hidden>
+    <dl class="facts">
+      <dt>保存する名前</dt><dd class="fname" id="fname"></dd>
+      <dt>行数</dt><dd id="count"></dd>
+      <dt>お届け先</dt><dd id="dests"></dd>
+    </dl>
+    <button class="btn primary" id="save">CSVを保存</button>
+    <div class="tiny muted" style="margin-top:6px">スプシからダウンロードしたときと同じ形（UTF-8・BOMなし・改行CRLF）で保存します。</div>
+    <div id="note" class="notice warn" hidden></div>
+    <div class="scroll" id="tableBox"></div>
+  </section>
+</main>
+
+<script>
+/* ===================================================================
+   追跡番号出力  v1
+
+   B2の発行済データから、選んだ列だけのCSVを作る。最初は 伝票番号（D列）とお届け先名（P列）。
+   ・1行目の見出しは残す
+   ・ファイル名は お届け先名の2行目（最初のお届け先名）。お届け先が複数なら「〇〇 他」
+     お届け先は 郵便番号＋お届け先名＋部門名２（店名）で見分ける（同じ所への送り状が2つあっても1か所）
+   ・グループ … 送り状ごとの番号。親番号（複数口くくりキー）が同じ行は同じ番号（1,1,1,2,2…）
+   ・商品名 … 品名１と品名２を一緒に出す。品名２が全部空なら品名２の列は出さない
+   ・保存の形はスプシからダウンロードしたのと同じ（UTF-8・BOMなし・CRLF、最後の行にも改行）
+   ・ファイルはブラウザの中で読むだけ。どこにも送らない
+   読み取りは 複数宛先ラベルの返却用（label/issued.js）と同じやり方
+   =================================================================== */
+(function () {
+'use strict';
+
+// 見出しの名前で探し、見つからなければB2の標準の位置
+const STD = {
+  '伝票番号': 3, '出荷予定日': 4, 'お届け予定（指定）日': 5, 'お届け先郵便番号': 10,
+  'お届け先会社・部門名２': 14, 'お届け先名': 15, '品名１': 27, '品名２': 29, '記事': 32, '複数口くくりキー': 73
+};
+// 一覧の上のほうに出す列。上からこの順でCSVに並ぶ
+const MAIN = [
+  {key: 'no', label: '伝票番号', cols: ['伝票番号'], def: true},
+  {key: 'name', label: 'お届け先名', cols: ['お届け先名'], def: true},
+  {key: 'group', label: 'グループ（送り状ごとの番号）', virtual: true},
+  {key: 'item', label: '商品名（品名１・品名２）', cols: ['品名１', '品名２'], dropEmpty: ['品名２']},
+  {key: 'dept2', label: '店名（部門名２）', cols: ['お届け先会社・部門名２']},
+  {key: 'ship', label: '出荷予定日', cols: ['出荷予定日']},
+  {key: 'due', label: 'お届け予定日', cols: ['お届け予定（指定）日']},
+  {key: 'memo', label: '記事', cols: ['記事']},
+];
+const LS = 'tracking_cols_v1';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const LETTER = i => { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - 1 - r) / 26; } return s; };
+const norm = s => String(s == null ? '' : s).normalize('NFKC').replace(/\s+/g, '');
+const digits = s => String(s == null ? '' : s).replace(/[^0-9]/g, '');
+
+const st = {head: [], body: [], file: '', pick: null, text: '', name: ''};
+
+function setMsg(el, text, cls) {
+  el = $(el);
+  el.textContent = text;
+  el.className = 'notice ' + (cls || '');
+  el.hidden = !text;
+}
+
+/* 区切り文字のテキストを [行][列] にする。"..." の中の改行もそのまま（ラベルと同じ） */
+function parseDelimited(text, sep) {
+  const rows = []; let row = [], cur = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"' && cur === '') q = true;
+    else if (c === sep) { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cur); rows.push(row); row = []; cur = '';
+    } else cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  while (rows.length && rows[rows.length - 1].every(v => !String(v).trim())) rows.pop();   // 下の空行
+  return rows;
+}
+
+function loadScript(src) {
+  return new Promise((ok, ng) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = () => ng(new Error('Excelを読む部品を読み込めませんでした'));
+    document.head.appendChild(s);
+  });
+}
+
+async function read(file) {
+  const buf = await file.arrayBuffer();
+  if (/\.xlsx?$/i.test(file.name)) {
+    // Excelで来たときだけ、複数宛先ラベルに置いてある読み取り部品を借りる
+    if (typeof XLSX === 'undefined') await loadScript('../label/vendor/xlsx.full.min.js');
+    const wb = XLSX.read(buf, {type: 'array'});
+    const ws = wb.Sheets[wb.SheetNames.find(n => /発行済/.test(n)) || wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, {header: 1, raw: false, defval: ''}).map(r => r.map(v => String(v)));
+  }
+  let text;
+  try { text = new TextDecoder('utf-8', {fatal: true}).decode(buf); }
+  catch (e) { text = new TextDecoder('shift_jis').decode(buf); }
+  return parseDelimited(text, /\t/.test(text.split(/\r?\n/)[0]) ? '\t' : ',');
+}
+
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+/* Windowsのファイル名に使えない字をよける */
+function safeName(s) {
+  return String(s).replace(/[\\/:*?"<>|\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+}
+
+/* 見出しの名前 → 列の位置 */
+function colOf(label) {
+  const i = st.head.indexOf(label);
+  if (i >= 0) return i;
+  return STD[label] !== undefined && STD[label] < st.head.length ? STD[label] : -1;
+}
+const cell = (r, i) => (i < 0 || r[i] == null ? '' : String(r[i]));
+
+/* 列の候補。よく使う列＋ほかの列（見出しの並び順） */
+function options() {
+  const used = new Set();
+  const main = MAIN.map(o => {
+    const idx = (o.cols || []).map(colOf);
+    idx.forEach(i => used.add(i));
+    return Object.assign({}, o, {idx: idx});
+  });
+  const more = [];
+  st.head.forEach((h, i) => {
+    if (used.has(i) || !String(h).trim()) return;
+    more.push({key: 'c' + i + ':' + h, label: h, idx: [i], cols: [h]});
+  });
+  return {main: main, more: more};
+}
+
+function loadPick() {
+  try { const v = JSON.parse(localStorage.getItem(LS) || 'null'); if (Array.isArray(v)) return new Set(v); } catch (e) { /* 覚えられなくても動く */ }
+  return new Set(MAIN.filter(o => o.def).map(o => o.key));
+}
+function savePick() {
+  try { localStorage.setItem(LS, JSON.stringify(Array.from(st.pick))); } catch (e) { /* 覚えられなくても動く */ }
+}
+
+function renderPicks() {
+  const op = options();
+  const filled = i => i >= 0 && st.body.some(r => cell(r, i).trim());
+  const item = (o) => {
+    const ok = o.virtual || o.idx.some(i => i >= 0);
+    const has = o.virtual || o.idx.some(filled);
+    const where = o.virtual ? '' : o.idx.filter(i => i >= 0).map(LETTER).join('・');
+    return '<label class="pk' + (has ? '' : ' empty') + '" title="' + (has ? '' : 'このファイルでは全部空です') + '">' +
+      '<input type="checkbox" data-key="' + esc(o.key) + '"' + (st.pick.has(o.key) ? ' checked' : '') + (ok ? '' : ' disabled') + '>' +
+      esc(o.label) + (where ? '<span class="col">' + where + '</span>' : '') + '</label>';
+  };
+  $('#picks').innerHTML = op.main.map(item).join('');
+  $('#morePicks').innerHTML = op.more.map(item).join('');
+  $('#moreCount').textContent = op.more.length + '列';
+}
+
+async function open(file) {
+  setMsg('#msg', '');
+  $('#out').hidden = true;
+  $('#pickSec').hidden = true;
+  let grid;
+  try { grid = await read(file); }
+  catch (e) { setMsg('#msg', 'ファイルを読めませんでした：' + (e.message || e), 'err'); return; }
+  const hr = grid.findIndex(r => r.some(v => String(v).trim() === '伝票番号') && r.some(v => String(v).trim() === 'お届け先名'));
+  if (hr < 0) { setMsg('#msg', '見出しに「伝票番号」と「お届け先名」がありません。B2の発行済データを入れてください', 'err'); return; }
+  st.head = grid[hr].map(v => String(v).trim());
+  st.body = grid.slice(hr + 1).filter(r => r.some(v => String(v).trim()));
+  st.file = file.name;
+  st.hr = hr;
+  if (!st.body.length) { setMsg('#msg', '見出しの下にデータがありません', 'err'); return; }
+  if (!st.pick) st.pick = loadPick();
+  renderPicks();
+  $('#pickSec').hidden = false;
+  build();
+}
+
+/* 選んだ列でCSVを組み立てて、画面に出す */
+function build() {
+  const op = options();
+  const all = op.main.concat(op.more).filter(o => st.pick.has(o.key));
+  const notes = [];
+  if (st.hr !== 0) notes.push('見出しが ' + (st.hr + 1) + '行目にありました。それより上の行は入れていません');
+  const iNo = colOf('伝票番号'), iName = colOf('お届け先名');
+  if (iNo !== 3 || iName !== 15) notes.push('伝票番号が ' + LETTER(iNo) + '列、お届け先名が ' + LETTER(iName) + '列にありました（いつもは D列・P列）。見出しの名前で探した列を使っています');
+
+  // グループ：親番号（くくりキー。空なら自分の伝票番号）ごとに 1,2,3…
+  const iKey = st.head.indexOf('複数口くくりキー');
+  const gno = new Map(), rowGroup = [];
+  st.body.forEach(r => {
+    const k = (iKey >= 0 && cell(r, iKey).trim()) || cell(r, iNo).trim();
+    if (!gno.has(k)) gno.set(k, gno.size + 1);
+    rowGroup.push(gno.get(k));
+  });
+  if (iKey < 0 && st.pick.has('group')) notes.push('「複数口くくりキー」の列がないので、グループは伝票番号ごとにしています');
+
+  // お届け先：郵便番号＋お届け先名＋部門名２
+  const iZip = colOf('お届け先郵便番号'), iDept2 = colOf('お届け先会社・部門名２');
+  const dests = new Map();
+  st.body.forEach(r => {
+    const k = digits(cell(r, iZip)) + '|' + norm(cell(r, iName)) + '|' + norm(cell(r, iDept2));
+    if (!dests.has(k)) dests.set(k, cell(r, iName).trim() + (cell(r, iDept2).trim() ? ' ' + cell(r, iDept2).trim() : ''));
+  });
+
+  // 列ごとの 見出し と 値の出し方
+  const cols = [];
+  all.forEach(o => {
+    if (o.virtual) { cols.push({head: 'グループ', val: (r, n) => String(rowGroup[n])}); return; }
+    o.idx.forEach((i, j) => {
+      if (i < 0) return;
+      const label = st.head[i] || o.cols[j];
+      if ((o.dropEmpty || []).indexOf(o.cols[j]) >= 0 && !st.body.some(r => cell(r, i).trim())) {
+        notes.push('「' + label + '」は全部空なので、列ごと出していません');
+        return;
+      }
+      cols.push({head: label, val: r => cell(r, i)});
+    });
+  });
+  if (!cols.length) {
+    $('#out').hidden = true;
+    setMsg('#msg', '出す列が1つも選ばれていません', 'warn');
+    return;
+  }
+
+  const first = cell(st.body[0], iName).trim();
+  st.name = (safeName(first) || '発行済データ') + (dests.size > 1 ? ' 他' : '') + '.csv';
+  const out = [cols.map(c => c.head)].concat(st.body.map((r, n) => cols.map(c => c.val(r, n))));
+  st.text = out.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+
+  $('#fname').textContent = st.name;
+  $('#count').textContent = '見出し1行 ＋ データ ' + st.body.length + '行　／　' + cols.length + '列';
+  const names = Array.from(dests.values());
+  $('#dests').textContent = dests.size + 'か所（送り状 ' + gno.size + '通）' +
+    '　' + names.slice(0, 5).join('、') + (names.length > 5 ? ' ほか' : '');
+  // 表：送り状ごとに色を交互に変え、送り状の変わり目に線
+  const show = st.body.slice(0, 200);
+  $('#tableBox').innerHTML = '<table><tr><th></th>' + cols.map(c => '<th>' + esc(c.head) + '</th>').join('') + '</tr>' +
+    show.map((r, n) => {
+      const g = rowGroup[n], top = n > 0 && rowGroup[n - 1] !== g;
+      return '<tr class="' + (g % 2 ? '' : 'g1') + (top ? ' gtop' : '') + '"><td class="rn">' + (n + 2) + '</td>' +
+        cols.map(c => '<td>' + esc(c.val(r, n)) + '</td>').join('') + '</tr>';
+    }).join('') + '</table>' +
+    (st.body.length > show.length ? '<div class="tiny muted" style="padding:6px">ほか ' + (st.body.length - show.length) + '行</div>' : '');
+  $('#out').hidden = false;
+  setMsg('#note', notes.join('。'), 'warn');
+  setMsg('#msg', st.file + ' を読みました', 'ok');
+}
+
+function save() {
+  if (!st.text) return;
+  const blob = new Blob([st.text], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = st.name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) open(e.dataTransfer.files[0]); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); if (!e.target.closest('#drop') && e.dataTransfer.files[0]) open(e.dataTransfer.files[0]); });
+$('#file').addEventListener('change', e => { if (e.target.files[0]) open(e.target.files[0]); e.target.value = ''; });
+$('#save').addEventListener('click', save);
+document.addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.key;
+  if (!k || !st.pick) return;
+  if (e.target.checked) st.pick.add(k); else st.pick.delete(k);
+  savePick();
+  build();
+});
+$('#resetPick').addEventListener('click', () => {
+  st.pick = new Set(MAIN.filter(o => o.def).map(o => o.key));
+  savePick();
+  renderPicks();
+  build();
+});
+
+// 確かめる用（画面の動きには関係しない）
+window.TRACKING = {open: open, state: st, setPick: keys => { st.pick = new Set(keys); renderPicks(); build(); }};
+})();
+</script>
+</body>
+</html>
