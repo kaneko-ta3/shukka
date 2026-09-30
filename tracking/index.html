@@ -79,7 +79,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSVを作ります。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v4</span>
+  <span class="ver">v5</span>
 </header>
 
 <main>
@@ -128,7 +128,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v4
+   追跡番号出力  v5
 
    B2の発行済データから、選んだ列だけのCSVを作る。最初は 伝票番号（D列）とお届け先名（P列）。
    ・1行目の見出しは残す
@@ -137,6 +137,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
      お届け先は 郵便番号＋お届け先名＋部門名２（店名）で見分ける（同じ所への送り状が2つあっても1か所）
    ・グループ … 送り状ごとの番号。親番号（複数口くくりキー）が同じ行は同じ番号（1,1,1,2,2…）
      出すときは必ず一番左の列。どのグループを出すかは選べる（番号はファイル全体での番号のまま）
+     出すグループが1つだけ（ファイルに1つしかない／1つだけ選んだ）ときは、グループの列は出さない
    ・列の並びは 表の見出しをドラッグして変えられる（ブラウザが覚える）
    ・商品名 … 品名１と品名２を一緒に出す。品名２が全部空なら品名２の列は出さない
    ・保存の形はスプシからダウンロードしたのと同じ（UTF-8・BOMなし・CRLF、最後の行にも改行）
@@ -364,7 +365,7 @@ async function open(file) {
   renderPicks();
   renderGroups();
   $('#pickSec').hidden = false;
-  $('#groupSec').hidden = false;
+  $('#groupSec').hidden = st.groups.length < 2;   // 送り状が1つだけなら選ぶものがない
   build();
 }
 
@@ -372,8 +373,8 @@ async function open(file) {
 function build() {
   const op = options();
   const byKey = new Map(op.main.concat(op.more).map(o => [o.key, o]));
-  // グループは必ず一番左。ほかはドラッグで並べた順
-  const all = (st.pick.has('group') ? ['group'] : []).concat(orderedKeys(op).filter(k => st.pick.has(k))).map(k => byKey.get(k));
+  // グループ以外はドラッグで並べた順（グループは出す行が決まってから一番左に足す）
+  const all = orderedKeys(op).filter(k => st.pick.has(k)).map(k => byKey.get(k));
   const notes = [];
   if (st.hr !== 0) notes.push('見出しが ' + (st.hr + 1) + '行目にありました。それより上の行は入れていません');
   const iNo = colOf('伝票番号'), iName = colOf('お届け先名');
@@ -390,6 +391,11 @@ function build() {
     return;
   }
   const gOut = new Set(rows.map(x => rowGroup[x.n]));
+  // グループが1つしか出ないときは、グループの列は要らないので出さない
+  if (st.pick.has('group')) {
+    if (gOut.size > 1) all.unshift(byKey.get('group'));
+    else if (st.groups.length > 1) notes.push('出すグループが1つだけなので、グループの列は出していません');
+  }
 
   // お届け先：郵便番号＋お届け先名＋部門名２（出す行だけで数える）
   const iZip = colOf('お届け先郵便番号'), iDept2 = colOf('お届け先会社・部門名２');
