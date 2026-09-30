@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>送り状 余白書き換え</title>
+<!-- タブのマーク（段ボールに黒帯）。ファイルを増やさないようページに直接書いている -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 20 L32 8 L56 20 L56 48 L32 60 L8 48 Z' fill='%23D9A445' stroke='%235a3e12' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M8 20 L32 32 L56 20 M32 32 L32 60' fill='none' stroke='%235a3e12' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M8 36 L32 48 L56 36' fill='none' stroke='%23111' stroke-width='7'/%3E%3C/svg%3E">
 <style>
 /* 出荷ボード・複数宛先ラベルと同じ色。いつもダークで表示します */
 :root{
@@ -123,7 +125,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v6</span>
+  <span class="ver">v7</span>
 </header>
 
 <main>
@@ -205,7 +207,7 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
