@@ -1,5 +1,8 @@
 /* ===================================================================
-   送り状 余白書き換え  v5   (hinmei/app.js)
+   送り状 余白書き換え  v6   (hinmei/app.js)
+
+   v6  品名だけのときは「商品名(数量)」を必ず数量の前で折る（1行と2行が混ざらないように）。
+       商品名が1行に入らないときは、数量を最後の行の後ろに付ける
 
    v5  入力中に、1枚ずつの見本をその場で描いて見せる（PDFは作らない。同じ計算・同じフォント）。
        「そのまま」はロゴのまま、まだ入れていない枚は「未入力」と薄く出す
@@ -116,8 +119,24 @@ function layout(text, rect, steps) {
     const given = text.split('\n').map(s => s.trim()).filter(Boolean);
     if (given.length) return {lines: given, size: snapTo(raw(given))};
   }
+  const m = text.match(/^(.+?)\s*([(（].*[)）])$/);      // 「品名」と「(数量)」
+  if (m && S.kind === 'name') {
+    // 品名だけのときは、どの枚も同じ形に揃える（1行と2行が混ざると見にくい）。
+    // 商品名が1行に入るなら 商品名／(数量)。入らなければ商品名を折って、数量は最後の行の後ろに付ける
+    const name = m[1], qty = m[2];
+    const alt = [[name, qty]];
+    for (let n = 2; n <= MAX_LINES; n++) {
+      const ls = splitEvenly(name, n);
+      if (ls.length === n) { ls[n - 1] += qty; alt.push(ls); }
+    }
+    let pick = null, pk = null;
+    for (const ls of alt) {
+      const k = [snapTo(raw(ls)), -ls.length];
+      if (!pick || k[0] > pk[0] || (k[0] === pk[0] && k[1] > pk[1])) { pick = ls; pk = k; }
+    }
+    return {lines: pick, size: snapTo(raw(pick))};
+  }
   const cands = [[text]];
-  const m = text.match(/^(.+?)\s*([(（].*[)）])$/);      // 「品名」と「(数量)」で折る
   if (m) cands.push([m[1], m[2]]);
   for (let n = 2; n <= MAX_LINES; n++) {
     const ls = splitEvenly(text, n);

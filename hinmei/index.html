@@ -123,7 +123,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v5</span>
+  <span class="ver">v6</span>
 </header>
 
 <main>
@@ -179,6 +179,7 @@ details.sk summary{cursor:pointer;}
         <li>入数で割りたいときだけ、右の「1箱の入数」と「総数」を入れます。端数の箱を頭に、満箱を自動で割り出して、枚数も自動で決まります。例）入数24・総数90 → 商品A(18)×1枚、商品A(24)×3枚</li>
         <li>文字を空のまま枚数だけ入れると「白紙」（手書き用）になります</li>
         <li>「そのまま」にチェックを入れると、その枚数はヤマトのロゴを残します</li>
+        <li>品名だけのときは、「商品名(数量)」を必ず数量の前で折って、どの枚も同じ形に揃えます。商品名が長いときは、数量を最後の行の後ろに付けます</li>
         <li>品名の文字の大きさは、大＝47・42・36・30pt、中＝36・30pt、小＝30pt から、枠に入る一番大きいものを自動で選びます。30ptに収まらない長さは作れません</li>
       </ul>
     </details>
@@ -204,7 +205,7 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
