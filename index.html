@@ -36,7 +36,9 @@
 :root{--mfg:#7FAAF2; --mfg-ink:#0B1F44; --mfg-soft:#16294A;
       --ship:#F2D64B; --ship-ink:#3A2E00; --ship-soft:#3B3512;
       /* ほかの業務（Googleカレンダーの参考表示）＝ライラック */
-      --misc:#D0C7F4; --misc-ink:#221A47; --misc-soft:#2E2752;}
+      --misc:#D0C7F4; --misc-ink:#221A47; --misc-soft:#2E2752;
+      /* メモ＝ピンク。ほかのどの意味（製造・出荷・他予定・期限・完了）とも重ならない色です */
+      --memo:#F59AC6; --memo-soft:#3A1F2E;}
 .kind{display:inline-block; font-size:.6em; font-weight:700; padding:2px 7px; border-radius:4px;
   margin-right:8px; vertical-align:middle; letter-spacing:.04em;
   background:var(--mfg); color:var(--mfg-ink);}
@@ -172,6 +174,10 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .c-item.bleed-l{margin-left:-5px}
 .c-item.cont-r{margin-right:-6px; border-top-right-radius:0; border-bottom-right-radius:0;}
 .c-more{font-size:10.5px; color:var(--muted); padding-left:3px;}
+/* メモがあるタスクの点。案件名の手前（左）に置きます。
+   右に置くと、日をまたぐ帯では隣のマスとの継ぎ目に重なるためです */
+.memo-dot{display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--memo); margin-right:4px; vertical-align:1px; flex:none;}
 
 /* PCは、その日のタスクが全部見えるようにマスを縦に伸ばします。
    画面に入りきらないぶんはカレンダーの中を縦スクロールします。
@@ -254,6 +260,24 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-sku .lab{color:var(--danger); font-weight:700; display:block;}
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
 .t-skus .note{font-size:12px; color:var(--warn)}
+
+/* メモ。資材の上に置きます。
+   書いてあるときはピンクの枠で目立たせ、空のときは薄い点線の枠だけにします。
+   改行が無ければ1行ぶんの高さで、改行や折り返しに合わせて伸びます */
+.t-memo{margin-top:6px; border:1px dashed var(--line); border-radius:5px;
+  padding:4px 8px 5px; background:transparent;}
+.t-memo.has{border:2px solid var(--memo); background:var(--memo-soft);}
+.t-memo .memo-lab{font-size:10.5px; font-weight:700; letter-spacing:.06em; color:var(--muted);}
+.t-memo.has .memo-lab{color:var(--memo)}
+.t-memo textarea{display:block; width:100%; margin:0; padding:0; border:0; outline:0;
+  background:transparent; color:var(--ink); resize:none; overflow:hidden;
+  font:inherit; font-size:13.5px; line-height:1.5; min-height:1.5em;
+  user-select:text; -webkit-user-select:text; cursor:text;}
+.t-memo textarea::placeholder{color:var(--line-strong)}
+.t-memo:focus-within{border-style:solid; border-color:var(--memo);}
+.t-memo.busy{opacity:.6}
+.t-memo.unsaved{border-color:var(--danger)}
+.t-memo .memo-err{font-size:11px; color:var(--danger); font-weight:700;}
 
 /* 資材。そのSKUを1箱作るのに要るもの。読むだけです。
    案件によって標準と違うことがあるので、見出しでそう断っています */
@@ -413,7 +437,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v92";
+const BUILD = "v93";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -536,6 +560,10 @@ let TODAY = null;
 let view = null;          /* Date: 表示中の月 */
 let openDate = null;      /* 'yyyy-MM-dd' or null（null なら月表示） */
 let pending = 0;
+let MEMO_FOCUS = false;   /* メモ欄に入力中か */
+let RENDER_LATER = false; /* 入力中に描き直しが来たので、あとで描く */
+const MEMO_MAX = 500;     /* GAS側の CONFIG.MEMO_MAX と同じ */
+const MEMO_DRAFT = {};    /* 保存に失敗したメモ。描き直しても消さずに残します */
 let booted = false;
 
 const app = document.getElementById("app");
@@ -709,6 +737,10 @@ window.addEventListener('resize', function(){
 
 /* ---------- 描画 ---------- */
 function render(){
+  /* メモを書いている途中は描き直しません。書きかけの文字が消えてしまうためです。
+     書き終わって欄を離れたら描き直します */
+  if (MEMO_FOCUS){ RENDER_LATER = true; return; }
+  RENDER_LATER = false;
   const y = app.scrollTop;
   app.innerHTML = "";
   app.className = openDate ? "view-day" : "view-month";
@@ -823,8 +855,10 @@ function renderMonth(){
                     + (contR ? ' cont-r' : ''));
       /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
          代わりに背景色と左の線で見分けます */
-      it.textContent = j.name;
-      it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name;
+      if (j.memo) it.appendChild(el('span', 'memo-dot'));
+      it.appendChild(document.createTextNode(j.name));
+      it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name
+               + (j.memo ? '\nメモ：' + j.memo : '');
       box.appendChild(it);
       shown++;
     });
@@ -1008,6 +1042,7 @@ function taskEl(j){
     +   (j.boxes ? '<span class="boxes"></span>' : '')
     +   (j.code ? '<span class="code"></span>' : '')
     + '</div>'
+    + '<div class="t-memo-slot"></div>'
     + '<div class="t-skus" hidden></div>'
     + '<div class="t-actions"><button type="button" class="act"></button></div>';
 
@@ -1024,6 +1059,9 @@ function taskEl(j){
   if (j.qty) card.querySelector('.qty').textContent = j.qty;
   if (j.boxes) card.querySelector('.boxes').textContent = j.boxes + '個口';
   if (j.code) card.querySelector('.code').textContent = j.code;
+
+  /* メモ。資材より上に出します */
+  card.querySelector('.t-memo-slot').replaceWith(memoEl(j));
 
   /* 製造タスクだけ、在庫のSKU一覧と「作らない」チェックを出します */
   if (j.kind !== 's') buildSkus(card.querySelector('.t-skus'), j);
@@ -1164,6 +1202,80 @@ function matsEl(mats){
   return box;
 }
 
+/* ---------- メモ ----------
+   タスクごとに1つ。編集者も作業者も書けて、上書きです。
+   欄から離れたときに保存します（ボタンは置きません） */
+function memoEl(j){
+  const draft = MEMO_DRAFT[j.id];
+  const has = !!(draft !== undefined ? draft : j.memo);
+  const box = el('div', 't-memo' + (has ? ' has' : '') + (draft !== undefined ? ' unsaved' : ''));
+  const lab = el('div', 'memo-lab');
+  /* 書いてあるときは、カレンダーと同じ点を見出しの手前に付けます */
+  if (has) lab.appendChild(el('span', 'memo-dot'));
+  lab.appendChild(document.createTextNode((j.kind === 's' ? '出荷' : '製造') + 'メモ'));
+  const ta = document.createElement('textarea');
+  ta.rows = 1;
+  ta.maxLength = MEMO_MAX;
+  ta.placeholder = 'メモを書く（改行できます）';
+  ta.value = (draft !== undefined) ? draft : (j.memo || '');
+  box.appendChild(lab);
+  box.appendChild(ta);
+  if (draft !== undefined){
+    const er = el('div', 'memo-err');
+    er.textContent = '保存できていません。欄を押して離れると、もう一度保存します';
+    box.appendChild(er);
+  }
+
+  /* 中身に合わせて高さを変えます。改行が無ければ1行ぶんです */
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', fit);
+  /* 描かれる前は高さを測れないので、まず改行の数だけ行を取っておき、
+     描かれたあとで折り返しも含めて合わせ直します */
+  ta.rows = Math.max(1, ta.value.split('\n').length);
+  requestAnimationFrame(fit);
+
+  /* 欄の中で指を動かしても、カードのスワイプ（完了）にしません */
+  box.addEventListener('pointerdown', e => e.stopPropagation());
+
+  ta.addEventListener('focus', () => { MEMO_FOCUS = true; });
+  ta.addEventListener('blur', () => {
+    MEMO_FOCUS = false;
+    saveMemo(j, ta, box);
+  });
+  return box;
+}
+
+function saveMemo(j, ta, box){
+  const v = ta.value.replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+  if (v === (j.memo || '') && MEMO_DRAFT[j.id] === undefined){
+    /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。
+       すぐ描くと、隣の「完了にする」を押した指が空振りするためです */
+    if (RENDER_LATER) setTimeout(function(){ if (!MEMO_FOCUS) render(); }, 600);
+    return;
+  }
+  box.classList.add('busy');
+  pending++;
+  setState("保存中…", "busy");
+  call("setMemo", {row: j.row, kind: j.kind, text: v})
+    .then(function(res){
+      pending--;
+      delete MEMO_DRAFT[j.id];
+      /* 読み込み直しで別の配列に入れ替わっていても、同じタスクを直します */
+      j.memo = res.memo;
+      jobs.forEach(function(x){ if (x.id === j.id) x.memo = res.memo; });
+      setState("メモを保存しました " + hm(), "");
+      render();
+    })
+    .catch(function(e){
+      pending--;
+      MEMO_DRAFT[j.id] = v;
+      box.classList.remove('busy');
+      box.classList.add('unsaved');
+      setState("メモを保存できませんでした", "err");
+      alert("メモを保存できませんでした。書いた文字は画面に残してあります。\n\n" + e.message);
+    });
+}
+
 function commit(j, done){
   const task = app.querySelector('.task[data-row="' + j.row + '"]');
   if (task) task.classList.add('busy');
@@ -1187,7 +1299,7 @@ function commit(j, done){
 
 /* ---------- 自動更新 ---------- */
 setInterval(function(){
-  if (pending || document.hidden || !booted) return;
+  if (pending || MEMO_FOCUS || document.hidden || !booted) return;
   load(true);
 }, 60000);
 
