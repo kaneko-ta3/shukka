@@ -1,5 +1,7 @@
 /* ===================================================================
-   送り状 余白書き換え  v11   (hinmei/app.js)
+   送り状 余白書き換え  v12   (hinmei/app.js)
+
+   v12 品名を上下のまん中に置く（前は最後の行の下の行間ぶん、字が少し上に寄っていた）。lineBases
 
    v11 空欄の送り状の枠の上下を右下パネルにそろえた（上＝お届け先控の上端、下＝お問い合わせ先の下端）
 
@@ -159,6 +161,14 @@ function layout(text, rect, steps) {
   return {lines: best, size: snapTo(raw(best))};
 }
 
+
+/** 各行のベースライン（上から）。字の高さ（ベースラインの上 BL・下 1−BL）で上下の真ん中に置く。
+    行の高さ LH で並べた全体を真ん中にすると、最後の行の下の行間ぶん字が上に寄って見えるため */
+function lineBases(f, nr) {
+  const inkH = f.size * (LH * (f.lines.length - 1) + 1);
+  const top = nr[1] + (nr[3] - nr[1] - inkH) / 2;
+  return f.lines.map((ln, k) => top + f.size * (LH * k + BL));
+}
 
 /* ================================================================
    注意書き（帯下・帯のみ）
@@ -846,8 +856,8 @@ function drawSketch(cv, zone, e) {
   }
   if (e.mode === TEXT) {
     const f = layout(e.text, nr);
-    const top = nr[1] + (nr[3] - nr[1] - f.size * LH * f.lines.length) / 2;
-    f.lines.forEach((ln, i) => text(ln, nr, f.size, top + f.size * LH * i + f.size * BL, '#000'));
+    const base = lineBases(f, nr);
+    f.lines.forEach((ln, i) => text(ln, nr, f.size, base[i], '#000'));
     if (f.size < MIN_SIZE) problem = fitProblem(f.lines);
   }
   return problem;
@@ -1111,9 +1121,8 @@ async function buildPdf(plan) {
     }
     if (p.mode === TEXT) {                                // 品名（Python版 stamp と同じ置き方）
       const f = layout(p.text, nr);
-      const totalH = f.size * LH * f.lines.length;
-      const top = nr[1] + (nr[3] - nr[1] - totalH) / 2;
-      f.lines.forEach((ln, k) => center(ln, nr, f.size, top + f.size * LH * k + f.size * BL, BLACK));
+      const base = lineBases(f, nr);
+      f.lines.forEach((ln, k) => center(ln, nr, f.size, base[k], BLACK));
     }
   });
   return await doc.save();
