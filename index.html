@@ -278,6 +278,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-memo.busy{opacity:.6}
 .t-memo.unsaved{border-color:var(--danger)}
 .t-memo .memo-err{font-size:11px; color:var(--danger); font-weight:700;}
+.t-memo .memo-st{font-weight:500; letter-spacing:0; color:var(--muted);}
+.t-memo .memo-dot{margin-right:5px}
 
 /* 資材。そのSKUを1箱作るのに要るもの。読むだけです。
    案件によって標準と違うことがあるので、見出しでそう断っています */
@@ -437,7 +439,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v93";
+const BUILD = "v94";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1204,35 +1206,100 @@ function matsEl(mats){
 
 /* ---------- メモ ----------
    タスクごとに1つ。編集者も作業者も書けて、上書きです。
-   欄から離れたときに保存します（ボタンは置きません） */
+   書いた瞬間に枠をピンクにして、手を止めて少しすると自動で保存します。
+   欄から離れたときにも保存します（ボタンは置きません） */
+const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒） */
+
+function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
+
 function memoEl(j){
-  const draft = MEMO_DRAFT[j.id];
-  const has = !!(draft !== undefined ? draft : j.memo);
-  const box = el('div', 't-memo' + (has ? ' has' : '') + (draft !== undefined ? ' unsaved' : ''));
+  const box = el('div', 't-memo');
   const lab = el('div', 'memo-lab');
-  /* 書いてあるときは、カレンダーと同じ点を見出しの手前に付けます */
-  if (has) lab.appendChild(el('span', 'memo-dot'));
+  const dot = el('span', 'memo-dot');
+  const st = el('span', 'memo-st');
+  lab.appendChild(dot);
   lab.appendChild(document.createTextNode((j.kind === 's' ? '出荷' : '製造') + 'メモ'));
+  lab.appendChild(st);
+
   const ta = document.createElement('textarea');
-  ta.rows = 1;
   ta.maxLength = MEMO_MAX;
   ta.placeholder = 'メモを書く（改行できます）';
+  const draft = MEMO_DRAFT[j.id];
   ta.value = (draft !== undefined) ? draft : (j.memo || '');
+
+  const er = el('div', 'memo-err');
+  er.textContent = '保存できていません。もう一度書くか、欄から離れると保存し直します';
+
   box.appendChild(lab);
   box.appendChild(ta);
-  if (draft !== undefined){
-    const er = el('div', 'memo-err');
-    er.textContent = '保存できていません。欄を押して離れると、もう一度保存します';
-    box.appendChild(er);
-  }
+  box.appendChild(er);
 
-  /* 中身に合わせて高さを変えます。改行が無ければ1行ぶんです */
-  const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
-  ta.addEventListener('input', fit);
-  /* 描かれる前は高さを測れないので、まず改行の数だけ行を取っておき、
+  let saved = j.memo || '';     /* シートに入っている内容 */
+  let timer = 0, inflight = false, again = false;
+
+  /* 見た目を今の中身に合わせます。保存を待たずに、書いた瞬間にピンクになります */
+  function paint(){
+    const has = !!memoNorm(ta.value);
+    const ng = (MEMO_DRAFT[j.id] !== undefined);
+    box.classList.toggle('has', has);
+    box.classList.toggle('unsaved', ng);
+    dot.hidden = !has;
+    er.hidden = !ng;
+  }
+  function status(t){ st.textContent = t ? '　' + t : ''; }
+
+  /* 中身に合わせて高さを変えます。改行が無ければ1行ぶんです。
+     描かれる前は高さを測れないので、まず改行の数だけ行を取っておき、
      描かれたあとで折り返しも含めて合わせ直します */
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   ta.rows = Math.max(1, ta.value.split('\n').length);
   requestAnimationFrame(fit);
+  paint();
+
+  function flush(){
+    clearTimeout(timer);
+    const v = memoNorm(ta.value);
+    if (v === saved && MEMO_DRAFT[j.id] === undefined) return;
+    if (inflight){ again = true; status('保存中…'); return; }   /* 送っている途中。返ってきたらもう一度 */
+    inflight = true;
+    status('保存中…');
+    pending++;
+    setState("保存中…", "busy");
+    call("setMemo", {row: j.row, kind: j.kind, text: v})
+      .then(function(res){
+        inflight = false;
+        pending--;
+        saved = res.memo;
+        delete MEMO_DRAFT[j.id];
+        /* 読み込み直しで別の配列に入れ替わっていても、同じタスクを直します */
+        j.memo = res.memo;
+        jobs.forEach(function(x){ if (x.id === j.id) x.memo = res.memo; });
+        setState("メモを保存しました " + hm(), "");
+        /* 送っている間に書き足していたら、続けて保存します */
+        if (again){ again = false; if (memoNorm(ta.value) !== saved){ flush(); return; } }
+        status('保存済');
+        paint();
+        /* カレンダーの点も描き直します。入力中なら、欄から離れたときに描きます */
+        render();
+      })
+      .catch(function(e){
+        inflight = false;
+        pending--;
+        again = false;
+        MEMO_DRAFT[j.id] = memoNorm(ta.value);
+        status('');
+        paint();
+        setState("メモを保存できませんでした", "err");
+      });
+  }
+
+  ta.addEventListener('input', function(){
+    fit();
+    paint();
+    status('');
+    clearTimeout(timer);
+    timer = setTimeout(flush, MEMO_WAIT);
+  });
 
   /* 欄の中で指を動かしても、カードのスワイプ（完了）にしません */
   box.addEventListener('pointerdown', e => e.stopPropagation());
@@ -1240,40 +1307,13 @@ function memoEl(j){
   ta.addEventListener('focus', () => { MEMO_FOCUS = true; });
   ta.addEventListener('blur', () => {
     MEMO_FOCUS = false;
-    saveMemo(j, ta, box);
+    const v = memoNorm(ta.value);
+    if (v !== saved || MEMO_DRAFT[j.id] !== undefined || inflight){ flush(); return; }
+    /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。
+       すぐ描くと、隣のボタンを押したクリックが空振りするためです */
+    if (RENDER_LATER) setTimeout(function(){ if (!MEMO_FOCUS) render(); }, 600);
   });
   return box;
-}
-
-function saveMemo(j, ta, box){
-  const v = ta.value.replace(/\r\n?/g, '\n').replace(/\s+$/, '');
-  if (v === (j.memo || '') && MEMO_DRAFT[j.id] === undefined){
-    /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。
-       すぐ描くと、隣の「完了にする」を押した指が空振りするためです */
-    if (RENDER_LATER) setTimeout(function(){ if (!MEMO_FOCUS) render(); }, 600);
-    return;
-  }
-  box.classList.add('busy');
-  pending++;
-  setState("保存中…", "busy");
-  call("setMemo", {row: j.row, kind: j.kind, text: v})
-    .then(function(res){
-      pending--;
-      delete MEMO_DRAFT[j.id];
-      /* 読み込み直しで別の配列に入れ替わっていても、同じタスクを直します */
-      j.memo = res.memo;
-      jobs.forEach(function(x){ if (x.id === j.id) x.memo = res.memo; });
-      setState("メモを保存しました " + hm(), "");
-      render();
-    })
-    .catch(function(e){
-      pending--;
-      MEMO_DRAFT[j.id] = v;
-      box.classList.remove('busy');
-      box.classList.add('unsaved');
-      setState("メモを保存できませんでした", "err");
-      alert("メモを保存できませんでした。書いた文字は画面に残してあります。\n\n" + e.message);
-    });
 }
 
 function commit(j, done){

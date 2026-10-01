@@ -440,6 +440,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-memo.busy{opacity:.6}
 .dv-memo.unsaved{border-color:var(--danger)}
 .dv-memo .memo-err{font-size:11px; color:var(--danger); font-weight:700;}
+.dv-memo .memo-st{font-weight:500; letter-spacing:0; color:var(--muted);}
 
 /* 資材。そのSKUを1箱作るのに要るもの。読むだけです */
 .dv-mats{margin:3px 0 0 25px; padding-left:8px; border-left:2px solid var(--line);
@@ -728,7 +729,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v93";
+const BUILD = "v94";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1836,78 +1837,116 @@ function dayRow(t){
 
 /* ---------- メモ ----------
    タスクごとに1つ。編集者も作業者も書けて、上書きです。
-   欄から離れたときに保存します（ボタンは置きません） */
-function memoEl(t){
-  const draft = MEMO_DRAFT[t.id];
-  const has = !!(draft !== undefined ? draft : t.memo);
-  const box = document.createElement("div");
-  box.className = "dv-memo" + (has ? " has" : "") + (draft !== undefined ? " unsaved" : "");
-  const lab = document.createElement("div");
-  lab.className = "memo-lab";
-  /* 書いてあるときは、カレンダーと同じ点を見出しの手前に付けます */
-  if (has){
-    const d = document.createElement("span");
-    d.className = "memo-dot";
-    lab.appendChild(d);
-  }
-  lab.appendChild(document.createTextNode(kindName(t.kind) + "メモ"));
-  const ta = document.createElement("textarea");
-  ta.rows = 1;
+   書いた瞬間に枠をピンクにして、手を止めて少しすると自動で保存します。
+   欄から離れたときにも保存します（ボタンは置きません） */
+const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒） */
+
+function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
+
+function memoEl(j){
+  const mk = (tag, cls) => { const x = document.createElement(tag); x.className = cls; return x; };
+  const box = mk('div', 'dv-memo');
+  const lab = mk('div', 'memo-lab');
+  const dot = mk('span', 'memo-dot');
+  const st = mk('span', 'memo-st');
+  lab.appendChild(dot);
+  lab.appendChild(document.createTextNode((j.kind === 's' ? '出荷' : '製造') + 'メモ'));
+  lab.appendChild(st);
+
+  const ta = document.createElement('textarea');
   ta.maxLength = MEMO_MAX;
-  ta.placeholder = "メモを書く（改行できます）";
-  ta.value = (draft !== undefined) ? draft : (t.memo || "");
+  ta.placeholder = 'メモを書く（改行できます）';
+  const draft = MEMO_DRAFT[j.id];
+  ta.value = (draft !== undefined) ? draft : (j.memo || '');
+
+  const er = mk('div', 'memo-err');
+  er.textContent = '保存できていません。もう一度書くか、欄から離れると保存し直します';
+
   box.appendChild(lab);
   box.appendChild(ta);
-  if (draft !== undefined){
-    const er = document.createElement("div");
-    er.className = "memo-err";
-    er.textContent = "保存できていません。欄を押して離れると、もう一度保存します";
-    box.appendChild(er);
+  box.appendChild(er);
+
+  let saved = j.memo || '';     /* シートに入っている内容 */
+  let timer = 0, inflight = false, again = false;
+
+  /* 見た目を今の中身に合わせます。保存を待たずに、書いた瞬間にピンクになります */
+  function paint(){
+    const has = !!memoNorm(ta.value);
+    const ng = (MEMO_DRAFT[j.id] !== undefined);
+    box.classList.toggle('has', has);
+    box.classList.toggle('unsaved', ng);
+    dot.hidden = !has;
+    er.hidden = !ng;
+  }
+  function status(t){ st.textContent = t ? '　' + t : ''; }
+
+  /* 中身に合わせて高さを変えます。改行が無ければ1行ぶんです。
+     描かれる前は高さを測れないので、まず改行の数だけ行を取っておき、
+     描かれたあとで折り返しも含めて合わせ直します */
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.rows = Math.max(1, ta.value.split('\n').length);
+  requestAnimationFrame(fit);
+  paint();
+
+  function flush(){
+    clearTimeout(timer);
+    const v = memoNorm(ta.value);
+    if (v === saved && MEMO_DRAFT[j.id] === undefined) return;
+    if (inflight){ again = true; status('保存中…'); return; }   /* 送っている途中。返ってきたらもう一度 */
+    inflight = true;
+    status('保存中…');
+    busy(true);
+    call("setMemo", {row: j.row, kind: j.kind, text: v})
+      .then(function(res){
+        inflight = false;
+        busy(false);
+        saved = res.memo;
+        delete MEMO_DRAFT[j.id];
+        /* 読み込み直しで別の配列に入れ替わっていても、同じタスクを直します */
+        j.memo = res.memo;
+        tasks.forEach(function(x){ if (x.id === j.id) x.memo = res.memo; });
+        log(res.message, "更新");
+        /* 送っている間に書き足していたら、続けて保存します */
+        if (again){ again = false; if (memoNorm(ta.value) !== saved){ flush(); return; } }
+        status('保存済');
+        paint();
+        /* カレンダーの点も描き直します。
+           入力中でも、カレンダーと左右の欄はメモ欄と別の場所なので先に描けます。
+           日の表示（メモ欄があるところ）だけは、欄から離れたときに描きます */
+        if (MEMO_FOCUS){
+          renderCal(); renderPool("m"); renderPool("s"); renderDone(); renderSummary();
+          RENDER_LATER = true;
+        } else render();
+      })
+      .catch(function(e){
+        inflight = false;
+        busy(false);
+        again = false;
+        MEMO_DRAFT[j.id] = memoNorm(ta.value);
+        status('');
+        paint();
+        log("メモを保存できませんでした：" + e.message, "", true);
+      });
   }
 
-  /* 中身に合わせて高さを変えます。改行が無ければ1行ぶんです */
-  const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
-  ta.addEventListener("input", fit);
-  /* 描かれる前は高さを測れないので、まず改行の数だけ行を取っておき、
-     描かれたあとで折り返しも含めて合わせ直します */
-  ta.rows = Math.max(1, ta.value.split("\n").length);
-  requestAnimationFrame(fit);
-
-  ta.addEventListener("focus", () => { MEMO_FOCUS = true; });
-  ta.addEventListener("blur", () => {
-    MEMO_FOCUS = false;
-    saveMemo(t, ta, box);
+  ta.addEventListener('input', function(){
+    fit();
+    paint();
+    status('');
+    clearTimeout(timer);
+    timer = setTimeout(flush, MEMO_WAIT);
   });
-  return box;
-}
 
-function saveMemo(t, ta, box){
-  const v = ta.value.replace(/\r\n?/g, "\n").replace(/\s+$/, "");
-  if (v === (t.memo || "") && MEMO_DRAFT[t.id] === undefined){
+  ta.addEventListener('focus', () => { MEMO_FOCUS = true; });
+  ta.addEventListener('blur', () => {
+    MEMO_FOCUS = false;
+    const v = memoNorm(ta.value);
+    if (v !== saved || MEMO_DRAFT[j.id] !== undefined || inflight){ flush(); return; }
     /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。
        すぐ描くと、隣のボタンを押したクリックが空振りするためです */
     if (RENDER_LATER) setTimeout(function(){ if (!MEMO_FOCUS) render(); }, 600);
-    return;
-  }
-  box.classList.add("busy");
-  busy(true);
-  call("setMemo", {row: t.row, kind: t.kind, text: v})
-    .then(function(r){
-      busy(false);
-      delete MEMO_DRAFT[t.id];
-      /* 読み込み直しで別の配列に入れ替わっていても、同じタスクを直します */
-      t.memo = r.memo;
-      tasks.forEach(function(x){ if (x.id === t.id) x.memo = r.memo; });
-      log(r.message, "更新");
-      render();
-    })
-    .catch(function(e){
-      busy(false);
-      MEMO_DRAFT[t.id] = v;
-      box.classList.remove("busy");
-      box.classList.add("unsaved");
-      log("メモを保存できませんでした：" + e.message, "", true);
-    });
+  });
+  return box;
 }
 
 /* ---------- 在庫：作らないチェック ---------- */
