@@ -1,5 +1,9 @@
 /* ===================================================================
-   送り状 余白書き換え  v7   (hinmei/app.js)
+   送り状 余白書き換え  v10   (hinmei/app.js)
+
+   v10 左下が空欄（ロゴが印刷されていない）送り状にも書ける。すぐ上の「ヤマト運輸株式会社」の画像を目印に、
+       ロゴがあるときと同じ位置・大きさの枠に書く（findZone → blankZone）
+   v8・v9 は index.html だけの変更（タブのマークを横長の送り状に／ドロップ欄の文言）
 
    v7  タブのマークを付けた（段ボールに黒帯。index.html に直接書いている）
 
@@ -307,7 +311,22 @@ function findZone(pg) {
     if (r[2] - r[0] < 80 || r[3] - r[1] < 40) continue;     // 小さいマーク類は無視
     if (!best || (r[2] - r[0]) * (r[3] - r[1]) > (best[2] - best[0]) * (best[3] - best[1])) best = r;
   }
-  return best;
+  return best || blankZone(pg);
+}
+
+/* 左下が空欄（ロゴが印刷されていない）送り状は、すぐ上の「ヤマト運輸株式会社」の画像を目印に、
+   ロゴがあるときと同じ大きさ・位置の枠を作る。
+   ロゴありの送り状で 目印(48.2,256.3)-(107.5,264.6) → ロゴ(34.4,269.6)-(306.0,401.7)。
+   印刷のずれで送り状全体が左右にずれることがあるので、目印からの相対位置で決める */
+const NO_LOGO = {dx: -13.8, dy: 5.0, w: 271.6, h: 132.1};
+function blankZone(pg) {
+  const a = pg.images.find(r => {
+    const w = r[2] - r[0], h = r[3] - r[1], cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+    return w > 55 && w < 64 && h > 7 && h < 10 && cx < pg.w / 2 && cy > pg.h / 2 && cy < pg.h * 0.7;
+  });
+  if (!a) return null;
+  const z = [a[0] + NO_LOGO.dx, a[3] + NO_LOGO.dy, a[0] + NO_LOGO.dx + NO_LOGO.w, a[3] + NO_LOGO.dy + NO_LOGO.h];
+  return z[0] >= 0 && z[3] <= pg.h ? z : null;
 }
 
 /** 四角の中の文字を行にする */
