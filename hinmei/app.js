@@ -1,5 +1,9 @@
 /* ===================================================================
-   送り状 余白書き換え  v12   (hinmei/app.js)
+   送り状 余白書き換え  v13   (hinmei/app.js)
+
+   v13 割れ物：表の「割れ物」にチェック（入数マスタで割れ物にチェックがある商品は自動判別でチェック）すると、
+       右に横5.7cmを空けてシール(5cm×4cm)の目安の薄い枠と「割れ」を入れ、品名は左に小さく入れる。
+       帯下のときは帯も左だけ（入らなければ「この面を上に」を外す）
 
    v12 品名を上下のまん中に置く（前は最後の行の下の行間ぶん、字が少し上に寄っていた）。lineBases
 
@@ -46,6 +50,9 @@ const SIZE_SET = {L: [47, 42, 36, 30], M: [36, 30], S: [30]};
 const MIN_SIZE = 30;                     // 下限。送り状の上の仕分けコードの数字(27.8pt)より少し大きい
 const MAX_LINES = 3;                     // 30ptを守れるのは3行まで
 const LH = 1.22, BL = 0.88;              // 行の高さ、ベースラインの位置（文字の大きさに対する比）
+// 割れ物：右に横5.7cmを空け、その中にシール(横5cm×縦4cm)の目安の薄い枠と「割れ」を入れる。品名は残りの左に小さく
+const CM = 72 / 2.54;
+const FRAGILE = {w: 5.7 * CM, sw: 5 * CM, sh: 4 * CM, steps: [30, 26, 22, 18, 15], min: 15, gray: 0.6, label: '割れ', labelSize: 16};
 
 // 右上の貼付票の「お届け先」と「品名」。左上の配達票は、子伝票だと住所が載らないので使わない
 const HARI_TODOKE = [330, 28, 540, 110];
@@ -184,14 +191,31 @@ function selectedMarks() {
   }).filter(Boolean);
 }
 
-/** 帯下：帯に入れる文と大きさ */
-function bandLayout(zone) {
+/** 帯下：帯に入れる文と大きさ。割れ物のときは帯も左（品名の下）だけ。
+    入りきらなければ添え書きを外す（例「天地無用　この面を上に」→「天地無用」） */
+function bandLayout(zone, fragile) {
   const m = selectedMarks()[0];
   if (!m) return null;
-  const text = m.band || m.label;
-  const band = [zone[0], zone[3] - BAND.h, zone[2], zone[3]];
-  const size = Math.min((band[2] - band[0] - 16) / width(text, 1), BAND.h * 0.68);
+  const band = [zone[0], zone[3] - BAND.h, fragile ? zone[2] - FRAGILE.w : zone[2], zone[3]];
+  const sizeOf = t => Math.min((band[2] - band[0] - 16) / width(t, 1), BAND.h * 0.68);
+  let text = m.band || m.label;
+  if (fragile && m.band && sizeOf(text) < BAND.min) text = m.label;
+  const size = sizeOf(text);
   return {band: band, text: text, size: size, base: band[1] + (BAND.h + size * 0.72) / 2};
+}
+
+/** 割れ物の枠。左＝品名を入れるところ、frame＝シールの目安（空けた幅の中で上下左右まん中） */
+function fragileSplit(zone) {
+  const x = zone[2] - FRAGILE.w;
+  const fx = x + (FRAGILE.w - FRAGILE.sw) / 2, fy = zone[1] + (zone[3] - zone[1] - FRAGILE.sh) / 2;
+  return {left: [zone[0], zone[1], x, zone[3]], frame: [fx, fy, fx + FRAGILE.sw, fy + FRAGILE.sh]};
+}
+
+/** 割れ物の帯が入らないときの文（なければ ''） */
+function fragileBandProblem(zone) {
+  if (S.kind !== 'band') return '';
+  const b = bandLayout(zone, true);
+  return b && b.size < BAND.min ? '割れ物の帯に「' + b.text + '」が入りません（' + Math.round(b.size) + 'ptになります）' : '';
 }
 
 /** 帯のみ：枠と、行ごとの文・大きさ・ベースライン */
@@ -234,10 +258,10 @@ function marksProblem(zone) {
   return null;
 }
 
-function fitProblem(lines) {
-  if (lines.length > MAX_LINES) return lines.length + '行は多すぎます（' + MIN_SIZE + 'ptを保てるのは' + MAX_LINES + '行まで）';
+function fitProblem(lines, fragile) {
+  if (lines.length > MAX_LINES) return lines.length + '行は多すぎます（' + minFor(fragile) + 'ptを保てるのは' + MAX_LINES + '行まで）';
   const longest = lines.reduce((a, b) => (Array.from(b).length > Array.from(a).length ? b : a), '');
-  return '1行が長すぎます（「' + longest + '」）';
+  return '1行が長すぎます（「' + longest + '」' + (fragile ? '。割れ物は右を空けるので幅が半分以下です' : '') + '）';
 }
 
 /** 入数と総数から箱を割り出す。端数の箱を頭に、そのあと満箱 */
@@ -250,10 +274,12 @@ function splitBoxes(name, per, total) {
   return out;
 }
 
-/** 品名を入れる枠。帯下のときは帯のぶん下を空ける */
-function nameRect(zone) {
-  return S.kind === 'band' ? [zone[0], zone[1], zone[2], zone[3] - BAND.h] : zone;
+/** 品名を入れる枠。帯下のときは帯のぶん下を空ける。割れ物のときは右を空ける */
+function nameRect(zone, fragile) {
+  const z = fragile ? fragileSplit(zone).left : zone;
+  return S.kind === 'band' ? [z[0], z[1], z[2], z[3] - BAND.h] : z;
 }
+const minFor = fragile => (fragile ? FRAGILE.min : MIN_SIZE);
 
 
 /* ================================================================
@@ -578,7 +604,7 @@ function setMsg(sel, text, cls) {
 /* ================================================================
    画面：3 品名と枚数（届け先ごと）
    ================================================================ */
-function blankRow() { return {name: '', per: '', total: '', count: '', keep: false}; }
+function blankRow() { return {name: '', per: '', total: '', count: '', keep: false, fragile: false}; }
 
 function renderGroups() {
   const box = $('#groups');
@@ -598,6 +624,7 @@ function renderGroups() {
       '<table class="rows"><thead><tr>' +
       '<th class="c-name" rowspan="2">商品名 / 入れたい文字列</th><th class="c-num" rowspan="2">枚数</th>' +
       '<th class="c-keep" rowspan="2">そのまま</th>' +
+      '<th class="c-keep" rowspan="2" title="右に割れ物シールの場所を空けます">割れ物</th>' +
       '<th class="c-opt opt-l" colspan="2">入数で割るとき（任意）</th>' +
       '<th class="c-det" rowspan="2">内訳</th><th class="c-del" rowspan="2"></th></tr><tr>' +
       '<th class="c-num opt-l">1箱の入数</th><th class="c-num">総数</th>' +
@@ -623,6 +650,7 @@ function renderRows(gi) {
       '<td class="c-name"><textarea rows="2" data-f="name" placeholder="例) 商品A">' + esc(r.name) + '</textarea></td>' +
       '<td class="c-num"><input type="text" inputmode="numeric" data-f="count" value="' + esc(r.count) + '"></td>' +
       '<td class="c-keep"><input type="checkbox" data-f="keep" tabindex="-1"' + (r.keep ? ' checked' : '') + '></td>' +
+      '<td class="c-keep"><input type="checkbox" data-f="fragile" tabindex="-1"' + (r.fragile ? ' checked' : '') + '></td>' +
       '<td class="c-num opt-l"><input type="text" inputmode="numeric" data-f="per" class="opt" placeholder="入数" value="' + esc(r.per) + '"></td>' +
       '<td class="c-num"><input type="text" inputmode="numeric" data-f="total" class="opt" placeholder="総数" value="' + esc(r.total) + '"></td>' +
       '<td class="c-det"><span class="det"></span></td>' +
@@ -646,18 +674,30 @@ function rowInfo(r) {
     if (!name) return {kind: 'err', msg: '商品名を入れてください'};
     const boxes = splitBoxes(name, +per, +total);
     if (!boxes.length) return {kind: 'err', msg: '入数・総数では箱が出せません'};
-    return {kind: 'auto', boxes: boxes, count: boxes.reduce((s, b) => s + b[1], 0)};
+    return {kind: 'auto', boxes: boxes, count: boxes.reduce((s, b) => s + b[1], 0), fragile: !!r.fragile};
   }
   const c = String(r.count).trim();
   if (!c) return {kind: 'empty'};
   if (!isInt(c) || +c < 1) return {kind: 'err', msg: '枚数は1以上の数字で'};
   const text = r.name.trim();
-  return text ? {kind: TEXT, text: text, count: +c} : {kind: BLANK, count: +c};
+  return text ? {kind: TEXT, text: text, count: +c, fragile: !!r.fragile} : {kind: BLANK, count: +c, fragile: !!r.fragile};
 }
 
-function fitOf(text, gi) {
+/** 品名の折り方と大きさ。割れ物のときは右を空けた残りに、小さい段階まで使って入れる */
+function fitIn(text, zone, fragile) {
+  const rect = nameRect(zone, fragile);
+  if (!fragile) return layout(text, rect);
+  // 割れ物は幅が狭いので、大きさより「商品名／(数量)」の形を優先する（商品名の途中で折らない）
+  const m = text.indexOf('\n') < 0 && text.match(/^(.+?)\s*([(（].*[)）])$/);
+  if (m) {
+    const f = layout(m[1] + '\n' + m[2], rect, FRAGILE.steps);
+    if (f.size >= FRAGILE.min) return f;
+  }
+  return layout(text, rect, FRAGILE.steps);
+}
+function fitOf(text, gi, fragile) {
   const g = S.src.groups[gi];
-  return layout(text, nameRect(S.src.pages[g.pages[0]].zone));
+  return fitIn(text, S.src.pages[g.pages[0]].zone, fragile);
 }
 
 function refreshGroup(gi) {
@@ -673,6 +713,7 @@ function refreshGroup(gi) {
     $('[data-f="name"]', tr).disabled = !!r.keep;
     $('[data-f="per"]', tr).disabled = !!r.keep;
     $('[data-f="total"]', tr).disabled = !!r.keep;
+    $('[data-f="fragile"]', tr).disabled = !!r.keep;
     if (info.kind === 'auto') {
       cnt.value = info.count;
       cnt.disabled = true;
@@ -686,16 +727,17 @@ function refreshGroup(gi) {
     if (info.kind === 'err') { det.textContent = info.msg; det.classList.add('err-ink'); bad = true; }
     else if (info.kind === 'empty') det.textContent = '';
     else if (info.kind === KEEP) { det.textContent = 'ロゴのまま'; det.classList.add('muted'); }
-    else if (info.kind === BLANK) { det.textContent = '白紙'; det.classList.add('muted'); }
+    else if (info.kind === BLANK) { det.textContent = '白紙' + (info.fragile ? '＋割れ物の枠' : ''); det.classList.add('muted'); }
     else if (info.kind === TEXT) {
-      const f = fitOf(info.text, gi);
-      if (f.size < MIN_SIZE) { det.textContent = fitProblem(f.lines); det.classList.add('err-ink'); }
-      else { det.textContent = Math.round(f.size) + 'pt'; det.classList.add('muted'); }
+      const f = fitOf(info.text, gi, info.fragile);
+      if (f.size < minFor(info.fragile)) { det.textContent = fitProblem(f.lines, info.fragile); det.classList.add('err-ink'); }
+      else { det.textContent = Math.round(f.size) + 'pt' + (info.fragile ? '＋割れ物の枠' : ''); det.classList.add('muted'); }
     } else if (info.kind === 'auto') {
-      const worst = info.boxes.map(b => fitOf(b[0], gi)).reduce((a, b) => (b.size < a.size ? b : a));
+      const worst = info.boxes.map(b => fitOf(b[0], gi, info.fragile)).reduce((a, b) => (b.size < a.size ? b : a));
+      const ng = worst.size < minFor(info.fragile);
       det.textContent = info.boxes.map(b => b[0] + '×' + b[1]).join('　') +
-                        (worst.size < MIN_SIZE ? '　← 枠に入りません' : '');
-      if (worst.size < MIN_SIZE) det.classList.add('err-ink');
+                        (info.fragile ? '　＋割れ物の枠' : '') + (ng ? '　← 枠に入りません' : '');
+      if (ng) det.classList.add('err-ink');
     }
     if (info.count) total += info.count;
   });
@@ -717,7 +759,7 @@ function onInput(e) {
   if (!gEl || !tr) return;
   const gi = +gEl.dataset.gi, ri = +tr.dataset.ri;
   const r = S.src.groups[gi].rows[ri];
-  r[f] = (f === 'keep') ? el.checked : el.value;
+  r[f] = (f === 'keep' || f === 'fragile') ? el.checked : el.value;
   refreshGroup(gi);
   invalidateOut();
 }
@@ -803,9 +845,10 @@ function sketchSeq(gi) {
     const info = rowInfo(r);
     if (info.kind === 'empty') continue;
     if (info.kind === 'err') { seq.push({mode: 'err', msg: info.msg}); continue; }
-    if (info.kind === 'auto') info.boxes.forEach(b => { for (let k = 0; k < b[1]; k++) seq.push({mode: TEXT, text: b[0]}); });
-    else if (info.kind === TEXT) for (let k = 0; k < info.count; k++) seq.push({mode: TEXT, text: info.text});
-    else for (let k = 0; k < info.count; k++) seq.push({mode: info.kind});
+    const fr = !!info.fragile;
+    if (info.kind === 'auto') info.boxes.forEach(b => { for (let k = 0; k < b[1]; k++) seq.push({mode: TEXT, text: b[0], fragile: fr}); });
+    else if (info.kind === TEXT) for (let k = 0; k < info.count; k++) seq.push({mode: TEXT, text: info.text, fragile: fr});
+    else for (let k = 0; k < info.count; k++) seq.push({mode: info.kind, fragile: fr});
   }
   return seq;
 }
@@ -843,22 +886,29 @@ function drawSketch(cv, zone, e) {
     o.lines.forEach(l => text(l.text, o.body, l.size, l.base, '#000'));
     return marksProblem(zone) || '';
   }
-  let nr = zone;
+  const fr = !!e.fragile;
   if (S.kind === 'band') {
-    const b = bandLayout(zone);
+    const b = bandLayout(zone, fr);
     if (b) {
       ctx.fillStyle = '#000';
       ctx.fillRect(b.band[0], b.band[1], b.band[2] - b.band[0], b.band[3] - b.band[1]);
       text(b.text, b.band, b.size, b.base, '#fff');
     }
-    problem = marksProblem(zone) || '';
-    nr = nameRect(zone);
+    problem = marksProblem(zone) || (fr ? fragileBandProblem(zone) : '');
+  }
+  if (fr) {                                         // シールの目安の薄い枠と「割れ」
+    const fz = fragileSplit(zone).frame, g = Math.round(255 * FRAGILE.gray);
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+    ctx.strokeRect(fz[0], fz[1], fz[2] - fz[0], fz[3] - fz[1]);
+    text(FRAGILE.label, fz, FRAGILE.labelSize, (fz[1] + fz[3]) / 2 + FRAGILE.labelSize * 0.38, ctx.strokeStyle);
   }
   if (e.mode === TEXT) {
-    const f = layout(e.text, nr);
+    const nr = nameRect(zone, fr);
+    const f = fitIn(e.text, zone, fr);
     const base = lineBases(f, nr);
     f.lines.forEach((ln, i) => text(ln, nr, f.size, base[i], '#000'));
-    if (f.size < MIN_SIZE) problem = fitProblem(f.lines);
+    if (f.size < minFor(fr)) problem = fitProblem(f.lines, fr);
   }
   return problem;
 }
@@ -885,6 +935,7 @@ function sketchGroup(gi) {
     let lab = e.mode === TEXT ? e.text.replace(/\n/g, ' / ') : e.mode === BLANK ? '白紙' : e.mode === KEEP ? 'ロゴのまま' :
               e.mode === 'only' ? marks : e.mode === 'err' ? e.msg : '未入力';
     if (S.kind === 'band' && (e.mode === TEXT || e.mode === BLANK)) lab += '＋' + marks;
+    if (e.fragile && (e.mode === TEXT || e.mode === BLANK)) lab += '＋割れ物';
     fig.className = e.mode === 'empty' ? 'empty' : (e.mode === 'err' || problem) ? 'bad' : '';
     $('figcaption', fig).innerHTML = '<b>' + (g.pages[j] + 1) + '</b>　' + esc(problem ? problem : lab);
   });
@@ -939,7 +990,7 @@ function invalidateOut() {
 async function askMaster(names) {
   const api = window.HINMEI_IRISU_API;
   if (!api) throw new Error('入数マスタの接続先（config.js）が空です');
-  const found = {}, missing = [], bad = [];
+  const found = {}, missing = [], bad = [], fragile = [];
   for (let i = 0; i < names.length; i += 20) {         // 入数マスタは1回20商品まで
     const part = names.slice(i, i + 20);
     const u = api + '?q=' + encodeURIComponent(JSON.stringify(part));
@@ -956,8 +1007,9 @@ async function askMaster(names) {
     Object.assign(found, j.found || {});
     missing.push.apply(missing, j.missing || []);
     bad.push.apply(bad, j.bad || []);
+    fragile.push.apply(fragile, j.fragile || []);        // 入数マスタ v2 から。v1 のままなら空
   }
-  return {found: found, missing: missing, bad: bad};
+  return {found: found, missing: missing, bad: bad, fragile: fragile};
 }
 
 async function autofill(masterOverride) {
@@ -995,7 +1047,8 @@ async function autofill(masterOverride) {
       g.rows = rd.items.map(it => ({
         name: it.name,
         per: ans.found[it.name] !== undefined ? String(ans.found[it.name]) : '',
-        total: String(it.total), count: '', keep: false
+        total: String(it.total), count: '', keep: false,
+        fragile: (ans.fragile || []).indexOf(it.name) >= 0     // 入数マスタで「割れ物」にチェックがある商品
       }));
       rd.items.forEach(it => {
         if (ans.missing.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタにありません。入数を手で入れてください');
@@ -1051,18 +1104,23 @@ function makePlan() {
       const info = rowInfo(r);
       if (info.kind === 'empty') continue;
       if (info.kind === 'err') throw new Error(where + '表に直すところがあります：' + info.msg);
+      const fr = !!info.fragile;
+      if (fr && info.kind !== KEEP) {
+        const bp = fragileBandProblem(s.pages[g.pages[0]].zone);
+        if (bp) throw new Error(where + bp);
+      }
       if (info.kind === 'auto') {
         for (const b of info.boxes) {
-          const f = fitOf(b[0], gi);
-          if (f.size < MIN_SIZE) throw new Error(where + '「' + b[0] + '」が枠に入りません：' + fitProblem(f.lines));
-          for (let k = 0; k < b[1]; k++) seq.push({mode: TEXT, text: b[0]});
+          const f = fitOf(b[0], gi, fr);
+          if (f.size < minFor(fr)) throw new Error(where + '「' + b[0] + '」が枠に入りません：' + fitProblem(f.lines, fr));
+          for (let k = 0; k < b[1]; k++) seq.push({mode: TEXT, text: b[0], fragile: fr});
         }
       } else if (info.kind === TEXT) {
-        const f = fitOf(info.text, gi);
-        if (f.size < MIN_SIZE) throw new Error(where + '「' + info.text.replace(/\n/g, ' / ') + '」が枠に入りません：' + fitProblem(f.lines));
-        for (let k = 0; k < info.count; k++) seq.push({mode: TEXT, text: info.text});
+        const f = fitOf(info.text, gi, fr);
+        if (f.size < minFor(fr)) throw new Error(where + '「' + info.text.replace(/\n/g, ' / ') + '」が枠に入りません：' + fitProblem(f.lines, fr));
+        for (let k = 0; k < info.count; k++) seq.push({mode: TEXT, text: info.text, fragile: fr});
       } else {
-        for (let k = 0; k < info.count; k++) seq.push({mode: info.kind});
+        for (let k = 0; k < info.count; k++) seq.push({mode: info.kind, fragile: info.kind === KEEP ? false : fr});
       }
     }
     const need = g.pages.length;
@@ -1112,15 +1170,20 @@ async function buildPdf(plan) {
       return;
     }
 
-    let nr = zone;
+    const fr = !!p.fragile;
     if (S.kind === 'band') {                              // 帯下：下に黒帯、注意書きは白抜き
-      const b = bandLayout(zone);
+      const b = bandLayout(zone, fr);
       rect(b.band, {color: BLACK});
       center(b.text, b.band, b.size, b.base, WHITE);
-      nr = nameRect(zone);
+    }
+    if (fr) {                                             // 割れ物：シールの目安の薄い枠と「割れ」
+      const fz = fragileSplit(zone).frame, GRAY = PDFLib.rgb(FRAGILE.gray, FRAGILE.gray, FRAGILE.gray);
+      rect(fz, {borderColor: GRAY, borderWidth: 0.8});
+      center(FRAGILE.label, fz, FRAGILE.labelSize, (fz[1] + fz[3]) / 2 + FRAGILE.labelSize * 0.38, GRAY);
     }
     if (p.mode === TEXT) {                                // 品名（Python版 stamp と同じ置き方）
-      const f = layout(p.text, nr);
+      const nr = nameRect(zone, fr);
+      const f = fitIn(p.text, zone, fr);
       const base = lineBases(f, nr);
       f.lines.forEach((ln, k) => center(ln, nr, f.size, base[k], BLACK));
     }
@@ -1189,6 +1252,7 @@ async function renderPreview(bytes, plan) {
     const marks = selectedMarks().map(m => m.label).join('・');
     let lab = p.mode === 'only' ? marks : p.mode === KEEP ? 'ロゴのまま' : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
     if (S.kind === 'band' && p.mode !== KEEP) lab += '＋' + marks;
+    if (p.fragile) lab += '＋割れ物';
     const fig = document.createElement('figure');
     fig.innerHTML = '<figcaption><b>' + i + '</b>　' + esc(lab) + '</figcaption>';
     fig.insertBefore(c, fig.firstChild);
