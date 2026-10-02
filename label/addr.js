@@ -257,6 +257,7 @@ const Addr = (() => {
     }
 
     res.towns = townKnown ? uniq(best.map(e => e.town)) : [];   // 見つかった町名（正式な書き方）
+    res.cities = hit.cities.slice();                             // 当てた市区町村名（正式な書き方）
     res.byAddr = zipsA.slice(0, 4).map(z => {
       const es = best.filter(e => e.zip === z);
       return {zip: z, label: label_(pc, es[0].city, es[0].town, es.map(e => e.note).filter(Boolean).join('、'))};

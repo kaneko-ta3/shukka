@@ -643,7 +643,7 @@ function computeRow(row) {
         zipFilled = '（空）';
         warn.push('〒が空なので、住所から ' + zipOut + ' を入れました');
       }
-      else if (ck.zipUnknown && zip) warn.push('〒 ' + zip + ' は郵便番号データにありません（会社やビル専用の〒かもしれません）。書き換えずにそのまま出します');
+      /* データに無い〒も「〒の確認」として止めます（打ち間違いがほとんど）。直すかどうかは人が「住所どおり」を押して決めます */
       else err.push('check');
     }
   }
@@ -712,7 +712,15 @@ function computeRow(row) {
 
   /* 補った県・市（全角）にも同じ変換を掛けます */
   /* ケ／ヶは郵便番号データの正式な書き方にそろえます（保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など） */
-  const addrA = Addr.canonKe(applyMaster(asc(addr.replace(/,/g, '，'))), check && check.towns);
+  let addrA = Addr.canonKe(applyMaster(asc(addr.replace(/,/g, '，'))), check && check.towns);
+  /* 「福岡市福岡市東区」「岩国市岩国市南岩国町」のように市区町村名が2回続いていたら1つにします */
+  if (check && check.cities) {
+    const names = [];
+    check.cities.forEach(c => { names.push(c); const m = c.match(/^(.+?[市郡])/); if (m) names.push(m[1]); });
+    for (const n of names.sort((a, b) => b.length - a.length)) {
+      if (addrA.indexOf(n + n) >= 0) { addrA = addrA.replace(n + n, n); warn.push('住所の「' + n + '」が2回続いていたので、1つにしました'); break; }
+    }
+  }
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
@@ -1221,6 +1229,9 @@ function renderSummary() {
   const excl = S.rows.length - inc.length;
   const sp = senderProblems(currentSender());
 
+  const unknownRows = inc.filter(r => r.err.includes('check') && r.check && r.check.zipUnknown);
+  const nUnknown = unknownRows.length;
+  const nUnknownFix = unknownRows.filter(r => r.check.byAddr && r.check.byAddr.length === 1).length;
   /* 件数のうち、問題の件数は押すとその行だけに絞り込めます（もう一度押すと全部に戻る） */
   const chip = (view, cls, label, n) => n ? '<button type="button" class="stat stat-btn ' + cls + (S.view === view ? ' on' : '') + '" data-view="' + view + '" title="押すとこの行だけを表に出します">' +
     label + ' ' + n + (view === 'excl' ? '行' : '件') + (S.view === view ? ' ✕' : '') + '</button>' : '';
@@ -1231,6 +1242,8 @@ function renderSummary() {
     ((S.map.qty2 || []).length ? '<span class="stat">' + esc(itemName('item2') || '商品2') + ' <b>' + sumQ('q2') + '</b></span>' : '') +
     chip('excl', 'muted', '除外', excl) +
     chip('chk', 'warn-ink', '〒の確認', nChk) +
+    chip('unknown', 'warn-ink', 'うちデータに無い〒', nUnknown) +
+    (nUnknownFix ? '<button type="button" class="stat stat-btn warn-ink" data-fix-unknown="1" title="データに無い〒のうち、住所から〒が1つに決まる行を、まとめて住所から引いた〒にします">データに無い〒をまとめて住所どおりにする（' + nUnknownFix + '件）</button>' : '') +
     chip('filled', 'warn-ink', '〒を住所から入れた', inc.filter(r => r.out.zipFilled).length) +
     chip('bad', 'err-ink', '要修正', inc.filter(r => r.err.some(e => e !== 'check')).length) +
     (S.view ? '<button type="button" class="stat stat-btn" data-view="">全部表示に戻す（' + visibleRows().length + '/' + S.rows.length + '行を表示中）</button>' : '') +
@@ -1264,6 +1277,7 @@ function inView(row) {
   const inn = included(row);
   switch (S.view) {
     case 'chk':    return inn && row.err.includes('check');
+    case 'unknown': return inn && row.err.includes('check') && !!(row.check && row.check.zipUnknown);
     case 'filled': return inn && !!row.out.zipFilled;
     case 'bad':    return inn && row.err.some(e => e !== 'check');
     case 'excl':   return !inn;
@@ -1356,14 +1370,16 @@ function checkUi(row) {
   const ck = row.check;
   const zip = row.out.zipIn;
   /* 2つの場所を見比べて、頭から同じ部分の後ろ（食い違っているところ）を赤くします */
-  const zipLabel = ck.byZip || '';
+  const zipLabel = ck.zipUnknown ? '' : (ck.byZip || '');     // データに無い〒のときは見比べる相手が無いので赤くしない
   const diffMark = (text, other) => {
     let i = 0;
     while (i < text.length && i < other.length && text[i] === other[i]) i++;
     return esc(text.slice(0, i)) + (i < text.length ? '<span class="diff">' + esc(text.slice(i)) + '</span>' : '');
   };
   const firstAddr = ck.byAddr.length ? ck.byAddr[0].label : '';
-  let h = '<div class="ck"><div class="ck-title">〒と住所が合いません。どちらが正しいか選んでください' + (ck.msg ? '（' + esc(ck.msg) + '）' : '') + '</div>';
+  let h = '<div class="ck"><div class="ck-title">' + (ck.zipUnknown
+      ? 'この〒（' + esc(zip) + '）は郵便番号データにありません。打ち間違いのことが多いので、住所から引いた〒を確かめてください'
+      : '〒と住所が合いません。どちらが正しいか選んでください') + (ck.msg ? '（' + esc(ck.msg) + '）' : '') + '</div>';
   h += '<div class="ck-opts">';
   ck.byAddr.forEach(c => {
     h += '<button class="btn small primary" data-fixzip="' + row.src + '" data-zip="' + c.zip + '">住所どおり：〒を ' + Addr.fmtZip(c.zip) + ' にする</button>' +
@@ -1371,7 +1387,7 @@ function checkUi(row) {
   });
   if (!ck.byAddr.length) h += '<span class="tiny muted">住所からは〒を引けませんでした。住所か〒を手で直してください</span>';
   h += '</div><div class="ck-opts">';
-  h += '<span class="tiny">今の〒 ' + esc(zip || '（なし）') + ' は：' + (zipLabel && firstAddr ? diffMark(zipLabel, firstAddr) : esc(zipLabel || '―')) + '</span>';
+  h += '<span class="tiny">今の〒 ' + esc(zip || '（なし）') + ' は：' + (zipLabel && firstAddr ? diffMark(zipLabel, firstAddr) : esc(ck.byZip || '―')) + '</span>';
   if (zip) h += '<button class="btn small" data-keep="' + row.src + '">このまま出す</button>';
   h += '</div></div>';
   return h;
@@ -1572,6 +1588,18 @@ function bindEvents() {
       const vis = visibleRows();
       vis.forEach(r => { if (t.checked) S.sel.add(r.src); else S.sel.delete(r.src); });
       paintSel(vis.map(r => r.src)); return;
+    }
+    if (t.closest && t.closest('[data-fix-unknown]')) {
+      /* データに無い〒のうち、住所から〒が1つに決まる行だけを、まとめて住所どおりにします（人が押したときだけ） */
+      let n = 0;
+      S.rows.forEach(r => {
+        if (included(r) && r.err.includes('check') && r.check && r.check.zipUnknown && r.check.byAddr && r.check.byAddr.length === 1) {
+          setEdit(r.src, 'zip', Addr.fmtZip(r.check.byAddr[0].zip)); n++;
+        }
+      });
+      if (S.view === 'unknown') S.view = '';
+      recompute(); toast('データに無い〒 ' + n + '件を、住所から引いた〒にしました（元の〒はセルに重ねると出ます）');
+      return;
     }
     const vb = t.closest && t.closest('[data-view]');
     if (vb) { S.view = S.view === vb.dataset.view ? '' : vb.dataset.view; renderRows(); return; }
