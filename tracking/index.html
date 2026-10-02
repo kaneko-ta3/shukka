@@ -49,6 +49,10 @@ label.pk{display:inline-flex; gap:5px; align-items:center; padding:4px 10px; bor
 label.pk:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
 label.pk .col{color:var(--muted); font-size:11px;}
 label.pk.empty{opacity:.55;}
+/* グループが1つだけで出さないとき：チェックは残して灰色に */
+label.pk.na, label.pk.na:has(input:checked){opacity:.5; border-color:var(--line); background:var(--ground); color:var(--muted);}
+label.pk.na input{filter:grayscale(1);}
+label.pk .why{color:var(--muted); font-size:11px;}
 details.more{margin-top:10px;}
 details.more summary{cursor:pointer; color:var(--muted); font-size:12px;}
 details.more .picks{margin-top:8px;}
@@ -79,7 +83,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSVを作ります。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v5</span>
+  <span class="ver">v6</span>
 </header>
 
 <main>
@@ -128,7 +132,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v5
+   追跡番号出力  v6
 
    B2の発行済データから、選んだ列だけのCSVを作る。最初は 伝票番号（D列）とお届け先名（P列）。
    ・1行目の見出しは残す
@@ -391,10 +395,17 @@ function build() {
     return;
   }
   const gOut = new Set(rows.map(x => rowGroup[x.n]));
-  // グループが1つしか出ないときは、グループの列は要らないので出さない
-  if (st.pick.has('group')) {
-    if (gOut.size > 1) all.unshift(byKey.get('group'));
-    else if (st.groups.length > 1) notes.push('出すグループが1つだけなので、グループの列は出していません');
+  // グループが1つしか出ないときは、グループの列は要らないので出さない。
+  // 「出す列」のグループはチェックを残したまま灰色にして、出さないことを添える（2つ以上に戻れば元どおり）
+  if (st.pick.has('group') && gOut.size > 1) all.unshift(byKey.get('group'));
+  const gChip = document.querySelector('#picks input[data-key="group"]');
+  if (gChip) {
+    const lab = gChip.closest('label');
+    lab.classList.toggle('na', gOut.size <= 1);
+    lab.title = gOut.size <= 1 ? '送り状が1つだけなので、グループの列は出しません' : '';
+    let why = lab.querySelector('.why');
+    if (gOut.size <= 1 && !why) { why = document.createElement('span'); why.className = 'why'; why.textContent = '1つだけなので出しません'; lab.appendChild(why); }
+    else if (gOut.size > 1 && why) why.remove();
   }
 
   // お届け先：郵便番号＋お届け先名＋部門名２（出す行だけで数える）
