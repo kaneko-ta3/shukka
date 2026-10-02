@@ -1,5 +1,7 @@
 /* ===================================================================
-   送り状 余白書き換え  v17   (hinmei/app.js)
+   送り状 余白書き換え  v18   (hinmei/app.js)
+
+   v18 「何も書かない」：中身には一切触らず、送り状番号の順に並べ直すだけ（出す名前は 〜_番号順.pdf）
 
    v17 出すPDFのページを送り状番号の小さい順（＝発行済データの順）に並べ直す。
        B2のPDFは一部の地域が先頭にまとまるなど並びが割れることがあるため（中身は触らず順番だけ）
@@ -254,7 +256,7 @@ function onlyLayout(zone) {
 
 /** 注意書きの問題。無ければ null */
 function marksProblem(zone) {
-  if (S.kind === 'name') return null;
+  if (S.kind === 'name' || S.kind === 'none') return null;
   const ms = selectedMarks();
   if (!ms.length) return '注意書きを1つ以上選んでください';
   if (ms.length > MARK_LIMIT[S.kind]) return '注意書きは' + (S.kind === 'band' ? '帯下では1つ' : '帯のみでは2つ') + 'までです';
@@ -581,9 +583,9 @@ function renderFile() {
 function showSteps() {
   const has = !!S.src;
   $('#secKind').hidden = !has;
-  $('#secRows').hidden = !has || S.kind === 'only';
+  $('#secRows').hidden = !has || S.kind === 'only' || S.kind === 'none';
   $('#secMake').hidden = !has;
-  $('#marksBox').hidden = !(has && S.kind !== 'name');
+  $('#marksBox').hidden = !(has && S.kind !== 'name' && S.kind !== 'none');
   $('#onlyNote').hidden = !(has && S.kind === 'only');
   renderMarks();
 }
@@ -607,7 +609,7 @@ function renderMarks() {
   const p = z ? marksProblem(z) : null;
   const note = $('#markMsg');
   if (p) { note.textContent = p; note.className = 'tiny err-ink'; }
-  else if (S.kind !== 'name' && z) {
+  else if (S.kind !== 'name' && S.kind !== 'none' && z) {
     const ms = selectedMarks();
     note.className = 'tiny muted';
     if (S.kind === 'band') { const b = bandLayout(z); note.textContent = '帯：「' + b.text + '」' + Math.round(b.size) + 'pt'; }
@@ -1177,6 +1179,7 @@ async function autofill(masterOverride) {
 function makePlan() {
   const s = S.src;
   const plan = new Array(s.pages.length).fill(null);
+  if (S.kind === 'none') return plan.map(() => ({mode: KEEP}));   // 何も書かない（並べ直すだけ）
   const mp = marksProblem(s.pages[0].zone);
   if (mp) throw new Error(mp);
   if (S.kind === 'only') return plan.map(() => ({mode: 'only'}));
@@ -1229,7 +1232,7 @@ async function buildPdf(plan) {
   // フォントは丸ごと埋め込む。使う文字だけに絞る(subset)と、このフォントでは字が消える
   // (pdf-lib 1.17.1 + fontkit 1.1.1 で確認。絞らなければPython版と画素まで一致)。
   // PDFは3MBほどになるが、Python版も同じ大きさ
-  const font = await doc.embedFont(S.fontBytes, {subset: false});
+  const font = S.kind === 'none' ? null : await doc.embedFont(S.fontBytes, {subset: false});   // 何も書かないならフォントも入れない
   const BLACK = PDFLib.rgb(0, 0, 0), WHITE = PDFLib.rgb(1, 1, 1);
   const pages = doc.getPages();
   if (pages.length !== s.pages.length) throw new Error('ページ数が読み込み時と違います');
@@ -1286,7 +1289,7 @@ async function buildPdf(plan) {
 
 function outName() {
   const base = S.src.name.replace(/\.pdf$/i, '');
-  return base + '_余白書き換え.pdf';
+  return base + (S.kind === 'none' ? '_番号順.pdf' : '_余白書き換え.pdf');
 }
 
 async function make() {
@@ -1314,7 +1317,8 @@ async function make() {
     $('#result').hidden = false;
     const order = S.lastOrder || plan.map((p, i) => i);
     const moved = order.some((v, i) => v !== i);
-    setMsg('#makeMsg', 'できました。' + (moved ? '元のPDFは並びが割れていたので、送り状番号の小さい順（発行済データの順）に並べ直しました。' : '') +
+    setMsg('#makeMsg', 'できました。' + (moved ? '元のPDFは並びが割れていたので、送り状番号の小さい順（発行済データの順）に並べ直しました。'
+                                         : S.kind === 'none' ? '元のPDFはもともと送り状番号の順でした（中身も順番も元のままです）。' : '') +
                        'ダウンロードが始まらないときは下のボタンから', 'ok');
     a.click();
     await renderPreview(bytes, plan, order);
@@ -1347,7 +1351,7 @@ async function renderPreview(bytes, plan, order) {
     c.getContext('2d').drawImage(full, cut[0], cut[1], c.width, c.height, 0, 0, c.width, c.height);
     const p = plan[si] || {mode: KEEP};
     const marks = selectedMarks().map(m => m.label).join('・');
-    let lab = p.mode === 'only' ? marks : p.mode === KEEP ? 'ロゴのまま' : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
+    let lab = p.mode === 'only' ? marks : p.mode === KEEP ? (S.kind === 'none' ? '何も書かない' : 'ロゴのまま') : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
     if (S.kind === 'band' && p.mode !== KEEP) lab += '＋' + marks;
     if (p.fragile) lab += '＋割れ物';
     const fig = document.createElement('figure');

@@ -125,7 +125,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v17</span>
+  <span class="ver">v18</span>
 </header>
 
 <main>
@@ -145,6 +145,7 @@ details.sk summary{cursor:pointer;}
       <label class="kind"><input type="radio" name="kind" value="name" checked><b>品名だけ</b><span class="tiny muted">帯なし</span></label>
       <label class="kind"><input type="radio" name="kind" value="band"><b>品名＋注意書き</b><span class="tiny muted">帯下（下の黒帯に注意書きを1つ）</span></label>
       <label class="kind"><input type="radio" name="kind" value="only"><b>注意書きだけ</b><span class="tiny muted">帯のみ（品名は入れない。2つまで）</span></label>
+      <label class="kind"><input type="radio" name="kind" value="none"><b>何も書かない</b><span class="tiny muted">送り状番号の順に並べ直すだけ</span></label>
     </div>
     <div id="marksBox" class="marks" hidden>
       <div class="tiny muted">注意書き　<span id="markLimit"></span></div>
@@ -212,7 +213,7 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=17"></script>
-<script src="app.js?v=17"></script>
+<script src="config.js?v=18"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
