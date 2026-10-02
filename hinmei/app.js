@@ -1,5 +1,8 @@
 /* ===================================================================
-   送り状 余白書き換え  v14   (hinmei/app.js)
+   送り状 余白書き換え  v15   (hinmei/app.js)
+
+   v15 表を 届け先＋送り状（親番号）ごとに分ける。同じ届け先に別の送り状が来ても1つの表に混ざらない
+       （複数口の子は「親伝票 送り状番号」で親にまとめる）。同じ届け先の表が複数なら見出しに送り状番号の下4桁
 
    v14 割れ物の目安の枠を、シール(5cm×4cm)より縦横0.8cm小さい 4.2cm×3.2cm に（貼ったシールで隠れるように）
 
@@ -430,17 +433,47 @@ function readKiji(pg) {
 
 const normMark = s => String(s).normalize('NFKC').replace(/[\s　]/g, '');
 
-/** 届け先ごとにページをまとめる。読めないページは直前と同じ届け先 */
+/** 送り状（1通）の番号。複数口の子は「親伝票 送り状番号」の番号、それ以外は自分の送り状番号
+    （1枚に3か所印字されるので、いちばん多く出てくる番号）。読めなければ '' */
+const SLIP_NO = /\d{4}-\d{4}-\d{4}/;
+function readSlip(pg) {
+  const nums = pg.items.filter(it => SLIP_NO.test(it.str)).map(it => ({no: it.str.match(SLIP_NO)[0], x: it.x, y: it.y}));
+  if (!nums.length) return '';
+  const label = pg.items.find(it => /親伝票/.test(it.str));
+  if (label) {
+    let best = null, bd = Infinity;
+    for (const n of nums) {
+      const dx = n.x - label.x, dy = Math.abs(n.y - label.y);
+      if (dx > 0 && dx < 120 && dy < 16 && dx + dy * 4 < bd) { bd = dx + dy * 4; best = n; }
+    }
+    if (best) return best.no;
+  }
+  const cnt = {};
+  nums.forEach(n => { cnt[n.no] = (cnt[n.no] || 0) + 1; });
+  return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+}
+
+/** 届け先と送り状（親番号）ごとにページをまとめる。同じ届け先でも別の送り状なら別の表にする
+    （品名欄の総数は送り状ごとなので）。届け先が読めないページは直前と同じ届け先 */
 function groupPages(pages) {
-  const groups = [], byKey = {};
+  const groups = [], byKey = {}, perDest = {};
   let last = null;
   pages.forEach((pg, i) => {
     const d = pg.dest || last || {key: '(届け先を読めません)', name: '(届け先を読めません)', zip: '', addr: ''};
-    let g = byKey[d.key];
-    if (!g) { g = {name: d.name, zip: d.zip, addr: d.addr, pages: []}; byKey[d.key] = g; groups.push(g); }
+    const key = d.key + '\n#' + (pg.slip || '');
+    let g = byKey[key];
+    if (!g) {
+      g = {name: d.name, zip: d.zip, addr: d.addr, slip: pg.slip || '', pages: []};
+      byKey[key] = g;
+      groups.push(g);
+      perDest[d.key] = (perDest[d.key] || 0) + 1;
+      g.destKey = d.key;
+    }
     g.pages.push(i);
     last = d;
   });
+  // 同じ届け先の表が2つ以上あるときだけ、見出しに送り状番号の下4桁を添える
+  groups.forEach(g => { g.slipTag = perDest[g.destKey] > 1 && g.slip ? '送り状 …' + g.slip.slice(-4) : ''; });
   return groups;
 }
 
@@ -485,6 +518,7 @@ async function openPdf(bytes, name) {
       pg.zone = findZone(pg);
       if (!pg.zone) noZone.push(i + 1);
       pg.dest = readDestination(pg);
+      pg.slip = readSlip(pg);
       pg.hin = readHin(pg);
       pg.kiji = readKiji(pg);
     });
@@ -621,7 +655,8 @@ function renderGroups() {
     el.innerHTML =
       '<div class="gh"><b>■ ' + esc(g.name || '(届け先名なし)') + '</b>' +
       '<span class="cnt">' + g.pages.length + ' 枚</span>' +
-      '<span class="muted tiny">' + esc(pageRanges(g.pages)) + '</span></div>' +
+      '<span class="muted tiny">' + esc(pageRanges(g.pages)) + '</span>' +
+      (g.slipTag ? '<span class="muted tiny">' + esc(g.slipTag) + '</span>' : '') + '</div>' +
       (addr.trim() ? '<div class="ga tiny muted">' + esc(addr) + '</div>' : '') +
       '<div class="gs" hidden></div>' +
       '<table class="rows"><thead><tr>' +
