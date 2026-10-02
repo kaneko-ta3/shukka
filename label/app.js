@@ -87,6 +87,7 @@ const S = {
   company: '',
   item1: {name: '', per: ''},
   item2: {name: '', per: ''},
+  boxMode: 'each',          // 個口の計算。each＝商品ごとに割って切り上げてから足す／mix＝割ったまま足して最後に切り上げ
   rows: [],                 // 組み立てた行
   edits: {},                // 元の行番号 -> {項目: 手で入れた値}
   include: {},              // 元の行番号 -> true/false（手で発行する／外す）
@@ -636,15 +637,22 @@ function computeRow(row) {
   const item1 = item(S.item1, q1, '商品1');
   const item2 = item(S.item2, q2, '商品2');
 
-  /* 個口数。手入力 > 別紙の個口数 > 数量÷入数（切り上げ、商品ごとに足す） > 1 */
+  /* 個口数。手入力 > 別紙の個口数 > 数量÷入数 > 1
+       each：商品ごとに割って切り上げてから足す（別々の箱に詰める）
+       mix ：割ったまま足して、最後に切り上げ（同じ箱に混ぜて詰める） */
   let boxesAuto = 0;
   const bcol = String(row.auto.boxes || '').trim();
   if (bcol && !isNaN(num(bcol))) boxesAuto = Math.round(num(bcol));
   else {
+    let frac = 0;
     [[q1, S.item1.per], [q2, S.item2.per]].forEach(([q, per]) => {
       const n = num(q), p = num(per);
-      if (!isNaN(n) && n > 0 && !isNaN(p) && p > 0) boxesAuto += Math.ceil(n / p);
+      if (isNaN(n) || n <= 0 || isNaN(p) || p <= 0) return;
+      if (S.boxMode === 'mix') frac += n / p;
+      else boxesAuto += Math.ceil(n / p);
     });
+    /* 0.1＋0.2 のような小数のずれで 1 口増えないよう、ごく小さい差は丸めてから切り上げます */
+    if (S.boxMode === 'mix' && frac > 0) boxesAuto = Math.ceil(Math.round(frac * 1e9) / 1e9);
   }
   if (!boxesAuto) boxesAuto = 1;
   let boxes = boxesAuto;
@@ -1007,7 +1015,15 @@ function renderMap() {
       const nameNeed = p === 'item1' || cols.length > 0;
       r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
         '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !o.name.trim() ? ' class="req-empty"' : '') + '>' +
-        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4"><span class="plus">個/箱</span></div></div>';
+        '<span class="plus">÷</span><input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4" title="1箱に入る数。個口＝数量÷入数"><span class="plus">個/箱</span></div></div>';
+      /* 個口の計算のしかた。商品1の下に1回だけ出します */
+      if (it.key === 'qty1') {
+        const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
+        r += '<div class="mr sub"><div class="ml tiny muted">└ 個口の計算</div><div class="ms">' +
+          opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します（別々の箱に詰める）。例：30÷48→1、30÷24→2、合計3口') +
+          opt('mix', '割ったまま足して最後に切り上げ', '数量÷入数 を切り上げずに足して、最後に切り上げます（同じ箱に混ぜて詰める）。例：0.625＋1.25＝1.875→2口') +
+          '</div></div>';
+      }
     }
     if (it.key === 'store') {
       r += '<div class="mr sub"><div class="ml tiny muted" title="入れると「名前」に会社名、「備考(住所4)」に店名が入ります。空なら店名が「名前」に入ります">└ 会社名</div><div class="ms">' +
@@ -1280,8 +1296,13 @@ function bindEvents() {
     }
     if (t.dataset.item) {
       S[t.dataset.item][t.dataset.f] = t.value;
-      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2});
+      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode});
       renderMap(); recompute(); return;
+    }
+    if (t.name === 'boxMode') {
+      S.boxMode = t.value === 'mix' ? 'mix' : 'each';
+      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode});
+      recompute(); return;
     }
     if (t.id === 'company') { S.company = t.value; recompute(); return; }
     if (t.dataset.cell) { commitCell(t); return; }
@@ -1419,7 +1440,10 @@ function bindEvents() {
 function init() {
   loadSenders();
   const it = lsGet(CFG.LS_ITEMS, null);
-  if (it) { S.item1 = Object.assign(S.item1, it.item1 || {}); S.item2 = Object.assign(S.item2, it.item2 || {}); }
+  if (it) {
+    S.item1 = Object.assign(S.item1, it.item1 || {}); S.item2 = Object.assign(S.item2, it.item2 || {});
+    if (it.boxMode === 'mix') S.boxMode = 'mix';
+  }
   $('#vTime').innerHTML = CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();
   Issued.bind();

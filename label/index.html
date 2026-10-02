@@ -115,6 +115,7 @@ label.pick{display:inline-flex; gap:4px; align-items:center; background:var(--su
 .acct.ok{background:var(--accent-soft); color:var(--accent);}
 .acct.ng{background:var(--danger-soft); color:var(--danger);}
 table.ours-t td{max-width:360px;}
+label.boxmode{display:flex; gap:4px; align-items:center; font-size:12px; cursor:pointer; white-space:nowrap;}
 details.morecols{border-top:1px solid var(--line); padding-top:4px;}
 details.morecols > summary{cursor:pointer; color:var(--muted); font-size:12px; padding:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 details.morecols[open] > summary{color:var(--ink);}
@@ -165,7 +166,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v14</span>
+  <span class="ver">v15</span>
 </header>
 
 <main>
@@ -269,8 +270,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=14"></script>
-<script src="app.js?v=14"></script>
-<script src="issued.js?v=14"></script>
+<script src="addr.js?v=15"></script>
+<script src="app.js?v=15"></script>
+<script src="issued.js?v=15"></script>
 </body>
 </html>
