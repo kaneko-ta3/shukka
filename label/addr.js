@@ -78,7 +78,7 @@ const Addr = (() => {
   const VARIANT = {'澤': '沢', '嶋': '島', '嶌': '島', '淵': '渕', '邊': '辺', '邉': '辺', '髙': '高', '﨑': '崎', '嵜': '崎',
                    '濱': '浜', '廣': '広', '齋': '斎', '齊': '斎', '櫻': '桜', '國': '国', '瀧': '滝', '舘': '館', '槇': '槙',
                    '龍': '竜', '條': '条', '藏': '蔵', '冨': '富', '眞': '真', '德': '徳', '黑': '黒', '曽': '曾', '萬': '万',
-                   '苅': '刈', '餠': '餅'};
+                   '苅': '刈', '餠': '餅', '糟': '粕'};
   const VARIANT_RE = new RegExp('[' + Object.keys(VARIANT).join('') + ']', 'g');
   /* カタカナと漢字で形が同じ字。旭市の町名「イ・ロ・ハ・ニ」は、データはカタカナ、別紙は漢字（二・八・口）で来るため */
   const LOOKALIKE = {'ニ': '二', 'ハ': '八', 'ロ': '口', 'エ': '工', 'カ': '力'};
@@ -195,7 +195,14 @@ const Addr = (() => {
       res.addr = res.added + a;
     }
 
-    const rest = aKey.slice(hit.len).replace(/^(大字|字)/, '');
+    let rest = aKey.slice(hit.len);
+    /* 「岩国市岩国市南岩国町」「福岡市福岡市東区」のように、市区町村名が2回書かれていたら1回分を飛ばします */
+    for (const c of hit.cities) {
+      const ck = key(c);
+      if (ck && rest.startsWith(ck)) { rest = rest.slice(ck.length); break; }
+      const m = c.match(/^(.+?市)/);
+      if (m && rest.startsWith(key(m[1]))) { rest = rest.slice(key(m[1]).length); break; }
+    }
     const p = await loadFile_('p', pc);
     if (p === null) { res.status = 'nodata'; res.msg = '郵便番号データが読めませんでした'; return res; }
     const entries = [];
@@ -242,9 +249,11 @@ const Addr = (() => {
       const bh = bizHits.find(h => hit.cities.includes(h.city) && (!h.town || rest.startsWith(key(h.town))));
       if (bh) { ok = true; res.biz = bh.name; }
     }
-    /* 町名がデータに無い地域（「以下に掲載がない場合」の〒）。市区町村が合えばよしとします */
+    /* 住所の町名がデータに見つからない（打ち間違い・書き方の違い）ときは、
+       〒の指す市区町村が住所の市区町村とぴったり合っていれば、〒が正しいとみなします
+       （鹿児島市「柴原」と〒の「紫原」、徳島市「寺島町本町西」と〒の「寺島本町西」など） */
     if (!ok && zip && !townKnown && zipHits.length) {
-      ok = zipHits.some(h => hit.cities.includes(h.city) && !h.town);
+      ok = zipHits.some(h => hit.cities.includes(h.city));
     }
 
     res.byAddr = zipsA.slice(0, 4).map(z => {
