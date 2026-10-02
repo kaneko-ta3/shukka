@@ -446,9 +446,11 @@ function headerish(row) {
 function detectHeader() {
   const g = S.grid;
   let best = -1, bestScore = 0;
-  for (let r = 0; r < Math.min(15, g.length); r++) {
-    if (rowLooksData(g[r])) continue;
+  /* 上に集計表などが付いていて、見出しが20行目より下にある別紙もあるので、先頭60行まで探します。
+     見出しの行に合計の数字が入っていることもあるので、見出しらしい言葉が3つ以上あれば数字が混ざっていても候補にします */
+  for (let r = 0; r < Math.min(60, g.length); r++) {
     const sc = rowScore(g[r]);
+    if (rowLooksData(g[r]) && sc < 3) continue;
     if (sc > bestScore) { best = r; bestScore = sc; }
   }
   if (best < 0) { S.headTop = -1; S.headBottom = -1; S.dataFrom = 0; return; }
