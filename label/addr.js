@@ -256,6 +256,7 @@ const Addr = (() => {
       ok = zipHits.some(h => hit.cities.includes(h.city));
     }
 
+    res.towns = townKnown ? uniq(best.map(e => e.town)) : [];   // 見つかった町名（正式な書き方）
     res.byAddr = zipsA.slice(0, 4).map(z => {
       const es = best.filter(e => e.zip === z);
       return {zip: z, label: label_(pc, es[0].city, es[0].town, es.map(e => e.note).filter(Boolean).join('、'))};
@@ -272,5 +273,31 @@ const Addr = (() => {
     return m ? m[1] : '';
   }
 
-  return {loadIndex, check, digits7, fmtZip, prefOf, key, get ver() { return index ? index.ver : ''; }};
+  /* ケ／ヶの正式な書き方にそろえます（駒ヶ根市・保土ケ谷区・鎌ケ谷市 など）。
+     住所に「保土ヶ谷区」「鎌ヶ谷市」のように書かれていたら、郵便番号データの書き方に直します。
+     対象は ケ・ヶ が入った市区町村名と、照合で見つかった町名（extra）だけです */
+  let keRules = null;
+  function keRule_(name) {
+    const pat = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[ヶケヵがｹ]/g, '[ヶケヵがｹ]');
+    return {re: new RegExp(pat, 'g'), to: name};
+  }
+  function canonKe(text, extra) {
+    if (!index) return String(text);
+    if (!keRules) {
+      const names = [];
+      index.cities.forEach(([, c]) => {
+        if (!/[ヶケ]/.test(c)) return;
+        names.push(c);
+        const g = c.match(/^.+?郡(.+)$/); if (g && /[ヶケ]/.test(g[1])) names.push(g[1]);   // 郡を省いた書き方
+        const w = c.match(/^.+?市(.+区)$/); if (w && /[ヶケ]/.test(w[1])) names.push(w[1]); // 市を省いた区名
+      });
+      keRules = uniq(names).sort((a, b) => b.length - a.length).map(keRule_);
+    }
+    let t = String(text);
+    keRules.forEach(r => { t = t.replace(r.re, r.to); });
+    (extra || []).filter(n => n && /[ヶケが]/.test(n)).forEach(n => { const r = keRule_(n); t = t.replace(r.re, r.to); });
+    return t;
+  }
+
+  return {loadIndex, check, canonKe, digits7, fmtZip, prefOf, key, get ver() { return index ? index.ver : ''; }};
 })();

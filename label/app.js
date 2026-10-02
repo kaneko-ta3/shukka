@@ -711,7 +711,8 @@ function computeRow(row) {
   const memo2 = String(val(row, 'memo2') || '').trim();
 
   /* 補った県・市（全角）にも同じ変換を掛けます */
-  const addrA = applyMaster(asc(addr.replace(/,/g, '，')));
+  /* ケ／ヶは郵便番号データの正式な書き方にそろえます（保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など） */
+  const addrA = Addr.canonKe(applyMaster(asc(addr.replace(/,/g, '，'))), check && check.towns);
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
