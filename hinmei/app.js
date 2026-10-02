@@ -1,5 +1,8 @@
 /* ===================================================================
-   送り状 余白書き換え  v16   (hinmei/app.js)
+   送り状 余白書き換え  v17   (hinmei/app.js)
+
+   v17 出すPDFのページを送り状番号の小さい順（＝発行済データの順）に並べ直す。
+       B2のPDFは一部の地域が先頭にまとまるなど並びが割れることがあるため（中身は触らず順番だけ）
 
    v16 「全部に入れる」：入れた文字で全部の表を「その文字 × 送り状の枚数」にする（届け先が多い日用）
 
@@ -455,6 +458,30 @@ function readSlip(pg) {
   return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
 }
 
+/** 自分の送り状番号（1枚に3か所印字されるので、いちばん多く出てくる番号）。読めなければ '' */
+function readOwnNo(pg) {
+  const cnt = {};
+  pg.items.forEach(it => { const m = it.str.match(SLIP_NO); if (m) cnt[m[0]] = (cnt[m[0]] || 0) + 1; });
+  return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || '';
+}
+
+/** 出すPDFのページ順。送り状番号の小さい順（＝発行済データの順。B2のPDFは地域などで並びが割れることがある）。
+    複数口は親の番号でまとめてから自分の番号順。最後の1桁はチェック数字なので比べない。
+    番号が読めないページは直前のページのすぐ後ろ */
+function pageOrder(pages) {
+  const k = n => n.replace(/\D/g, '').slice(0, -1);
+  let prev = ['', ''];
+  const keys = pages.map(p => {
+    const own = p.own ? k(p.own) : '';
+    const key = own ? [k(p.slip || p.own), own] : prev;
+    prev = key;
+    return key;
+  });
+  return pages.map((p, i) => i).sort((a, b) =>
+    (keys[a][0] < keys[b][0] ? -1 : keys[a][0] > keys[b][0] ? 1 : 0) ||
+    (keys[a][1] < keys[b][1] ? -1 : keys[a][1] > keys[b][1] ? 1 : 0) || a - b);
+}
+
 /** 届け先と送り状（親番号）ごとにページをまとめる。同じ届け先でも別の送り状なら別の表にする
     （品名欄の総数は送り状ごとなので）。届け先が読めないページは直前と同じ届け先 */
 function groupPages(pages) {
@@ -521,6 +548,7 @@ async function openPdf(bytes, name) {
       if (!pg.zone) noZone.push(i + 1);
       pg.dest = readDestination(pg);
       pg.slip = readSlip(pg);
+      pg.own = readOwnNo(pg);
       pg.hin = readHin(pg);
       pg.kiji = readKiji(pg);
     });
@@ -1246,6 +1274,13 @@ async function buildPdf(plan) {
       f.lines.forEach((ln, k) => center(ln, nr, f.size, base[k], BLACK));
     }
   });
+  // ページを送り状番号の小さい順に並べ直す（中身はそのまま、順番だけ）
+  const order = pageOrder(s.pages);
+  S.lastOrder = order;
+  if (order.some((v, i) => v !== i)) {
+    for (let i = pages.length - 1; i >= 0; i--) doc.removePage(i);
+    order.forEach(i => doc.addPage(pages[i]));
+  }
   return await doc.save();
 }
 
@@ -1277,9 +1312,12 @@ async function make() {
     a.download = S.out.name;
     $('#outName').textContent = S.out.name;
     $('#result').hidden = false;
-    setMsg('#makeMsg', 'できました。ダウンロードが始まらないときは下のボタンから', 'ok');
+    const order = S.lastOrder || plan.map((p, i) => i);
+    const moved = order.some((v, i) => v !== i);
+    setMsg('#makeMsg', 'できました。' + (moved ? '元のPDFは並びが割れていたので、送り状番号の小さい順（発行済データの順）に並べ直しました。' : '') +
+                       'ダウンロードが始まらないときは下のボタンから', 'ok');
     a.click();
-    await renderPreview(bytes, plan);
+    await renderPreview(bytes, plan, order);
   } catch (e) {
     setMsg('#makeMsg', 'PDFを作れませんでした：' + (e.message || String(e)), 'err');
   } finally {
@@ -1288,7 +1326,7 @@ async function make() {
 }
 
 /** できたPDFの左下を並べて見せる（印刷前の確認用） */
-async function renderPreview(bytes, plan) {
+async function renderPreview(bytes, plan, order) {
   const box = $('#preview');
   box.innerHTML = '';
   const pdf = await pdfjsLib.getDocument({data: bytes.slice(0)}).promise;
@@ -1300,13 +1338,14 @@ async function renderPreview(bytes, plan) {
     full.width = Math.ceil(vp.width);
     full.height = Math.ceil(vp.height);
     await page.render({canvasContext: full.getContext('2d'), viewport: vp}).promise;
-    const z = S.src.pages[i - 1].zone;
+    const si = order ? order[i - 1] : i - 1;               // 出力の i 枚目 ＝ 元の si 枚目
+    const z = S.src.pages[si].zone;
     const cut = [z[0] - 10, z[1] - 10, z[2] + 10, z[3] + 10].map(v => Math.round(v * SC));
     const c = document.createElement('canvas');
     c.width = cut[2] - cut[0];
     c.height = cut[3] - cut[1];
     c.getContext('2d').drawImage(full, cut[0], cut[1], c.width, c.height, 0, 0, c.width, c.height);
-    const p = plan[i - 1] || {mode: KEEP};
+    const p = plan[si] || {mode: KEEP};
     const marks = selectedMarks().map(m => m.label).join('・');
     let lab = p.mode === 'only' ? marks : p.mode === KEEP ? 'ロゴのまま' : p.mode === BLANK ? '白紙' : p.text.replace(/\n/g, ' / ');
     if (S.kind === 'band' && p.mode !== KEEP) lab += '＋' + marks;
