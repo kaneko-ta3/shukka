@@ -48,13 +48,24 @@ const CFG = {
     memo2: ['備考', '記事']
   },
 
-  /* リードタイム。出荷日が空の行は、指定日からこの日数さかのぼります（土日は金曜へ） */
-  LEAD_NEAR: 1,
-  LEAD_FAR: 2,
+  /* 出荷日が空の行は「指定日 −（東京からの輸送日数＋1）」にし、営業日でなければ前の営業日まで戻します。
+     輸送1日：関東・甲信越・北陸・東海・近畿（兵庫まで）・東北（青森まで）／それ以外は2日 */
+  TRANSIT_NEAR: 1,
+  TRANSIT_FAR: 2,
   NEAR_PREF: ['東京都', '神奈川県', '埼玉県', '千葉県', '茨城県', '栃木県', '群馬県',
               '山梨県', '長野県', '新潟県', '静岡県', '愛知県', '岐阜県', '三重県',
               '富山県', '石川県', '福井県', '滋賀県', '京都府', '大阪府', '兵庫県',
-              '奈良県', '和歌山県'],
+              '奈良県', '和歌山県',
+              '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
+  /* 祝日（振替休日・国民の休日を含む）。年が変わる前に次の年を足してください */
+  HOLIDAYS: [
+    '2026/01/01', '2026/01/12', '2026/02/11', '2026/02/23', '2026/03/20', '2026/04/29',
+    '2026/05/03', '2026/05/04', '2026/05/05', '2026/05/06', '2026/07/20', '2026/08/11',
+    '2026/09/21', '2026/09/22', '2026/09/23', '2026/10/12', '2026/11/03', '2026/11/23',
+    '2027/01/01', '2027/01/11', '2027/02/11', '2027/02/23', '2027/03/21', '2027/03/22',
+    '2027/04/29', '2027/05/03', '2027/05/04', '2027/05/05', '2027/07/19', '2027/08/11',
+    '2027/09/20', '2027/09/23', '2027/10/11', '2027/11/03', '2027/11/23'
+  ],
 
   TIMES: [['', '指定なし'], ['0812', '午前中'], ['1416', '14〜16時'], ['1618', '16〜18時'],
           ['1820', '18〜20時'], ['1921', '19〜21時']],
@@ -251,9 +262,11 @@ function autoShip(due, addr) {
   const a = due.split('/').map(Number);
   const d = new Date(a[0], a[1] - 1, a[2]);
   const pref = Addr.prefOf(addr);
-  d.setDate(d.getDate() - (CFG.NEAR_PREF.includes(pref) ? CFG.LEAD_NEAR : CFG.LEAD_FAR));
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
-  return fmtYMD(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const transit = CFG.NEAR_PREF.includes(pref) ? CFG.TRANSIT_NEAR : CFG.TRANSIT_FAR;
+  d.setDate(d.getDate() - (transit + 1));
+  const ymd = () => fmtYMD(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  while (d.getDay() === 0 || d.getDay() === 6 || CFG.HOLIDAYS.includes(ymd())) d.setDate(d.getDate() - 1);
+  return ymd();
 }
 
 /* 時間指定。B2のコードにします。読めなければ null */
@@ -942,7 +955,36 @@ function openSenderDialog(s) {
   f.dataset.id = s ? s.id : '';
   ['code', 'name', 'tel', 'zip', 'addr', 'bldg'].forEach(k => { f.elements[k].value = s ? (s[k] || '') : ''; });
   $('#senderDlgTitle').textContent = s ? '依頼主を直す' : '依頼主を新しく入力';
+  $('#senderZipNote').textContent = '';
+  f.dataset.zipAuto = '';
+  $('#senderMore').open = !!(s && (s.code || s.bldg));
   d.showModal();
+}
+
+/* 依頼主の住所から〒を引いて入れます。〒が空か、前に自動で入れたものだけを書き換えます */
+async function senderZipFromAddr() {
+  const f = $('#senderForm');
+  const addr = f.elements.addr.value.trim();
+  const note = $('#senderZipNote');
+  const zipNow = f.elements.zip.value.trim();
+  if (!addr || (zipNow && zipNow !== f.dataset.zipAuto)) return;
+  note.textContent = '〒を探しています…';
+  note.className = 'tiny muted';
+  let r;
+  try { r = await Addr.check('', addr); } catch (e) { note.textContent = '郵便番号データが読めませんでした。〒は手で入れてください'; return; }
+  if (r.byAddr && r.byAddr.length === 1) {
+    const z = Addr.fmtZip(r.byAddr[0].zip);
+    f.elements.zip.value = z;
+    f.dataset.zipAuto = z;
+    note.textContent = '住所から入れました（' + r.byAddr[0].label + '）';
+    note.className = 'tiny warn-ink';
+  } else if (r.byAddr && r.byAddr.length > 1) {
+    note.textContent = '候補が複数あります。手で入れてください：' + r.byAddr.map(c => Addr.fmtZip(c.zip) + ' ' + c.label).join('　');
+    note.className = 'tiny warn-ink';
+  } else {
+    note.textContent = '住所から〒が分かりませんでした。手で入れてください' + (r.msg ? '（' + r.msg + '）' : '');
+    note.className = 'tiny err-ink';
+  }
 }
 
 /* ---- 別紙 ---- */
@@ -1495,9 +1537,10 @@ function bindEvents() {
 
   /* 選択中の行への一括操作 */
   const bulk = (fn) => { if (!S.sel.size) { toast('先に行を選んでください'); return; } S.sel.forEach(fn); recompute(); };
-  $('#bDue').addEventListener('click', () => { const v = $('#vDue').value; bulk(src => setEdit(src, 'due', v ? v.replace(/-/g, '/') : '')); });
-  $('#bShip').addEventListener('click', () => { const v = $('#vShip').value; bulk(src => setEdit(src, 'ship', v ? v.replace(/-/g, '/') : '')); });
-  $('#bTime').addEventListener('click', () => { const v = $('#vTime').value; bulk(src => setEdit(src, 'time', v)); });
+  /* 日付や時間を選んだ時点で、選択中の行に入れます（入れるボタンは無し） */
+  $('#vDue').addEventListener('change', e => { const v = e.target.value; if (v) bulk(src => setEdit(src, 'due', v.replace(/-/g, '/'))); });
+  $('#vShip').addEventListener('change', e => { const v = e.target.value; if (v) bulk(src => setEdit(src, 'ship', v.replace(/-/g, '/'))); });
+  $('#vTime').addEventListener('change', e => { const v = e.target.value; bulk(src => setEdit(src, 'time', v)); });
   $('#bBoxAuto').addEventListener('click', () => bulk(src => { if (S.edits[src]) delete S.edits[src].boxes; }));
   $('#bExcl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (r.autoExclude) delete S.include[src]; else S.include[src] = false; }));
   $('#bIncl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (!r.autoExclude) delete S.include[src]; else S.include[src] = true; }));
@@ -1506,12 +1549,20 @@ function bindEvents() {
   $('#dlBtn').addEventListener('click', downloadCsv);
 
   /* 依頼主の入力 */
-  $('#senderForm').addEventListener('submit', e => {
+  $('#senderForm').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
+    /* 〒が空のまま保存を押したら、先に住所から引いてみます */
+    if (!normZip(f.elements.zip.value) && f.elements.addr.value.trim()) await senderZipFromAddr();
     const s = {};
     ['code', 'name', 'tel', 'zip', 'addr', 'bldg'].forEach(k => { s[k] = f.elements[k].value.trim(); });
-    if (!s.name || !s.addr) { toast('名前と住所は必ず入れてください'); return; }
+    const miss = [];
+    if (!s.name) miss.push('名称');
+    if (!normTel(s.tel)) miss.push('電話');
+    if (!s.addr) miss.push('住所');
+    if (!normZip(s.zip)) miss.push('〒（7桁）');
+    if (miss.length) { toast(miss.join('・') + ' を入れてください'); return; }
+    s.zip = normZip(s.zip);
     const id = f.dataset.id;
     if (id) Object.assign(S.senders.find(x => x.id === id), s);
     else { s.id = newId(); S.senders.push(s); S.senderId = s.id; }
@@ -1520,6 +1571,7 @@ function bindEvents() {
     renderSender(); renderRows();
   });
   $('#senderCancel').addEventListener('click', () => { $('#senderDlg').close(); renderSender(); });
+  $('#senderForm').elements.addr.addEventListener('change', senderZipFromAddr);
 }
 
 

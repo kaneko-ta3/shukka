@@ -168,7 +168,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v17</span>
+  <span class="ver">v18</span>
 </header>
 
 <main>
@@ -219,11 +219,11 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
     <div id="bulk">
       <span id="selInfo" class="selcount"></span>
       <span class="sep"></span>
-      指定日 <input type="date" id="vDue"> <button class="btn small" id="bDue">入れる</button>
+      指定日 <input type="date" id="vDue" title="選んだ時点で、選択中の行に入ります">
       <span class="sep"></span>
-      出荷日 <input type="date" id="vShip"> <button class="btn small" id="bShip">入れる</button>
+      出荷日 <input type="date" id="vShip" title="選んだ時点で、選択中の行に入ります">
       <span class="sep"></span>
-      時間 <select id="vTime"></select> <button class="btn small" id="bTime">入れる</button>
+      時間 <select id="vTime" title="選んだ時点で、選択中の行に入ります"></select>
       <span class="sep"></span>
       <button class="btn small" id="bBoxAuto">個口を自動に戻す</button>
       <button class="btn small" id="bExcl">除外</button>
@@ -257,12 +257,16 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 <dialog id="senderDlg">
   <form id="senderForm">
     <h2 id="senderDlgTitle">依頼主</h2>
-    <label><span>依頼主コード（B2に登録済みのもの。取引先が依頼主なら空でOK）</span><input name="code"></label>
-    <label><span>名前 ※必須</span><input name="name"></label>
-    <label><span>電話</span><input name="tel"></label>
-    <label><span>〒</span><input name="zip"></label>
-    <label><span>住所 ※必須</span><input name="addr"></label>
-    <label><span>建物・マンション名</span><input name="bldg"></label>
+    <p class="tiny muted" style="margin-top:0">「ここから発送」の指示があったときなど。入れた依頼主は一覧に足され、次からも選べます。</p>
+    <label><span>名称 ※必須</span><input name="name" placeholder="例：株式会社△△"></label>
+    <label><span>電話 ※必須</span><input name="tel" placeholder="例：03-xxxx-xxxx"></label>
+    <label><span>住所 ※必須（1行で。建物名も続けて）</span><input name="addr" placeholder="例：東京都中央区銀座2-16-10 ○○ビル3F"></label>
+    <label><span>〒（住所を入れると自動で入ります）</span><input name="zip" placeholder="例：123-4567"></label>
+    <div class="tiny" id="senderZipNote" style="margin:-6px 0 10px"></div>
+    <details class="more" id="senderMore"><summary>依頼主コード・建物名（B2に登録済みの依頼主の場合だけ）</summary>
+      <label style="margin-top:8px"><span>依頼主コード</span><input name="code"></label>
+      <label><span>建物・マンション名</span><input name="bldg"></label>
+    </details>
     <p class="tiny muted">このブラウザにだけ保存します。</p>
     <div class="btns"><button class="btn primary" type="submit">保存</button><button class="btn" type="button" id="senderCancel">やめる</button></div>
   </form>
@@ -272,8 +276,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=17"></script>
-<script src="app.js?v=17"></script>
-<script src="issued.js?v=17"></script>
+<script src="addr.js?v=18"></script>
+<script src="app.js?v=18"></script>
+<script src="issued.js?v=18"></script>
 </body>
 </html>
