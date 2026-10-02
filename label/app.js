@@ -604,9 +604,14 @@ function computeRow(row) {
 
   const nameSrc = edited(row, 'name') ? String(val(row, 'name')) : nameAuto;
   const memoSrc = edited(row, 'memo') ? String(val(row, 'memo')) : memoAuto;
-  const name = asc(nameSrc).trim();
+  /* 名前は半角にして数えます（カタカナは半角カナ＝1バイト）。それでも長いときだけ、ひらがなも半角カナにして数え直します */
+  let name = asc(nameSrc).trim();
+  if (bytes(name) > CFG.NAME_BYTES) {
+    const kana = asc(name.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60))).trim();
+    if (bytes(kana) <= CFG.NAME_BYTES) { name = kana; warn.push('名前が長いので、ひらがなも半角カナにしました（' + name + '）'); }
+  }
   if (!name) err.push('名前が空です');
-  else if (bytes(name) > CFG.NAME_BYTES) err.push('名前が長すぎます（全角16文字まで。今 ' + Math.ceil(bytes(name) / 2) + '文字）');
+  else if (bytes(name) > CFG.NAME_BYTES) err.push('名前が長すぎます（半角にしても ' + bytes(name) + 'バイト。上限 ' + CFG.NAME_BYTES + 'バイト＝全角16文字）');
 
   let tel = normTel(val(row, 'tel'));
   const telEmpty = !tel;
