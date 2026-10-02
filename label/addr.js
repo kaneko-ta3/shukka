@@ -148,7 +148,7 @@ const Addr = (() => {
     }
     if (zipHits.length) res.byZip = uniq(zipHits.map(h => label_(h.pc, h.city, h.town))).join(' ／ ');
     else if (bizHits.length) res.byZip = label_(bizHits[0].pc, bizHits[0].city, bizHits[0].town + bizHits[0].banchi) + '（' + bizHits[0].name + '）';
-    else if (zip) res.byZip = 'この〒は郵便番号データにありません';
+    else if (zip) { res.byZip = 'この〒は郵便番号データにありません'; res.zipUnknown = true; }
 
     /* 住所の側。都道府県 → 市区町村 → 町名 の順に当てます */
     const aN = a.normalize('NFKC');
@@ -195,6 +195,13 @@ const Addr = (() => {
       else if (k.length === bestLen) best.push(e);
     };
     entries.forEach(e => { const k = key(e.town); if (k && rest.startsWith(k)) take(e, k); });
+    /* 「阿佐ヶ谷北」と「阿佐谷北」、「市ヶ谷」と「市谷」のように、ケの有る無しだけが違う町名。
+       ケを抜いて見比べます（当たらなかったときだけ） */
+    if (!best.length) {
+      const loose = s => s.replace(/ケ/g, '');
+      const restL = loose(rest);
+      entries.forEach(e => { const k = loose(key(e.town)); if (k && restL.startsWith(k)) take(e, k); });
+    }
     /* 京都は「烏丸通三条上る〇〇町」のように通り名が先に来るので、途中に町名があれば当てます */
     if (!best.length && /^京都市/.test(hit.cities[0])) {
       entries.forEach(e => { const k = key(e.town); if (k && k.length >= 2 && rest.indexOf(k) >= 0) take(e, k); });

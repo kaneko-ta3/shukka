@@ -43,7 +43,8 @@ const CFG = {
     ship:  ['出荷日', '発送日'],
     time:  ['時間'],
     qty1:  ['数量', '個数', '発注数', '注文数', '納品数', 'トイレ'],
-    store: ['お届け先名', '届け先名', '納品先', '宛先', '施設名', '学校名', '店舗名', '店名', '事業所名', '名称', '拠点', '営業所'],
+    /* 「社名」と「拠点名」のように並んでいれば、左から1つ目→お届け先名、2つ目→住所4 になります */
+    store: ['お届け先名', '届け先名', '納品先', '宛先', '社名', '施設名', '学校名', '店舗名', '店名', '事業所名', '名称', '拠点', '営業所'],
     memo2: ['備考', '記事']
   },
 
@@ -599,8 +600,8 @@ function computeRow(row) {
   if (telEmpty) { tel = '0'; warn.push('電話が空なので「0」で出します'); }
 
   const zipRaw = String(val(row, 'zip') || '');
-  const zip = normZip(zipRaw);
-  if (!zip) err.push(zipRaw ? '〒が7桁になりません（' + zipRaw + '）' : '〒が空です');
+  const zip = normZip(zipRaw);                       // 別紙（または手直し）の〒。照合にはこちらを使います
+  let zipOut = zip, zipFilled = '';                  // CSVに出す〒。住所から補ったときは zipFilled に元の〒
 
   const addrIn = String(val(row, 'addr') || '').replace(/\s+/g, ' ').trim();
   if (!addrIn) err.push('住所が空です');
@@ -615,12 +616,21 @@ function computeRow(row) {
       check = ck;
       if (ck.added) { addr = ck.addr; warn.push('「' + ck.added + '」を補いました'); }
       const okSig = S.edits[row.src] && S.edits[row.src].addrOk;
+      /* 〒が空、または郵便番号データに無い〒で、住所から〒が1つに決まるときは自動で入れます */
+      const canFill = (ck.status === 'nozip' || (ck.status === 'mismatch' && ck.zipUnknown)) && ck.byAddr.length === 1;
       if (ck.status === 'ok') { if (ck.biz) warn.push('会社専用の〒です（' + ck.biz + '）'); }
       else if (ck.status === 'nodata') warn.push(ck.msg);
       else if (okSig === zip + '|' + addrIn) warn.push('〒と住所の照合：このまま出すことにしました');
-      else if (zip || ck.status !== 'nozip') err.push('check');
+      else if (canFill) {
+        zipOut = Addr.fmtZip(ck.byAddr[0].zip);
+        zipFilled = zip || '（空）';
+        warn.push(zip ? '〒 ' + zip + ' は郵便番号データに無いので、住所から ' + zipOut + ' に置き換えました'
+                      : '〒が空なので、住所から ' + zipOut + ' を入れました');
+      }
+      else err.push('check');
     }
   }
+  if (!zipOut && !(check && check.status === 'pending')) err.push(zipRaw ? '〒が7桁になりません（' + zipRaw + '）' : '〒が空です');
 
   /* 商品と数量 */
   const q1 = String(val(row, 'qty1') || '').trim();
@@ -683,7 +693,7 @@ function computeRow(row) {
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
-  row.out = {name, memo: memoSrc.trim(), tel, telEmpty, zip, addr, addr1, addr2, item1, item2,
+  row.out = {name, memo: memoSrc.trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
              boxes, boxesAuto, due: due || '', ship: ship || '', shipAuto, time: time || '', memo2, q1, q2};
   row.err = err; row.warn = warn; row.check = check;
 }
@@ -695,28 +705,33 @@ let checkRunning = false, checkAgain = false;
 async function runChecks() {
   if (checkRunning) { checkAgain = true; return; }
   checkRunning = true;
+  const fresh = new Set();          // 今回あらたに照合した 〒|住所
   try {
     await Addr.loadIndex();
     $('#dataVer').textContent = Addr.ver ? '郵便番号データ ' + Addr.ver + ' 版' : '';
     for (const row of S.rows) {
-      if (!included(row) || !row.out.addr && !row.out.zip) continue;
-      const zip = row.out.zip;
+      if (!included(row) || !row.out.addr && !row.out.zipIn) continue;
+      const zip = row.out.zipIn;
       const addrN = addrNorm(row);
       const k = zip + '|' + addrN;
       if (!addrN || S.checks[k]) continue;
+      fresh.add(k);
       try { S.checks[k] = await Addr.check(zip, addrN); }
       catch (e) { S.checks[k] = {status: 'nodata', msg: '郵便番号データが読めませんでした', addr: addrN, added: ''}; }
     }
   } catch (e) {
     S.rows.forEach(row => {
       const addrN = addrNorm(row);
-      const k = row.out.zip + '|' + addrN;
+      const k = row.out.zipIn + '|' + addrN;
       if (!S.checks[k]) S.checks[k] = {status: 'nodata', msg: e.message, addr: addrN, added: ''};
     });
   }
   checkRunning = false;
-  S.rows.forEach(computeRow);
-  renderRows();
+  /* 結果が変わった行だけ計算し直して描き直します。多ければ表ごと描き直します */
+  const changed = S.rows.filter(r => fresh.has(r.out.zipIn + '|' + addrNorm(r)) || (r.check && r.check.status === 'pending'));
+  changed.forEach(computeRow);
+  if (changed.length > 40 || !document.querySelector('#rowsTable tbody')) renderRows();
+  else if (changed.length) updateRows(changed.map(r => r.src));
   if (checkAgain) { checkAgain = false; runChecks(); }
 }
 
@@ -1016,8 +1031,8 @@ function renderMap() {
       r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
         '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !o.name.trim() ? ' class="req-empty"' : '') + '>' +
         '<span class="plus">÷</span><input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4" title="1箱に入る数。個口＝数量÷入数"><span class="plus">個/箱</span></div></div>';
-      /* 個口の計算のしかた。商品1の下に1回だけ出します */
-      if (it.key === 'qty1') {
+      /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
+      if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
         r += '<div class="mr sub"><div class="ml tiny muted">└ 個口の計算</div><div class="ms">' +
           opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します（別々の箱に詰める）。例：30÷48→1、30÷24→2、合計3口') +
@@ -1031,24 +1046,80 @@ function renderMap() {
     }
     return r;
   };
-  const MORE = ['qty2', 'boxes', 'ship', 'time', 'memo2'];
-  const main = CFG.ITEMS.filter(it => !MORE.includes(it.key));
-  const more = CFG.ITEMS.filter(it => MORE.includes(it.key));
-  const used = more.filter(it => (S.map[it.key] || []).length).map(it => it.label);
-  if (S.moreOpen == null) S.moreOpen = used.length > 0 || !!S.item2.name;
-  let h = main.map(row).join('');
-  h += '<details class="morecols" id="moreCols"' + (S.moreOpen ? ' open' : '') + '><summary>その他の列（' +
-    (used.length ? '使用中：' + esc(used.join('・')) : more.map(it => it.label).join('・')) + '）</summary>' + more.map(row).join('') + '</details>';
+  /* まとまりごとに少し間を空けます（宛先／商品と個口／日付と時間／記事） */
+  const GROUP_START = ['qty1', 'due', 'memo2'];
+  let h = CFG.ITEMS.map(it => (GROUP_START.includes(it.key) ? '<div class="moregap"></div>' : '') + row(it)).join('');
   $('#mapBox').innerHTML = h;
 }
 
 /* ---- 一覧 ---- */
+/* 表全体を描き直します（別紙を入れた・列を変えた・一括で入れた とき）。
+   1行だけ変わったときは updateRows で、その行だけ描き直します（172行で全体は0.2〜0.3秒かかるため） */
 function renderRows() {
   if (!S.grid.length) return;
   const focus = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.cell;
   const ae = document.activeElement;
   const focusSel = focus && ae.selectionStart != null ? [ae.selectionStart, ae.selectionEnd] : null;
 
+  renderSummary();
+  const showQ2 = (S.map.qty2 || []).length || S.item2.name;
+  let h = '<table class="rows"><thead><tr>' +
+    '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
+    '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
+    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>指定日</th><th>出荷日</th><th>時間</th><th>記事</th>' +
+    '</tr></thead>';
+  /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
+  S.rows.forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
+  h += '</table>';
+  $('#rowsTable').innerHTML = h;
+  const all = $('#selAll');
+  if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
+
+  if (S.pendingFocus) focusCell(S.pendingFocus);
+  else if (focus) {
+    /* 描き直しても、入っていたセルと選んでいた範囲はそのままにします */
+    const el = document.querySelector('[data-cell="' + focus + '"]');
+    if (el) {
+      el.focus();
+      if (focusSel && el.setSelectionRange) { try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch (e) { /* 選べない欄 */ } }
+    }
+  }
+  renderPreview();
+}
+
+/* 指定した行だけ描き直します */
+function updateRows(srcs) {
+  const focus = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.cell;
+  srcs.forEach(src => {
+    const row = S.rows.find(r => r.src === src);
+    const tb = document.querySelector('#rowsTable tbody[data-row="' + src + '"]');
+    if (row && tb) tb.innerHTML = rowHtml(row);
+  });
+  renderSummary();
+  if (S.pendingFocus) focusCell(S.pendingFocus);
+  else if (focus && !document.activeElement.dataset.cell) {
+    const el = document.querySelector('[data-cell="' + focus + '"]');
+    if (el) el.focus();
+  }
+  renderPreview();
+}
+
+/* 選択の印（行の色とチェック）だけを塗り直します。表は描き直しません */
+function paintSel(srcs) {
+  srcs.forEach(src => {
+    const tb = document.querySelector('#rowsTable tbody[data-row="' + src + '"]');
+    if (!tb) return;
+    const on = S.sel.has(src);
+    const tr = tb.querySelector('tr');
+    if (tr) tr.classList.toggle('selected', on);
+    const cb = tb.querySelector('[data-sel]');
+    if (cb) cb.checked = on;
+  });
+  renderSummary();
+}
+
+/* 件数・保存ボタン・選択中の表示 */
+function renderSummary() {
   const inc = S.rows.filter(included);
   const nErr = inc.filter(r => r.err.length).length;
   const nPending = inc.filter(r => r.check && r.check.status === 'pending').length;
@@ -1065,6 +1136,7 @@ function renderRows() {
     ((S.map.qty2 || []).length ? '<span class="stat">' + esc(S.item2.name || '商品2') + ' <b>' + sumQ('q2') + '</b></span>' : '') +
     (excl ? '<span class="stat muted">除外 ' + excl + '行</span>' : '') +
     (nChk ? '<span class="stat warn-ink">〒の確認 ' + nChk + '件</span>' : '') +
+    (inc.some(r => r.out.zipFilled) ? '<span class="stat warn-ink">〒を住所から入れた ' + inc.filter(r => r.out.zipFilled).length + '件</span>' : '') +
     (nErr - nChk > 0 || (nErr && !nChk) ? '<span class="stat err-ink">要修正 ' + (inc.filter(r => r.err.some(e => e !== 'check')).length) + '件</span>' : '') +
     (nPending ? '<span class="stat muted">照合中…</span>' : '');
 
@@ -1087,12 +1159,15 @@ function renderRows() {
   $('#selInfo').textContent = '選択 ' + S.sel.size + '行';
   $('#bulk').classList.toggle('dim', !S.sel.size);
 
-  const showQ2 = (S.map.qty2 || []).length || S.item2.name;
-  let h = '<table class="rows"><thead><tr>' +
-    '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
-    '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
-    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>指定日</th><th>出荷日</th><th>時間</th><th>記事</th>' +
-    '</tr></thead><tbody>';
+  const all = $('#selAll');
+  if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
+}
+
+function showQ2() { return (S.map.qty2 || []).length || S.item2.name; }
+
+/* 1行ぶんの HTML（本体の行と、問題・お知らせの行） */
+function rowHtml(row) {
+  const cols = 14 + (showQ2() ? 1 : 0);
   const cell = (row, key, shown, cls, extra) => {
     const ed = edited(row, key);
     const orig = row.auto[key];
@@ -1100,9 +1175,6 @@ function renderRows() {
     return '<td class="' + (cls || '') + (ed ? ' edited' : '') + (row.filledKeys.has(key) && !ed ? ' filled' : '') + '"' +
       (title ? ' title="' + esc(title) + '"' : '') + '><input data-cell="' + row.src + ':' + key + '" value="' + esc(shown) + '"' + (extra || '') + '></td>';
   };
-  const cols = 14 + (showQ2 ? 1 : 0);
-
-  S.rows.forEach(row => {
     const inn = included(row);
     const o = row.out;
     const bad = inn && row.err.some(e => e !== 'check');
@@ -1112,17 +1184,19 @@ function renderRows() {
     const nameShown = edited(row, 'name') ? val(row, 'name') : nameAuto;
     const memoShown = edited(row, 'memo') ? val(row, 'memo') : memoAuto;
     const hasEdits = S.edits[row.src] && Object.keys(S.edits[row.src]).length;
-    h += '<tr class="' + cls + (S.sel.has(row.src) ? ' selected' : '') + '">' +
+    let h = '<tr class="' + cls + (S.sel.has(row.src) ? ' selected' : '') + '">' +
       '<td class="c-sel"><input type="checkbox" data-sel="' + row.src + '"' + (S.sel.has(row.src) ? ' checked' : '') + '></td>' +
       '<td class="c-rn">' + (row.src + 1) + (hasEdits ? '<button class="undo" data-undo="' + row.src + '" title="この行の手直しを全部戻す">↺</button>' : '') + '</td>' +
       '<td class="c-inc"><input type="checkbox" data-inc="' + row.src + '"' + (inn ? ' checked' : '') + '></td>' +
       cell(row, 'name', nameShown, 'w-name') +
       cell(row, 'memo', memoShown, 'w-memo') +
       cell(row, 'tel', edited(row, 'tel') ? val(row, 'tel') : o.tel, 'w-tel') +
-      cell(row, 'zip', edited(row, 'zip') ? val(row, 'zip') : (o.zip || row.auto.zip), 'w-zip') +
+      (o.zipFilled && !edited(row, 'zip')
+        ? '<td class="w-zip filledzip" title="住所から入れました（元の〒：' + esc(o.zipFilled) + '）"><input data-cell="' + row.src + ':zip" value="' + esc(o.zip) + '"></td>'
+        : cell(row, 'zip', edited(row, 'zip') ? val(row, 'zip') : (o.zip || row.auto.zip), 'w-zip')) +
       cell(row, 'addr', edited(row, 'addr') ? val(row, 'addr') : row.auto.addr, 'c-addr') +
       cell(row, 'qty1', val(row, 'qty1'), 'w-num') +
-      (showQ2 ? cell(row, 'qty2', val(row, 'qty2'), 'w-num') : '') +
+      (showQ2() ? cell(row, 'qty2', val(row, 'qty2'), 'w-num') : '') +
       '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
@@ -1146,22 +1220,7 @@ function renderRows() {
       if (o.addr2 && bytes(o.addr2) > 32) msgs.push('<span class="warn-ink">△ 住所が長く、2行目が ' + bytes(o.addr2) + 'バイトあります</span>');
     }
     if (msgs.length) h += '<tr class="msg ' + cls + '"><td colspan="3"></td><td colspan="' + (cols - 3) + '">' + msgs.join('　') + '</td></tr>';
-  });
-  h += '</tbody></table>';
-  $('#rowsTable').innerHTML = h;
-  const all = $('#selAll');
-  if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
-
-  if (S.pendingFocus) focusCell(S.pendingFocus);
-  else if (focus) {
-    /* 描き直しても、入っていたセルと選んでいた範囲はそのままにします */
-    const el = document.querySelector('[data-cell="' + focus + '"]');
-    if (el) {
-      el.focus();
-      if (focusSel && el.setSelectionRange) { try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch (e) { /* 選べない欄 */ } }
-    }
-  }
-  renderPreview();
+    return h;
 }
 
 /* 表のセルに入ります。中身を選んだ状態にするので、そのまま打てば上書きできます */
@@ -1176,7 +1235,7 @@ function focusCell(id) {
 /* 〒と住所がずれている行の、選ぶところ */
 function checkUi(row) {
   const ck = row.check;
-  const zip = row.out.zip;
+  const zip = row.out.zipIn;
   let h = '<div class="ck"><div class="ck-title">〒と住所が合いません。どちらが正しいか選んでください' + (ck.msg ? '（' + esc(ck.msg) + '）' : '') + '</div>';
   h += '<div class="ck-opts">';
   ck.byAddr.forEach(c => {
@@ -1222,7 +1281,7 @@ function commitCell(el) {
   }
   if (key === 'boxes') {
     if (trimmed === String(row.out.boxesAuto) && !edited(row, 'boxes')) return;
-    if (trimmed === String(row.out.boxesAuto)) { delete S.edits[row.src].boxes; recompute(); return; }
+    if (trimmed === String(row.out.boxesAuto)) { delete S.edits[row.src].boxes; recomputeRow(row); return; }
   }
   const autoV = key === 'name' ? autoNameMemo(row)[0]
               : key === 'memo' ? autoNameMemo(row)[1]
@@ -1231,7 +1290,14 @@ function commitCell(el) {
   if (!edited(row, key) && trimmed === String(autoV)) return;
   if (trimmed === String(autoV)) delete S.edits[row.src][key];
   else setEdit(row.src, key, key === 'time' ? v : trimmed);
-  recompute();
+  recomputeRow(row);
+}
+
+/* 1行だけ計算し直して、その行だけ描き直します */
+function recomputeRow(row) {
+  computeRow(row);
+  updateRows([row.src]);
+  runChecks();
 }
 
 function recompute() {
@@ -1310,7 +1376,7 @@ function bindEvents() {
       const src = Number(t.dataset.inc);
       const row = S.rows.find(r => r.src === src);
       if (t.checked === !row.autoExclude) delete S.include[src]; else S.include[src] = t.checked;
-      recompute(); return;
+      recomputeRow(row); return;
     }
     if (t.id === 'senderSel') {
       if (t.value === '__new') { renderSender(); openSenderDialog(null); return; }
@@ -1366,10 +1432,17 @@ function bindEvents() {
 
   /* 行の選択（Shiftで範囲） */
   document.addEventListener('click', e => {
+    /* チェックの周り（マス全体）を押しても、チェックを押したことにします */
+    const td = e.target.closest && e.target.closest('td.c-sel, td.c-inc');
+    if (td && e.target === td) {
+      const cb = td.querySelector('input[type=checkbox]');
+      if (cb) cb.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, shiftKey: e.shiftKey}));
+      return;
+    }
     const t = e.target;
     if (t.id === 'selAll') {
       if (t.checked) S.rows.forEach(r => S.sel.add(r.src)); else S.sel.clear();
-      renderRows(); return;
+      paintSel(S.rows.map(r => r.src)); return;
     }
     if (t.dataset && t.dataset.sel != null) {
       const src = Number(t.dataset.sel);
@@ -1380,16 +1453,20 @@ function bindEvents() {
         for (let i = lo; i <= hi; i++) { if (t.checked) S.sel.add(ids[i]); else S.sel.delete(ids[i]); }
       } else if (t.checked) S.sel.add(src); else S.sel.delete(src);
       S.lastClick = src;
-      renderRows(); return;
+      paintSel(S.rows.map(r => r.src)); return;
     }
-    if (t.dataset && t.dataset.undo != null) { delete S.edits[Number(t.dataset.undo)]; recompute(); return; }
+    if (t.dataset && t.dataset.undo != null) {
+      const row = S.rows.find(r => r.src === Number(t.dataset.undo));
+      delete S.edits[row.src]; recomputeRow(row); return;
+    }
     if (t.dataset && t.dataset.fixzip != null) {
-      setEdit(Number(t.dataset.fixzip), 'zip', Addr.fmtZip(t.dataset.zip)); recompute(); return;
+      const row = S.rows.find(r => r.src === Number(t.dataset.fixzip));
+      setEdit(row.src, 'zip', Addr.fmtZip(t.dataset.zip)); recomputeRow(row); return;
     }
     if (t.dataset && t.dataset.keep != null) {
       const row = S.rows.find(r => r.src === Number(t.dataset.keep));
       const addrIn = String(val(row, 'addr') || '').replace(/\s+/g, ' ').trim();
-      setEdit(row.src, 'addrOk', row.out.zip + '|' + addrIn); recompute(); return;
+      setEdit(row.src, 'addrOk', row.out.zipIn + '|' + addrIn); recomputeRow(row); return;
     }
     if (t.id === 'senderNew') { openSenderDialog(null); return; }
     if (t.id === 'senderEdit') { openSenderDialog(currentSender()); return; }

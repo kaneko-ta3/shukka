@@ -116,6 +116,7 @@ label.pick{display:inline-flex; gap:4px; align-items:center; background:var(--su
 .acct.ng{background:var(--danger-soft); color:var(--danger);}
 table.ours-t td{max-width:360px;}
 label.boxmode{display:flex; gap:4px; align-items:center; font-size:12px; cursor:pointer; white-space:nowrap;}
+.moregap{height:14px;}
 details.morecols{border-top:1px solid var(--line); padding-top:4px;}
 details.morecols > summary{cursor:pointer; color:var(--muted); font-size:12px; padding:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 details.morecols[open] > summary{color:var(--ink);}
@@ -133,6 +134,7 @@ table.rows td{border-bottom:1px solid var(--line); padding:2px 3px; vertical-ali
 table.rows td input:not([type=checkbox]), table.rows td select{width:100%; background:transparent; border:1px solid transparent; padding:3px 4px; border-radius:4px;}
 table.rows td input:not([type=checkbox]):hover, table.rows td select:hover{border-color:var(--line);}
 table.rows td.edited input, table.rows td.edited select{background:var(--edit-soft); border-color:var(--edit);}
+table.rows td.filledzip input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
 table.rows td.filled input{font-style:italic; color:var(--muted);}
 table.rows td.auto input{color:var(--muted);}
 table.rows tr.excl td{opacity:.45;}
@@ -166,7 +168,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v15</span>
+  <span class="ver">v16</span>
 </header>
 
 <main>
@@ -270,8 +272,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=15"></script>
-<script src="app.js?v=15"></script>
-<script src="issued.js?v=15"></script>
+<script src="addr.js?v=16"></script>
+<script src="app.js?v=16"></script>
+<script src="issued.js?v=16"></script>
 </body>
 </html>
