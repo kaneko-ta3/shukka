@@ -631,17 +631,19 @@ function computeRow(row) {
       check = ck;
       if (ck.added) { addr = ck.addr; warn.push('「' + ck.added + '」を補いました'); }
       const okSig = S.edits[row.src] && S.edits[row.src].addrOk;
-      /* 〒が空、または郵便番号データに無い〒で、住所から〒が1つに決まるときは自動で入れます */
-      const canFill = (ck.status === 'nozip' || (ck.status === 'mismatch' && ck.zipUnknown)) && ck.byAddr.length === 1;
+      /* 相手が入れた〒は書き換えません（相手の〒で出して違っていたら相手のデータの問題だが、
+         こちらで変えて元が合っていたらこちらのミスになるため）。
+         住所から〒を入れるのは、〒が空で、住所から1つに決まるときだけです */
+      const canFill = ck.status === 'nozip' && ck.byAddr.length === 1;
       if (ck.status === 'ok') { if (ck.biz) warn.push('会社専用の〒です（' + ck.biz + '）'); }
       else if (ck.status === 'nodata') warn.push(ck.msg);
       else if (okSig === zip + '|' + addrIn) warn.push('〒と住所の照合：このまま出すことにしました');
       else if (canFill) {
         zipOut = Addr.fmtZip(ck.byAddr[0].zip);
-        zipFilled = zip || '（空）';
-        warn.push(zip ? '〒 ' + zip + ' は郵便番号データに無いので、住所から ' + zipOut + ' に置き換えました'
-                      : '〒が空なので、住所から ' + zipOut + ' を入れました');
+        zipFilled = '（空）';
+        warn.push('〒が空なので、住所から ' + zipOut + ' を入れました');
       }
+      else if (ck.zipUnknown && zip) warn.push('〒 ' + zip + ' は郵便番号データにありません（会社やビル専用の〒かもしれません）。書き換えずにそのまま出します');
       else err.push('check');
     }
   }
