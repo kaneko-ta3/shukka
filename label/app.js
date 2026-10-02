@@ -72,6 +72,7 @@ const CFG = {
 
   /* B2の文字数。バイトで数えます（全角2・半角1） */
   NAME_BYTES: 32,
+  CSV_MAX_ROWS: 1000,        // これを超えたらCSVを分けます（B2に1度に上げる件数）
   ADDR1_BYTES: 38,
 
   CSV_HEAD: ['備考(住所4)', 'お届け先電話', '備考2(記事欄)', '商品名1', '商品名2',
@@ -895,14 +896,38 @@ function downloadCsv() {
     if (!ok) return;
   }
   const rows = outRows();
-  /* 今スプシから落としているCSVと同じ形（UTF-8、BOMなし、改行CRLF） */
-  const text = [CFG.CSV_HEAD].concat(rows).map(csvLine).join('\r\n') + '\r\n';
   const d = new Date();
   const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
-  download('ラベル_' + stamp + '.csv', text);
+
+  /* 1000件を超えたら1000件ずつのファイルに分けます（商品名順に並べ替えたあとで分ける）。
+     くくりキー（複数口の印＝ファイルの中の行番号）は、ファイルごとに振り直します */
+  const parts = [];
+  for (let i = 0; i < rows.length; i += CFG.CSV_MAX_ROWS) {
+    const chunk = rows.slice(i, i + CFG.CSV_MAX_ROWS).map((r, j) => {
+      const a = r.slice();
+      if (a[16] === 6) a[22] = j + 2;
+      return a;
+    });
+    const total = Math.ceil(rows.length / CFG.CSV_MAX_ROWS);
+    parts.push({
+      name: 'ラベル_' + stamp + (total > 1 ? '_' + (parts.length + 1) + 'of' + total : '') + '.csv',
+      from: i + 1, to: i + chunk.length,
+      /* 今スプシから落としているCSVと同じ形（UTF-8、BOMなし、改行CRLF） */
+      text: [CFG.CSV_HEAD].concat(chunk).map(csvLine).join('\r\n') + '\r\n'
+    });
+  }
+  /* 続けて保存します。ブラウザに止められたときのために、ファイルごとのボタンも出します */
+  parts.forEach((p, i) => setTimeout(() => download(p.name, p.text), i * 700));
+  const box = $('#dlParts');
+  if (parts.length > 1) {
+    box.innerHTML = '<div class="tiny">' + rows.length + '件を ' + parts.length + 'つのファイルに分けました（1ファイル最大' + CFG.CSV_MAX_ROWS + '件）。保存されていないファイルがあれば、ここから保存してください：</div>' +
+      '<div class="btns" style="margin-top:4px">' + parts.map((p, i) => '<button class="btn small" data-part="' + i + '">' + esc(p.name) + '（' + p.from + '〜' + p.to + '件目）</button>').join('') + '</div>';
+    box.onclick = e => { const b = e.target.closest('[data-part]'); if (b) { const p = parts[Number(b.dataset.part)]; download(p.name, p.text); } };
+  } else box.innerHTML = '';
+
   /* 発行済データと照合するための控え（〒・名前・店名・出荷日だけ）。このブラウザに保存します */
   Issued.saveBatch('ラベル_' + stamp + '.csv', S.rows.filter(included).map(r => r.out));
-  toast('CSVを保存しました（' + rows.length + '件）');
+  toast('CSVを保存しました（' + rows.length + '件' + (parts.length > 1 ? '・' + parts.length + 'ファイル' : '') + '）');
 }
 
 
@@ -1577,9 +1602,21 @@ function bindEvents() {
   /* 選択中の行への一括操作 */
   const bulk = (fn) => { if (!S.sel.size) { toast('先に行を選んでください'); return; } S.sel.forEach(fn); recompute(); };
   /* 日付や時間を選んだ時点で、選択中の行に入れます（入れるボタンは無し） */
-  $('#vDue').addEventListener('change', e => { const v = e.target.value; if (v) bulk(src => setEdit(src, 'due', v.replace(/-/g, '/'))); });
-  $('#vShip').addEventListener('change', e => { const v = e.target.value; if (v) bulk(src => setEdit(src, 'ship', v.replace(/-/g, '/'))); });
-  $('#vTime').addEventListener('change', e => { const v = e.target.value; bulk(src => setEdit(src, 'time', v)); });
+  /* 入れたら欄を空に戻します。同じ日付を別の行にもう一度入れられるように */
+  const bulkSet = (el, key, label, conv) => el.addEventListener('change', e => {
+    const raw = e.target.value;
+    if (raw === '' || raw === '__') return;
+    const v = conv(raw);
+    const n = S.sel.size;
+    if (n) {
+      bulk(src => setEdit(src, key, v));
+      toast(label + '「' + (key === 'time' ? (CFG.TIMES.find(t => t[0] === v) || ['', v])[1] : v.slice(5)) + '」を ' + n + '行に入れました');
+    } else toast('先に行を選んでください');
+    e.target.value = key === 'time' ? '__' : '';
+  });
+  bulkSet($('#vDue'), 'due', '指定日', v => v.replace(/-/g, '/'));
+  bulkSet($('#vShip'), 'ship', '出荷日', v => v.replace(/-/g, '/'));
+  bulkSet($('#vTime'), 'time', '時間', v => v);
   $('#bBoxAuto').addEventListener('click', () => bulk(src => { if (S.edits[src]) delete S.edits[src].boxes; }));
   $('#bExcl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (r.autoExclude) delete S.include[src]; else S.include[src] = false; }));
   $('#bIncl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (!r.autoExclude) delete S.include[src]; else S.include[src] = true; }));
@@ -1623,7 +1660,8 @@ function init() {
     S.item1 = Object.assign(S.item1, it.item1 || {}); S.item2 = Object.assign(S.item2, it.item2 || {});
     if (it.boxMode === 'mix') S.boxMode = 'mix';
   }
-  $('#vTime').innerHTML = CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
+  /* 先頭の「選ぶ」は何も入れない印。時間を入れたらここに戻します */
+  $('#vTime').innerHTML = '<option value="__">（選ぶ）</option>' + CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();
   Issued.bind();
   renderAll();
