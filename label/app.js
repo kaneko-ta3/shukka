@@ -649,7 +649,7 @@ function computeRow(row) {
   const q1 = String(val(row, 'qty1') || '').trim();
   const q2 = String(val(row, 'qty2') || '').trim();
   const item = (it, q, label) => {
-    const nm = it.name.trim();
+    const nm = itemName(it === S.item1 ? 'item1' : 'item2');
     /* 数量の列を選んでいないとき、商品1は名前だけを出します。商品2は出しません（名前が残っていても） */
     if (!q) return label === '商品1' && nm && !(S.map.qty1 || []).length ? nm : '';
     const n = num(q);
@@ -1081,8 +1081,15 @@ function renderMap() {
       const p = it.key === 'qty1' ? 'item1' : 'item2';
       /* 商品1の名前はいつも必須。商品2は数量の列を選んだときだけ必須 */
       const nameNeed = p === 'item1' || cols.length > 0;
-      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(o.name || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
-        '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !o.name.trim() ? ' class="req-empty"' : '') + '>' +
+      /* 商品名は「入力」か「数量の列の見出し」を選べます */
+      const fromHead = o.src === 'head';
+      const nm = itemName(p);
+      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(nm || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
+        '<select data-item="' + p + '" data-f="src" class="srcsel" title="商品名を入力するか、数量の列の見出しをそのまま使うか">' +
+          '<option value="input"' + (fromHead ? '' : ' selected') + '>入力</option><option value="head"' + (fromHead ? ' selected' : '') + '>見出し</option></select>' +
+        (fromHead
+          ? '<input type="text" readonly value="' + esc(nm) + '" placeholder="数量の列を選ぶと見出しが入ります" title="数量の列の見出しを使います"' + (nameNeed && !nm ? ' class="req-empty"' : ' class="fromhead"') + '>'
+          : '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !nm ? ' class="req-empty"' : '') + '>') +
         '<span class="plus">÷</span><input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4" title="1箱に入る数。個口＝数量÷入数"><span class="plus">個/箱</span></div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
@@ -1115,7 +1122,7 @@ function renderRows() {
   const focusSel = focus && ae.selectionStart != null ? [ae.selectionStart, ae.selectionEnd] : null;
 
   renderSummary();
-  const showQ2 = (S.map.qty2 || []).length || S.item2.name;
+  const showQ2 = (S.map.qty2 || []).length || itemName('item2');
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
@@ -1188,8 +1195,8 @@ function renderSummary() {
   $('#summary').innerHTML =
     '<span class="stat"><b>' + inc.length + '</b>件</span>' +
     '<span class="stat">個口合計 <b>' + boxes + '</b></span>' +
-    ((S.map.qty1 || []).length ? '<span class="stat">' + esc(S.item1.name || '商品1') + ' <b>' + sumQ('q1') + '</b></span>' : '') +
-    ((S.map.qty2 || []).length ? '<span class="stat">' + esc(S.item2.name || '商品2') + ' <b>' + sumQ('q2') + '</b></span>' : '') +
+    ((S.map.qty1 || []).length ? '<span class="stat">' + esc(itemName('item1') || '商品1') + ' <b>' + sumQ('q1') + '</b></span>' : '') +
+    ((S.map.qty2 || []).length ? '<span class="stat">' + esc(itemName('item2') || '商品2') + ' <b>' + sumQ('q2') + '</b></span>' : '') +
     chip('excl', 'muted', '除外', excl) +
     chip('chk', 'warn-ink', '〒の確認', nChk) +
     chip('filled', 'warn-ink', '〒を住所から入れた', inc.filter(r => r.out.zipFilled).length) +
@@ -1202,8 +1209,8 @@ function renderSummary() {
   CFG.ITEMS.forEach(it => {
     if (it.need && !(S.map[it.key] || []).length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip))) block.push('「' + it.label + '」の列を選んでください');
   });
-  if (!S.item1.name.trim()) block.push('商品1の商品名を入れてください');
-  if ((S.map.qty2 || []).length && !S.item2.name.trim()) block.push('商品2の商品名を入れてください');
+  if (!itemName('item1')) block.push('商品1の商品名を入れてください');
+  if ((S.map.qty2 || []).length && !itemName('item2')) block.push('商品2の商品名を入れてください');
   sp.forEach(p => block.push(p));
   if (nErr) block.push('直すところが残っています（赤い行）');
   if (nPending) block.push('住所の照合が終わっていません');
@@ -1233,7 +1240,17 @@ function inView(row) {
 }
 function visibleRows() { return S.rows.filter(inView); }
 
-function showQ2() { return (S.map.qty2 || []).length || S.item2.name; }
+/* 商品名。src が 'head' なら数量の列の見出しを、そうでなければ入力した名前を使います */
+function itemName(p) {
+  const it = S[p];
+  if (it.src === 'head') {
+    const c = (S.map[p === 'item1' ? 'qty1' : 'qty2'] || [])[0];
+    return c == null ? '' : headText(c).trim();
+  }
+  return String(it.name || '').trim();
+}
+
+function showQ2() { return (S.map.qty2 || []).length || itemName('item2'); }
 
 /* 1行ぶんの HTML（本体の行と、問題・お知らせの行） */
 function rowHtml(row) {
