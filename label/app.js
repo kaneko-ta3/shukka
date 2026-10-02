@@ -19,7 +19,7 @@ const CFG = {
   /* 対応表の項目。multi は複数の列をつなげられる項目 */
   ITEMS: [
     {key: 'store', label: '店名・宛先名', need: true, multi: true,
-     hint: '会社名を入れたときは「備考(住所4)」へ、空のときは「名前」へ入ります'},
+     hint: '列を2つ選ぶと、1つ目が「お届け先名」、2つ目が「備考(住所4)」に入ります。会社名を入れたときは、選んだ列はすべて「備考(住所4)」へ'},
     {key: 'tel',   label: '電話', need: true, hint: '行ごとに電話が空のときは「0」で出し、保存のときに知らせます'},
     {key: 'zip',   label: '〒', need: true, hint: '住所の列に〒が入っているなら空でOK'},
     {key: 'addr',  label: '住所', need: true, multi: true, hint: '2〜3列に分かれていれば全部選ぶとつなげます'},
@@ -570,14 +570,25 @@ function included(row) {
   return (row.src in S.include) ? S.include[row.src] : !row.autoExclude;
 }
 
+/* 名前（お届け先名）と備考(住所4)の自動の値
+     会社名あり                → 名前＝会社名、備考＝選んだ列を全部つなげたもの
+     会社名なし・列を2つ以上   → 名前＝1つ目の列、備考＝2つ目以降の列
+     会社名なし・列が1つ       → 名前＝その列、備考＝空 */
+function autoNameMemo(row) {
+  const company = S.company.trim();
+  const parts = (S.map.store || []).map(c => cellText(row.raw[c]));
+  if (company) return [company, parts.filter(Boolean).join(' ')];
+  if (parts.length >= 2) return [parts[0], parts.slice(1).filter(Boolean).join(' ')];
+  return [parts.filter(Boolean).join(' '), ''];
+}
+
 /* 1行ぶんの出力値と、問題の一覧を作ります */
 function computeRow(row) {
   const err = [], warn = [];
-  const company = S.company.trim();
-  const store = String(val(row, 'store') || '').trim();
+  const [nameAuto, memoAuto] = autoNameMemo(row);
 
-  const nameSrc = edited(row, 'name') ? String(val(row, 'name')) : (company || store);
-  const memoSrc = edited(row, 'memo') ? String(val(row, 'memo')) : (company ? store : '');
+  const nameSrc = edited(row, 'name') ? String(val(row, 'name')) : nameAuto;
+  const memoSrc = edited(row, 'memo') ? String(val(row, 'memo')) : memoAuto;
   const name = asc(nameSrc).trim();
   if (!name) err.push('名前が空です');
   else if (bytes(name) > CFG.NAME_BYTES) err.push('名前が長すぎます（全角16文字まで。今 ' + Math.ceil(bytes(name) / 2) + '文字）');
@@ -1081,8 +1092,9 @@ function renderRows() {
     const bad = inn && row.err.some(e => e !== 'check');
     const chk = inn && row.err.includes('check');
     const cls = !inn ? 'excl' : (bad ? 'bad' : (chk ? 'chk' : ''));
-    const nameShown = edited(row, 'name') ? val(row, 'name') : (S.company.trim() || String(val(row, 'store') || ''));
-    const memoShown = edited(row, 'memo') ? val(row, 'memo') : (S.company.trim() ? String(val(row, 'store') || '') : '');
+    const [nameAuto, memoAuto] = autoNameMemo(row);
+    const nameShown = edited(row, 'name') ? val(row, 'name') : nameAuto;
+    const memoShown = edited(row, 'memo') ? val(row, 'memo') : memoAuto;
     const hasEdits = S.edits[row.src] && Object.keys(S.edits[row.src]).length;
     h += '<tr class="' + cls + (S.sel.has(row.src) ? ' selected' : '') + '">' +
       '<td class="c-sel"><input type="checkbox" data-sel="' + row.src + '"' + (S.sel.has(row.src) ? ' checked' : '') + '></td>' +
@@ -1196,8 +1208,8 @@ function commitCell(el) {
     if (trimmed === String(row.out.boxesAuto) && !edited(row, 'boxes')) return;
     if (trimmed === String(row.out.boxesAuto)) { delete S.edits[row.src].boxes; recompute(); return; }
   }
-  const autoV = key === 'name' ? (S.company.trim() || String(row.auto.store || ''))
-              : key === 'memo' ? (S.company.trim() ? String(row.auto.store || '') : '')
+  const autoV = key === 'name' ? autoNameMemo(row)[0]
+              : key === 'memo' ? autoNameMemo(row)[1]
               : key === 'tel' ? normTel(row.auto.tel)
               : cellText(row.auto[key]);
   if (!edited(row, key) && trimmed === String(autoV)) return;
