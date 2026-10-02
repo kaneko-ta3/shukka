@@ -159,6 +159,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 .w-num{width:62px;} .w-date{width:96px;} .w-time{width:100px;}
 .undo{background:none; border:none; color:var(--edit); cursor:pointer; padding:0 2px; font-size:13px;}
 .ck{margin-top:2px; padding:6px 8px; border:1px solid var(--warn); border-radius:6px; background:var(--warn-soft);}
+/* 〒と住所の食い違っているところ */
+.ck .diff{color:#FF6B6B; font-weight:700;}
 .ck-title{color:var(--warn); font-weight:700; margin-bottom:4px;}
 .ck-opts{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;}
 .dl{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
@@ -177,7 +179,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v28</span>
+  <span class="ver">v29</span>
 </header>
 
 <main>
@@ -286,8 +288,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=28"></script>
-<script src="app.js?v=28"></script>
-<script src="issued.js?v=28"></script>
+<script src="addr.js?v=29"></script>
+<script src="app.js?v=29"></script>
+<script src="issued.js?v=29"></script>
 </body>
 </html>

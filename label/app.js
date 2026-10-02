@@ -1351,15 +1351,23 @@ function focusCell(id) {
 function checkUi(row) {
   const ck = row.check;
   const zip = row.out.zipIn;
+  /* 2つの場所を見比べて、頭から同じ部分の後ろ（食い違っているところ）を赤くします */
+  const zipLabel = ck.byZip || '';
+  const diffMark = (text, other) => {
+    let i = 0;
+    while (i < text.length && i < other.length && text[i] === other[i]) i++;
+    return esc(text.slice(0, i)) + (i < text.length ? '<span class="diff">' + esc(text.slice(i)) + '</span>' : '');
+  };
+  const firstAddr = ck.byAddr.length ? ck.byAddr[0].label : '';
   let h = '<div class="ck"><div class="ck-title">〒と住所が合いません。どちらが正しいか選んでください' + (ck.msg ? '（' + esc(ck.msg) + '）' : '') + '</div>';
   h += '<div class="ck-opts">';
   ck.byAddr.forEach(c => {
     h += '<button class="btn small primary" data-fixzip="' + row.src + '" data-zip="' + c.zip + '">住所どおり：〒を ' + Addr.fmtZip(c.zip) + ' にする</button>' +
-      '<span class="tiny">' + esc(c.label) + '</span>';
+      '<span class="tiny">' + (zipLabel ? diffMark(c.label, zipLabel) : esc(c.label)) + '</span>';
   });
   if (!ck.byAddr.length) h += '<span class="tiny muted">住所からは〒を引けませんでした。住所か〒を手で直してください</span>';
   h += '</div><div class="ck-opts">';
-  h += '<span class="tiny">今の〒 ' + esc(zip || '（なし）') + ' は：' + esc(ck.byZip || '―') + '</span>';
+  h += '<span class="tiny">今の〒 ' + esc(zip || '（なし）') + ' は：' + (zipLabel && firstAddr ? diffMark(zipLabel, firstAddr) : esc(zipLabel || '―')) + '</span>';
   if (zip) h += '<button class="btn small" data-keep="' + row.src + '">このまま出す</button>';
   h += '</div></div>';
   return h;
