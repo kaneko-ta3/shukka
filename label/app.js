@@ -1614,6 +1614,10 @@ function bindEvents() {
     } else toast('先に行を選んでください');
     e.target.value = key === 'time' ? '__' : '';
   });
+  /* 日付の欄は、どこを押してもカレンダーを出します（右端のアイコンだけでなく） */
+  ['#vDue', '#vShip'].forEach(id => $(id).addEventListener('click', e => {
+    try { if (e.target.showPicker) e.target.showPicker(); } catch (err) { /* 出せないブラウザでは通常どおり */ }
+  }));
   bulkSet($('#vDue'), 'due', '指定日', v => v.replace(/-/g, '/'));
   bulkSet($('#vShip'), 'ship', '出荷日', v => v.replace(/-/g, '/'));
   bulkSet($('#vTime'), 'time', '時間', v => v);

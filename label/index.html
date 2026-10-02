@@ -135,6 +135,7 @@ label.boxmode{justify-content:flex-start;}
 #bulk{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:var(--surface-2); border-radius:6px; margin:6px 0 10px;}
 #bulk.dim .btn, #bulk.dim input, #bulk.dim select{opacity:.55;}
 #bulk .selcount{display:inline-block; width:6.5em; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap;}
+#bulk input[type=date]{cursor:pointer;}
 #bulk .sep{width:1px; height:22px; background:var(--line); margin:0 4px;}
 table.rows{font-size:13px; width:100%;}
 table.rows th{background:var(--surface-2); position:sticky; top:0; z-index:2; font-weight:700; text-align:left; padding:5px 4px; border-bottom:1px solid var(--line-strong); white-space:nowrap;}
@@ -176,7 +177,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v26</span>
+  <span class="ver">v27</span>
 </header>
 
 <main>
@@ -285,8 +286,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=26"></script>
-<script src="app.js?v=26"></script>
-<script src="issued.js?v=26"></script>
+<script src="addr.js?v=27"></script>
+<script src="app.js?v=27"></script>
+<script src="issued.js?v=27"></script>
 </body>
 </html>
