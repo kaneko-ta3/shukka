@@ -398,7 +398,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null;
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = '';
   detectHeader();
   guessMap();
   rebuild();
@@ -1122,11 +1122,11 @@ function renderRows() {
     '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>指定日</th><th>出荷日</th><th>時間</th><th>記事</th>' +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
-  S.rows.forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
+  visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
   h += '</table>';
   $('#rowsTable').innerHTML = h;
   const all = $('#selAll');
-  if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
+  if (all) all.checked = visibleRows().length > 0 && visibleRows().every(r => S.sel.has(r.src));
 
   if (S.pendingFocus) focusCell(S.pendingFocus);
   else if (focus) {
@@ -1182,15 +1182,19 @@ function renderSummary() {
   const excl = S.rows.length - inc.length;
   const sp = senderProblems(currentSender());
 
+  /* 件数のうち、問題の件数は押すとその行だけに絞り込めます（もう一度押すと全部に戻る） */
+  const chip = (view, cls, label, n) => n ? '<button type="button" class="stat stat-btn ' + cls + (S.view === view ? ' on' : '') + '" data-view="' + view + '" title="押すとこの行だけを表に出します">' +
+    label + ' ' + n + (view === 'excl' ? '行' : '件') + (S.view === view ? ' ✕' : '') + '</button>' : '';
   $('#summary').innerHTML =
     '<span class="stat"><b>' + inc.length + '</b>件</span>' +
     '<span class="stat">個口合計 <b>' + boxes + '</b></span>' +
     ((S.map.qty1 || []).length ? '<span class="stat">' + esc(S.item1.name || '商品1') + ' <b>' + sumQ('q1') + '</b></span>' : '') +
     ((S.map.qty2 || []).length ? '<span class="stat">' + esc(S.item2.name || '商品2') + ' <b>' + sumQ('q2') + '</b></span>' : '') +
-    (excl ? '<span class="stat muted">除外 ' + excl + '行</span>' : '') +
-    (nChk ? '<span class="stat warn-ink">〒の確認 ' + nChk + '件</span>' : '') +
-    (inc.some(r => r.out.zipFilled) ? '<span class="stat warn-ink">〒を住所から入れた ' + inc.filter(r => r.out.zipFilled).length + '件</span>' : '') +
-    (nErr - nChk > 0 || (nErr && !nChk) ? '<span class="stat err-ink">要修正 ' + (inc.filter(r => r.err.some(e => e !== 'check')).length) + '件</span>' : '') +
+    chip('excl', 'muted', '除外', excl) +
+    chip('chk', 'warn-ink', '〒の確認', nChk) +
+    chip('filled', 'warn-ink', '〒を住所から入れた', inc.filter(r => r.out.zipFilled).length) +
+    chip('bad', 'err-ink', '要修正', inc.filter(r => r.err.some(e => e !== 'check')).length) +
+    (S.view ? '<button type="button" class="stat stat-btn" data-view="">全部表示に戻す（' + visibleRows().length + '/' + S.rows.length + '行を表示中）</button>' : '') +
     (nPending ? '<span class="stat muted">照合中…</span>' : '');
 
   const block = [];
@@ -1213,8 +1217,21 @@ function renderSummary() {
   $('#bulk').classList.toggle('dim', !S.sel.size);
 
   const all = $('#selAll');
-  if (all) all.checked = S.rows.length > 0 && S.rows.every(r => S.sel.has(r.src));
+  if (all) all.checked = visibleRows().length > 0 && visibleRows().every(r => S.sel.has(r.src));
 }
+
+/* 絞り込み。'' は全部、chk＝〒の確認、filled＝〒を住所から入れた、bad＝要修正、excl＝除外 */
+function inView(row) {
+  const inn = included(row);
+  switch (S.view) {
+    case 'chk':    return inn && row.err.includes('check');
+    case 'filled': return inn && !!row.out.zipFilled;
+    case 'bad':    return inn && row.err.some(e => e !== 'check');
+    case 'excl':   return !inn;
+    default:       return true;
+  }
+}
+function visibleRows() { return S.rows.filter(inView); }
 
 function showQ2() { return (S.map.qty2 || []).length || S.item2.name; }
 
@@ -1494,13 +1511,17 @@ function bindEvents() {
     }
     const t = e.target;
     if (t.id === 'selAll') {
-      if (t.checked) S.rows.forEach(r => S.sel.add(r.src)); else S.sel.clear();
-      paintSel(S.rows.map(r => r.src)); return;
+      /* 絞り込み中は、表に出ている行だけを選びます */
+      const vis = visibleRows();
+      vis.forEach(r => { if (t.checked) S.sel.add(r.src); else S.sel.delete(r.src); });
+      paintSel(vis.map(r => r.src)); return;
     }
+    const vb = t.closest && t.closest('[data-view]');
+    if (vb) { S.view = S.view === vb.dataset.view ? '' : vb.dataset.view; renderRows(); return; }
     if (t.dataset && t.dataset.sel != null) {
       const src = Number(t.dataset.sel);
       if (e.shiftKey && S.lastClick != null) {
-        const ids = S.rows.map(r => r.src);
+        const ids = visibleRows().map(r => r.src);
         const a = ids.indexOf(S.lastClick), b = ids.indexOf(src);
         const [lo, hi] = a < b ? [a, b] : [b, a];
         for (let i = lo; i <= hi; i++) { if (t.checked) S.sel.add(ids[i]); else S.sel.delete(ids[i]); }

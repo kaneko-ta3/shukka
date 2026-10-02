@@ -74,8 +74,14 @@ const Addr = (() => {
     }
     return String(total + cur);
   }
+  /* 旧字体・異体字。住所とデータで字が違っても同じ町とみなすため（大澤↔大沢、西嶋↔西島、淵野辺↔渕野辺 など） */
+  const VARIANT = {'澤': '沢', '嶋': '島', '嶌': '島', '淵': '渕', '邊': '辺', '邉': '辺', '髙': '高', '﨑': '崎', '嵜': '崎',
+                   '濱': '浜', '廣': '広', '齋': '斎', '齊': '斎', '櫻': '桜', '國': '国', '瀧': '滝', '舘': '館', '槇': '槙',
+                   '龍': '竜', '條': '条', '藏': '蔵', '冨': '富', '眞': '真', '德': '徳', '黑': '黒', '曽': '曾', '萬': '万'};
+  const VARIANT_RE = new RegExp('[' + Object.keys(VARIANT).join('') + ']', 'g');
   function key(s) {
     return String(s == null ? '' : s).normalize('NFKC')
+      .replace(VARIANT_RE, c => VARIANT[c])
       .replace(/\s+/g, '')
       .replace(/[ヶヵケが]/g, 'ケ')
       .replace(/[之の]/g, 'ノ')
@@ -201,6 +207,16 @@ const Addr = (() => {
       const loose = s => s.replace(/ケ/g, '');
       const restL = loose(rest);
       entries.forEach(e => { const k = loose(key(e.town)); if (k && restL.startsWith(k)) take(e, k); });
+    }
+    /* 「東寺山町」を住所で「東寺山」と書くように、町名の最後の「町」が省かれている場合。
+       「町」を抜いた名前が2文字以上で、そのすぐ後ろが番地（数字）か丁目のときだけ当てます */
+    if (!best.length) {
+      entries.forEach(e => {
+        const k = key(e.town);
+        if (!/町$/.test(k) || k.length < 3) return;
+        const k2 = k.slice(0, -1);
+        if (rest.startsWith(k2) && /^(\d|丁目|$)/.test(rest.slice(k2.length))) take(e, k2);
+      });
     }
     /* 京都は「烏丸通三条上る〇〇町」のように通り名が先に来るので、途中に町名があれば当てます */
     if (!best.length && /^京都市/.test(hit.cities[0])) {

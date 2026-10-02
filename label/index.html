@@ -124,6 +124,12 @@ details.morecols[open] > summary{color:var(--ink);}
 /* 一覧 */
 .bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; background:var(--surface); padding:8px 0;}
 .stat{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:3px 10px;}
+.stat-btn{font:inherit; cursor:pointer;}
+.stat-btn:hover{border-color:var(--accent);}
+.stat-btn.on{border-color:currentColor; box-shadow:inset 0 0 0 1px currentColor;}
+/* ラジオは幅いっぱいにしない（丸と文字がくっつくように） */
+.mr input[type=radio]{width:auto; flex:none; margin:0;}
+label.boxmode{justify-content:flex-start;}
 #bulk{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:var(--surface-2); border-radius:6px; margin:6px 0 10px;}
 #bulk.dim .btn, #bulk.dim input, #bulk.dim select{opacity:.55;}
 #bulk .selcount{display:inline-block; width:6.5em; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap;}
@@ -168,7 +174,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v18</span>
+  <span class="ver">v19</span>
 </header>
 
 <main>
@@ -276,8 +282,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=18"></script>
-<script src="app.js?v=18"></script>
-<script src="issued.js?v=18"></script>
+<script src="addr.js?v=19"></script>
+<script src="app.js?v=19"></script>
+<script src="issued.js?v=19"></script>
 </body>
 </html>
