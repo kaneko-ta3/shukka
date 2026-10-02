@@ -259,6 +259,11 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink); margin-left:6px;}
 .t-sku .lab{color:var(--danger); font-weight:700; display:block;}
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
+/* 出荷指示と食い違っているSKU。stale＝灰色で取り消し線、miss＝同期待ちで橙 */
+.t-sku .why{display:block; font-size:11.5px; font-weight:700;}
+.t-sku.stale .code, .t-sku.stale .nm{color:var(--line-strong); text-decoration:line-through;}
+.t-sku.stale .why{color:var(--line-strong)}
+.t-sku.miss .why{color:var(--warn)}
 .t-skus .note{font-size:12px; color:var(--warn)}
 
 /* メモ。資材の上に置きます。
@@ -439,7 +444,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v94";
+const BUILD = "v95";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1131,6 +1136,18 @@ function enableSwipe(task, card, j){
 /* ---------- 在庫：何をいくつ作るかの表示 ----------
    押せるチェックは置いていません。作る／作らないの判断は編集者側で決めるものなので、
    ここでは「何をいくつ」と「作らない指示が付いているか」だけを読めるようにしています */
+/* 在庫シートの行と出荷指示が食い違っているときの印（GAS側で付けます）
+     missing … このタスクのSKUなのに、在庫シートに行がまだ無い（次の同期でできます）
+     stale   … 出荷指示のどの行にも無いSKU（SKUを直した直後の古い行など）
+     other   … 同じ番号の別の行（分納）のSKU
+   どれも、このタスクを完了にしても作成数は書きません */
+function skuState(x){
+  if (x.missing) return {cls:'miss',  lab:'在庫の行がまだありません（同期待ち）'};
+  if (x.stale)   return {cls:'stale', lab:'出荷指示に無いSKU（作成数は書きません）'};
+  if (x.other)   return {cls:'stale', lab:'同じ番号の別の行のSKU（このタスクでは書きません）'};
+  return null;
+}
+
 function buildSkus(box, j){
   if (!box) return;
   const list = j.skus || [];
@@ -1146,6 +1163,18 @@ function buildSkus(box, j){
   }
 
   list.forEach(function(x){
+    /* 出荷指示と食い違っている行は、灰色（同期待ちは橙）で理由だけ出します */
+    const st = skuState(x);
+    if (st){
+      const r = el('div', 't-sku ' + st.cls);
+      r.innerHTML = '<div><span class="code"></span> <span class="nm"></span></div><span class="why"></span>';
+      r.querySelector('.code').textContent = x.sku || '（SKU未設定）';
+      r.querySelector('.nm').textContent = x.name || '';
+      r.querySelector('.why').textContent = st.lab;
+      box.appendChild(r);
+      return;
+    }
+
     const row = el('div', 't-sku' + (x.skip ? ' off' : ''));
     row.innerHTML = '<div><span class="code"></span> <span class="nm"></span>'
                   + '<span class="qty"></span></div><span class="lab"></span>';

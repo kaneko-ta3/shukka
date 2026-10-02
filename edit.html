@@ -415,6 +415,17 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-sku.arr.off .t{color:var(--arr); font-weight:700;}
 .dv-sku.off .code, .dv-sku.off .qty{color:var(--danger)}
 .dv-sku.off .lab{color:var(--danger); font-weight:700;}
+/* 出荷指示と食い違っているSKU。stale＝灰色で取り消し線、miss＝同期待ちで橙。
+   チェックの代わりに同じ幅の空きを置いて、ほかの行と頭をそろえます */
+.dv-sku .ph{width:17px; flex:none;}
+.dv-sku .why{font-weight:700;}
+.dv-sku.stale .code, .dv-sku.stale .nm{color:var(--line-strong); text-decoration:line-through;}
+.dv-sku.stale .why{color:var(--line-strong)}
+.dv-sku.miss .why{color:var(--warn)}
+.chip .cs-note{font-size:10.5px; line-height:1.3; font-weight:700; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap;}
+.chip .cs-note.miss{color:var(--warn)}
+.chip .cs-note.stale{color:var(--line-strong)}
 .dv-sku.busy{opacity:.5}
 .dv-skus .note{font-size:11.5px; color:var(--warn)}
 
@@ -729,7 +740,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v94";
+const BUILD = "v95";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1473,15 +1484,40 @@ function toggleArrange(t, row, cb){
     });
 }
 
+/* 在庫シートの行と出荷指示が食い違っているときの印（GAS側で付けます）
+     missing … このタスクのSKUなのに、在庫シートに行がまだ無い（次の同期でできます）
+     stale   … 出荷指示のどの行にも無いSKU（SKUを直した直後の古い行など）
+     other   … 同じ番号の別の行（分納）のSKU
+   どれも、このタスクを完了にしても作成数は書きません */
+function skuState(x){
+  if (x.missing) return {cls:"miss",  lab:"在庫の行がまだありません（同期待ち）"};
+  if (x.stale)   return {cls:"stale", lab:"出荷指示に無いSKU（作成数は書きません）"};
+  if (x.other)   return {cls:"stale", lab:"同じ番号の別の行のSKU（このタスクでは書きません）"};
+  return null;
+}
+
 /* カードの中に出す、コンパクトな在庫チェック。
-   SKUが1つなら1行、複数ならSKUごとに1行です */
+   SKUが1つなら1行、複数ならSKUごとに1行です。
+   出荷指示と食い違っている行（同期待ち・出荷指示に無い）はチェックを出さず、
+   SKUと短い理由だけを1行にまとめます */
 function buildChipSkus(chip, t){
-  const list = t.skus || [];
-  if (!list.length) return;
-  const one = (list.length === 1);
+  const all = t.skus || [];
+  const list = all.filter(x => !skuState(x));
+  const odd = all.filter(x => !!skuState(x));
+  if (!list.length && !odd.length) return;
+  /* 食い違いの行が並ぶときは、どのSKUのチェックか分かるようにSKU名を出します */
+  const one = (list.length === 1 && !odd.length);
 
   const box = document.createElement("div");
   box.className = "cs";
+
+  odd.forEach(function(x){
+    const n = document.createElement("div");
+    n.className = "cs-note " + skuState(x).cls;
+    n.textContent = (x.sku || "") + "　" + (x.missing ? "在庫の行なし（同期待ち）"
+                                          : (x.stale ? "出荷指示に無い" : "別の行のSKU"));
+    box.appendChild(n);
+  });
 
   list.forEach(function(x){
     const row = document.createElement("div");
@@ -1965,6 +2001,20 @@ function buildSkus(box, t){
   }
 
   list.forEach(function(x){
+    /* 出荷指示と食い違っている行は、チェックを出さずに理由だけ出します */
+    const st = skuState(x);
+    if (st){
+      const r = document.createElement("div");
+      r.className = "dv-sku " + st.cls;
+      r.innerHTML = '<span class="ph"></span><span><span class="code"></span> <span class="nm"></span>'
+                  + ' 　<span class="why"></span></span>';
+      r.querySelector(".code").textContent = x.sku || "（SKU未設定）";
+      r.querySelector(".nm").textContent = x.name || "";
+      r.querySelector(".why").textContent = st.lab;
+      box.appendChild(r);
+      return;
+    }
+
     const row = document.createElement("div");
     row.className = "dv-sku" + (x.skip ? " off" : "");
     const id = "dvnm-" + t.row + "-" + (x.sku || "");
