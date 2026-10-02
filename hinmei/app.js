@@ -1,5 +1,7 @@
 /* ===================================================================
-   送り状 余白書き換え  v15   (hinmei/app.js)
+   送り状 余白書き換え  v16   (hinmei/app.js)
+
+   v16 「全部に入れる」：入れた文字で全部の表を「その文字 × 送り状の枚数」にする（届け先が多い日用）
 
    v15 表を 届け先＋送り状（親番号）ごとに分ける。同じ届け先に別の送り状が来ても1つの表に混ざらない
        （複数口の子は「親伝票 送り状番号」で親にまとめる）。同じ届け先の表が複数なら見出しに送り状番号の下4桁
@@ -1050,6 +1052,24 @@ async function askMaster(names) {
   return {found: found, missing: missing, bad: bad, fragile: fragile};
 }
 
+/** 全部の表を「同じ文字 × その送り状の枚数」にする（届け先が多い日用） */
+function bulkFill() {
+  const s = S.src;
+  if (!s) return;
+  const text = $('#bulkText').value.trim();
+  if (!text) { setMsg('#autoMsg', '全部に入れる文字を書いてください', 'warn'); return; }
+  const filled = s.groups.some(g => g.rows.some(r => r.name.trim() || String(r.per).trim() ||
+                                                    String(r.total).trim() || String(r.count).trim() || r.keep));
+  if (filled && !confirm('入力済みの内容を、全部「' + text + '」に置き換えます。よろしいですか？')) return;
+  s.groups.forEach(g => {
+    g.rows = [Object.assign(blankRow(), {name: text, count: String(g.pages.length)}), blankRow()];
+    g.status = null;
+  });
+  renderGroups();
+  setMsg('#autoMsg', '全部の表を「' + text + '」にしました（' + s.groups.length + 'か所・' + s.pages.length + '枚）', 'ok');
+  invalidateOut();
+}
+
 async function autofill(masterOverride) {
   const s = S.src;
   if (!s) return;
@@ -1345,6 +1365,8 @@ function wire() {
   $('#groups').addEventListener('click', onClick);
   $('#groups').addEventListener('keydown', onKey);
   $('#autoBtn').addEventListener('click', () => autofill());
+  $('#bulkBtn').addEventListener('click', bulkFill);
+  $('#bulkText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); bulkFill(); } });
   $('#makeBtn').addEventListener('click', make);
   $('#openBtn').addEventListener('click', () => { if (S.out) window.open(S.out.url, '_blank'); });
 }
@@ -1354,7 +1376,7 @@ loadFont().catch(e => setMsg('#fileInfo', e.message || String(e), 'err'));
 
 // 確かめる用（画面の動きには関係しない）
 window.HINMEI = {
-  open: openPdf, autofill: autofill, makePlan: makePlan, build: buildPdf, layout: layout,
+  open: openPdf, autofill: autofill, bulk: bulkFill, makePlan: makePlan, build: buildPdf, layout: layout,
   bandLayout: bandLayout, onlyLayout: onlyLayout, marksFromKiji: marksFromKiji,
   sketchAll: sketchAll, sketchGroup: sketchGroup,
   state: S, setKind: k => { $('input[name="kind"][value="' + k + '"]').click(); },

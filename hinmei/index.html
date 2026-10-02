@@ -125,7 +125,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v15</span>
+  <span class="ver">v16</span>
 </header>
 
 <main>
@@ -172,6 +172,11 @@ details.sk summary{cursor:pointer;}
         <label><input type="radio" name="size" value="S">小</label>
       </span>
     </div>
+    <div class="btns" style="margin-top:8px">
+      <input type="text" id="bulkText" class="freetext" placeholder="全部の送り状に入れる文字">
+      <button class="btn" id="bulkBtn">全部に入れる</button>
+      <span class="tiny muted">すべての表を、この文字×送り状の枚数 にします</span>
+    </div>
     <div id="autoMsg" class="notice" hidden></div>
     <div id="groups"></div>
     <details class="help">
@@ -207,7 +212,7 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="config.js?v=16"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
