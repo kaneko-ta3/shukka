@@ -875,7 +875,10 @@ function outRows() {
             o.name, o.zip, o.addr1, '', o.addr2, '', o.boxes,
             o.ship, o.due, o.time, s.code || '', kind,
             s.tel, s.name, normZip(s.zip), s.addr, s.bldg || '',
-            kind === 6 ? i + 2 : '', '', 0, 0];
+            kind === 6 ? i + 2 : '', '',
+            /* 受注ID。B2の取り込みでは25列目→検索キー1（タイトル「受注ID」あり）、26列目→検索キー4（タイトル無し）。
+               検索キー4に値があるとタイトル無しでエラーになるので、26列目は空にします */
+            0, ''];
   });
 }
 
