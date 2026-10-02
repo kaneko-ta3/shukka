@@ -641,11 +641,16 @@ function computeRow(row) {
     if (!q) return label === '商品1' && nm && !(S.map.qty1 || []).length ? nm : '';
     const n = num(q);
     if (isNaN(n)) { err.push(label + 'の数量が数字ではありません（' + q + '）'); return nm; }
+    if (n === 0) return '';                          // 数量0の商品は出しません
     if (!nm) { err.push(label + 'の商品名を上の欄に入れてください'); return ''; }
     return nm + '(' + n + ')';
   };
-  const item1 = item(S.item1, q1, '商品1');
-  const item2 = item(S.item2, q2, '商品2');
+  let item1 = item(S.item1, q1, '商品1');
+  let item2 = item(S.item2, q2, '商品2');
+  /* 商品1が出ないときは、商品2を商品名1に詰めます */
+  if (!item1 && item2) { item1 = item2; item2 = ''; }
+  const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
+  if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0（または空）です。発行から外すか、数量を直してください');
 
   /* 個口数。手入力 > 別紙の個口数 > 数量÷入数 > 1
        each：商品ごとに割って切り上げてから足す（別々の箱に詰める）
@@ -837,9 +842,15 @@ function csvCell(v) {
 }
 function csvLine(a) { return a.map(csvCell).join(','); }
 
+/* CSVは商品名1（同じなら商品名2）の昇順に並べて出します。数字は数として比べます（(2) が (10) より前）。
+   同じ商品名どうしは一覧の順のまま */
+const ITEM_ORDER = new Intl.Collator('ja', {numeric: true});
 function outRows() {
   const s = currentSender();
-  const list = S.rows.filter(included);
+  const list = S.rows.filter(included)
+    .map((row, i) => ({row, i}))
+    .sort((a, b) => ITEM_ORDER.compare(a.row.out.item1, b.row.out.item1) || ITEM_ORDER.compare(a.row.out.item2, b.row.out.item2) || a.i - b.i)
+    .map(x => x.row);
   return list.map((row, i) => {
     const o = row.out;
     const kind = o.boxes > 1 ? 6 : 0;               // 宅急便。複数口は6
