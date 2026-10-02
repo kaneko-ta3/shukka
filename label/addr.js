@@ -274,29 +274,37 @@ const Addr = (() => {
     return m ? m[1] : '';
   }
 
-  /* ケ／ヶの正式な書き方にそろえます（駒ヶ根市・保土ケ谷区・鎌ケ谷市 など）。
-     住所に「保土ヶ谷区」「鎌ヶ谷市」のように書かれていたら、郵便番号データの書き方に直します。
-     対象は ケ・ヶ が入った市区町村名と、照合で見つかった町名（extra）だけです */
-  let keRules = null;
-  function keRule_(name) {
-    const pat = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[ヶケヵがｹ]/g, '[ヶケヵがｹ]');
+  /* 市区町村名・町名を、郵便番号データの正式な書き方にそろえます。
+     住所の字が、ケ／ヶ（保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市）や、旧字体・似た字（粕屋郡→糟屋郡、大澤→大沢 など）
+     だけ違う場合に、正式な書き方に置き換えます。
+     対象は ケ・ヶ や旧字体の入る市区町村名と、照合で見つかった町名（extra）だけです */
+  const SAME = {};                                   // 字 → 同じとみなす字の集まり
+  const addSame = chars => { const g = Array.from(new Set(chars)); g.forEach(c => { SAME[c] = Array.from(new Set((SAME[c] || []).concat(g))); }); };
+  addSame(['ヶ', 'ケ', 'ヵ', 'が', 'ｹ']);
+  Object.keys(VARIANT).forEach(a => addSame([a, VARIANT[a]]));
+  Object.keys(VARIANT).forEach(a => addSame(SAME[VARIANT[a]]));
+  const escRe = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function canonRule_(name) {
+    const pat = Array.from(name).map(c => SAME[c] ? '[' + SAME[c].map(escRe).join('') + ']' : escRe(c)).join('');
     return {re: new RegExp(pat, 'g'), to: name};
   }
+  const hasSame = n => Array.from(n).some(c => SAME[c]);
+  let canonRules = null;
   function canonKe(text, extra) {
     if (!index) return String(text);
-    if (!keRules) {
+    if (!canonRules) {
       const names = [];
       index.cities.forEach(([, c]) => {
-        if (!/[ヶケ]/.test(c)) return;
+        if (!hasSame(c)) return;
         names.push(c);
-        const g = c.match(/^.+?郡(.+)$/); if (g && /[ヶケ]/.test(g[1])) names.push(g[1]);   // 郡を省いた書き方
-        const w = c.match(/^.+?市(.+区)$/); if (w && /[ヶケ]/.test(w[1])) names.push(w[1]); // 市を省いた区名
+        const g = c.match(/^.+?郡(.+)$/); if (g && hasSame(g[1])) names.push(g[1]);   // 郡を省いた書き方
+        const w = c.match(/^.+?市(.+区)$/); if (w && hasSame(w[1])) names.push(w[1]); // 市を省いた区名
       });
-      keRules = uniq(names).sort((a, b) => b.length - a.length).map(keRule_);
+      canonRules = uniq(names).sort((a, b) => b.length - a.length).map(canonRule_);
     }
     let t = String(text);
-    keRules.forEach(r => { t = t.replace(r.re, r.to); });
-    (extra || []).filter(n => n && /[ヶケが]/.test(n)).forEach(n => { const r = keRule_(n); t = t.replace(r.re, r.to); });
+    canonRules.forEach(r => { t = t.replace(r.re, r.to); });
+    (extra || []).filter(n => n && hasSame(n)).forEach(n => { const r = canonRule_(n); t = t.replace(r.re, r.to); });
     return t;
   }
 
