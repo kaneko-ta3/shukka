@@ -740,7 +740,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v95";
+const BUILD = "v96";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -2387,18 +2387,23 @@ document.addEventListener("pointerdown", e => {
   const grip = e.target.closest(".grip");
   if (!grip) return;
   const bar = grip.closest(".bar");
-  const week = bar.closest(".week");
   const t = byId(bar.dataset.id);
   if (!t || t.kind !== "m") return;
   e.preventDefault();
-  rz = {task:t, x0:e.clientX, days0:t.days, dw:week.getBoundingClientRect().width / 7};
+  rz = {task:t, days0:t.days};
   document.body.classList.add("resizing");
   grip.setPointerCapture(e.pointerId);
 });
+/* 引っぱっている間は、マウスの下にある日付の列をそのまま最終日にします。
+   土日の列は平日より狭いので（COL_W）、横に動いた量を「週の幅÷7」で割って
+   日数にすると、土日の近くで1日ずれていました。
+   日付は配置のドラッグと同じ dayUnder で拾うので、下の週へ動かしても、その週の日になります。
+   日付の上にいないとき（すき間・枠の外・日の一覧の上）は、直前の日数のままにします */
 document.addEventListener("pointermove", e => {
   if (!rz) return;
-  const delta = Math.round((e.clientX - rz.x0) / rz.dw);
-  const nd = Math.max(1, Math.min(MAX_DAYS, rz.days0 + delta));
+  const day = dayUnder(e.clientX, e.clientY);
+  if (!day || !day.dataset.date) return;
+  const nd = Math.max(1, Math.min(MAX_DAYS, diff(rz.task.start, day.dataset.date) + 1));
   if (nd !== rz.task.days){ rz.task.days = nd; suppressClick = true; renderCal(); renderSummary(); }
 });
 document.addEventListener("pointerup", () => {
