@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v102";
+const BUILD = "v103";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -2025,10 +2025,13 @@ function dayRow(t){
       box.hidden = false;
       box.appendChild(multiCheck(t));
     }
-    /* 自社配送のチェック。個口数が数字か空のとき、または自社配送のときだけ出します。
-       「チャーター」「西濃」など自社以外の運送手段が書いてあるときは出しません
-       （付けるとその書き込みを「自社」で上書きしてしまうため） */
-    if (!t.arrange || isJisha(t)){
+    /* 自社配送のチェック。自社配送は当日しかないので、
+       出荷日＝納品日で、個口数が数字か空のときだけ出します。
+       ・出荷日と納品日が違う日／まだ置いていない（出荷日が無い）ときは出しません
+       ・「チャーター」「西濃」など自社以外の運送手段が書いてあるときも出しません
+         （付けるとその書き込みを「自社」で上書きしてしまうため）
+       すでに自社配送になっているものは、外せるようにいつも出します */
+    if (isJisha(t) || (!t.arrange && t.start && t.start === t.due)){
       box.hidden = false;
       box.appendChild(jishaCheck(t));
     }
