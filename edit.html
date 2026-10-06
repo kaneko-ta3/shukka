@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v99";
+const BUILD = "v100";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -2025,9 +2025,13 @@ function dayRow(t){
       box.hidden = false;
       box.appendChild(multiCheck(t));
     }
-    /* 自社配送のチェックは、出荷タスクにいつも出します */
-    box.hidden = false;
-    box.appendChild(jishaCheck(t));
+    /* 自社配送のチェック。個口数が数字か空のとき、または自社配送のときだけ出します。
+       「チャーター」「西濃」など自社以外の運送手段が書いてあるときは出しません
+       （付けるとその書き込みを「自社」で上書きしてしまうため） */
+    if (!t.arrange || isJisha(t)){
+      box.hidden = false;
+      box.appendChild(jishaCheck(t));
+    }
   }
 
   const act = el.querySelector(".dv-act");
