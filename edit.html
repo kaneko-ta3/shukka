@@ -494,6 +494,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-lim span.multi, .chip .lim span.multi{background:var(--leadq-soft); color:var(--leadq); font-weight:700;}
 .dv-sku.multi input{accent-color:var(--leadq)}
 .dv-sku.multi .t{cursor:pointer}
+.dv-sku.jisha .t{cursor:pointer}
 /* 未スケジュールのカードに出す置き方の案内 */
 .dv-act.dv-hint{font-size:11.5px; color:var(--muted); justify-content:flex-start;}
 
@@ -754,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v98";
+const BUILD = "v99";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1098,6 +1099,14 @@ const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
    出荷日が納品日より後なら、今まで通り赤です */
 const isJisha = t => t.kind === "s" && /自社/.test(t.arrange || "");
 const jishaRow = row => tasks.some(x => x.row === row && isJisha(x));
+
+/* 個口数。数字のときだけ「〇個口」と出します。
+   この列には「自社」「カンガルー」などの運送手段も入るので、
+   文字のときは出しません（出荷手配・自社配送の印のほうで出ています） */
+const boxesText = v => {
+  const s = String(v == null ? "" : v).trim();
+  return (s && !isNaN(Number(s))) ? s + "個口" : "";
+};
 const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone && !isJisha(t);
 
 /* 完成品の在庫を引き終わった出荷。
@@ -1560,6 +1569,49 @@ function multiCheck(t){
   return row;
 }
 
+/* 自社配送のチェック。出荷指示の個口数の列に「自社」と書きます（外すと空）。
+   自社配送になると、出荷日＝納品日でも赤にせず、出荷手配にも出しません */
+function jishaCheck(t){
+  const row = document.createElement("div");
+  row.className = "dv-sku jisha";
+  const id = "js-" + t.row;
+  row.innerHTML = '<input type="checkbox" id="' + id + '">'
+                + '<label class="t" for="' + id + '">自社配送</label>';
+  const cb = row.querySelector("input");
+  cb.checked = isJisha(t);
+  cb.onchange = function(){
+    const on = cb.checked;
+    /* 外すと個口数の列が空になります。入っていたのが「自社」以外の文字
+       （「自社便」など）でも消えるので、外すときだけ確かめます */
+    if (!on && !confirm("自社配送を外すと、出荷指示の個口数の列が空になります。\n"
+                        + "個口数はあとで出荷指示に入れ直してください。外しますか？")){
+      cb.checked = true;
+      return;
+    }
+    row.classList.add("busy");
+    busy(true);
+    call("setJisha", {row: t.row, on: on ? 1 : 0})
+      .then(function(r){
+        busy(false);
+        row.classList.remove("busy");
+        tasks.forEach(function(x){
+          if (x.row !== t.row) return;
+          x.boxes = r.boxes;
+          if (x.kind === "s") x.arrange = r.arrange;
+        });
+        log(r.message, "更新");
+        render();
+      })
+      .catch(function(e){
+        busy(false);
+        row.classList.remove("busy");
+        cb.checked = !on;                      // 書けなかったので戻します
+        log("自社配送を変えられませんでした：" + e.message, "", true);
+      });
+  };
+  return row;
+}
+
 function toggleArrange(t, row, cb){
   const on = cb.checked;
   row.classList.add("busy");
@@ -1900,7 +1952,7 @@ function dayRow(t){
   if (t.kind === "s") kd.classList.add("k-s");
   el.querySelector(".dv-nmtxt").textContent = t.name;
   el.querySelector(".dv-sub").textContent =
-    [t.cust, t.to, t.qty, t.boxes ? t.boxes + "個口" : "", t.who, t.code]
+    [t.cust, t.to, t.qty, boxesText(t.boxes), t.who, t.code]
       .filter(Boolean).join("　");
 
   const lim = el.querySelector(".dv-lim");
@@ -1973,6 +2025,9 @@ function dayRow(t){
       box.hidden = false;
       box.appendChild(multiCheck(t));
     }
+    /* 自社配送のチェックは、出荷タスクにいつも出します */
+    box.hidden = false;
+    box.appendChild(jishaCheck(t));
   }
 
   const act = el.querySelector(".dv-act");

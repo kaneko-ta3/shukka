@@ -445,7 +445,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v98";
+const BUILD = "v99";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -711,6 +711,13 @@ function setState(t, cls){
 /* 自社配送（個口数の列に「自社」を含む出荷）は手配が要らないので、
    「出荷手配:自社」は出さず、「自社配送」とだけ出します */
 const isJisha = j => j.kind === 's' && /自社/.test(j.arrange || '');
+
+/* 個口数。数字のときだけ「〇個口」と出します。
+   この列には「自社」「カンガルー」などの運送手段も入るためです */
+const boxesText = v => {
+  const s = String(v == null ? '' : v).trim();
+  return (s && !isNaN(Number(s))) ? s + '個口' : '';
+};
 const needArrange = j => j.kind === 's' && !!j.arrange && !j.arrangeDone && !isJisha(j);
 
 /* ---------- 日付ごとの割り当て ---------- */
@@ -1051,7 +1058,7 @@ function taskEl(j){
     +   (isJisha(j) ? '<span class="jisha">自社配送</span>' : '')
     +   (j.label === false ? '<span class="nolabel">ラベル未発行</span>' : '')
     +   (j.qty ? '<span class="qty"></span>' : '')
-    +   (j.boxes ? '<span class="boxes"></span>' : '')
+    +   (boxesText(j.boxes) ? '<span class="boxes"></span>' : '')
     +   (j.code ? '<span class="code"></span>' : '')
     + '</div>'
     + '<div class="t-memo-slot"></div>'
@@ -1069,7 +1076,7 @@ function taskEl(j){
     : ('納品 ' + md(j.due) + '　'
        + (left < 0 ? Math.abs(left) + '日 遅れ' : (left === 0 ? '本日まで' : 'あと' + left + '日')));
   if (j.qty) card.querySelector('.qty').textContent = j.qty;
-  if (j.boxes) card.querySelector('.boxes').textContent = j.boxes + '個口';
+  if (boxesText(j.boxes)) card.querySelector('.boxes').textContent = boxesText(j.boxes);
   if (j.code) card.querySelector('.code').textContent = j.code;
 
   /* メモ。資材より上に出します */
