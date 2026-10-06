@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v100";
+const BUILD = "v102";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1095,7 +1095,7 @@ const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
    ・出荷日＝納品日でもよい（赤にしない）
    ・住所からの輸送日数で「間に合うか」を見ない／住所判定不可も出さない
    ・出荷手配は要らないので「出荷手配:自社」は出さない
-   ・出荷日の自動配置は、納品日と同じ日に置く
+   ・出荷日の自動配置は、納品日と同じ日に置く（土日でも）
    出荷日が納品日より後なら、今まで通り赤です */
 const isJisha = t => t.kind === "s" && /自社/.test(t.arrange || "");
 const jishaRow = row => tasks.some(x => x.row === row && isJisha(x));
@@ -2820,12 +2820,9 @@ document.getElementById("undo").onclick = () => {
    土日は出荷しないので、その分さらに前へずらします。
    製造は現場の都合があるので対象にしません。 */
 function shipDateFor(t){
-  /* 自社配送は納品日に自分で運ぶので、納品日と同じ日に置きます（土日なら前の平日） */
-  if (isJisha(t)){
-    let j = t.due;
-    while (isOff(j)) j = add(j, -1);
-    return j;
-  }
+  /* 自社配送は納品日に自分で運ぶ（当日しかない）ので、納品日と同じ日に置きます。
+     納品日が土日でも、その日に置きます */
+  if (isJisha(t)) return t.due;
   let d = t.due;
   let n = Math.max(1, Number(t.lead) || 2);
   while (n > 0){ d = add(d, -1); if (!isOff(d)) n--; }   // 稼働日で n 日さかのぼる
