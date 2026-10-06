@@ -249,6 +249,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-meta .code{font-family:"IBM Plex Mono",monospace;}
 /* ラベルがまだ出ていない出荷タスクの注意書き */
 .t-meta .nolabel{color:var(--warn); font-weight:700;}
+.t-meta .jisha{font-weight:700; padding:0 6px; border-radius:3px; box-shadow:inset 0 0 0 1px var(--line-strong);}
 /* 在庫：何をいくつ作るかの表示（読むだけ。押せません）。
    作らない指示が付いているものは赤で知らせます */
 .t-skus{display:flex; flex-direction:column; gap:5px; margin-top:6px;
@@ -444,7 +445,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v95";
+const BUILD = "v98";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -707,7 +708,10 @@ function setState(t, cls){
 /* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク。
    作業者ページは読むだけで、色も付けません（色の運用は編集者ページ側です）。
    日付タッチ後のカードに「出荷手配:〇〇」と出すだけです */
-const needArrange = j => j.kind === 's' && !!j.arrange && !j.arrangeDone;
+/* 自社配送（個口数の列に「自社」を含む出荷）は手配が要らないので、
+   「出荷手配:自社」は出さず、「自社配送」とだけ出します */
+const isJisha = j => j.kind === 's' && /自社/.test(j.arrange || '');
+const needArrange = j => j.kind === 's' && !!j.arrange && !j.arrangeDone && !isJisha(j);
 
 /* ---------- 日付ごとの割り当て ---------- */
 function jobsOn(date){
@@ -1044,6 +1048,7 @@ function taskEl(j){
     + '<div class="t-meta">'
     +   (j.due ? '<span class="due' + dueCls + '"></span>' : '')
     +   (needArrange(j) ? '<span class="arrange"></span>' : '')
+    +   (isJisha(j) ? '<span class="jisha">自社配送</span>' : '')
     +   (j.label === false ? '<span class="nolabel">ラベル未発行</span>' : '')
     +   (j.qty ? '<span class="qty"></span>' : '')
     +   (j.boxes ? '<span class="boxes"></span>' : '')

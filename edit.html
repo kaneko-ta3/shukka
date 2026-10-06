@@ -402,6 +402,9 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-lim span.nolabel{background:var(--warn-soft); color:var(--warn); font-weight:700;}
 .dv-lim span.arrange{background:var(--arr-soft); color:var(--arr); font-weight:700;}
 .dv-lim span.alloc{background:var(--fee-soft); color:var(--fee); font-weight:700;}
+/* 自社配送。色の意味（警告・済）を持たせない、白い枠だけの印です */
+.dv-lim span.jisha, .chip .lim span.jisha{background:transparent; color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--line-strong); font-weight:700;}
 .dv-lim span.over{background:var(--danger); color:#fff;}
 .dv-lim span.ago{background:var(--ago-soft); color:var(--ago-ink);}
 /* 在庫：SKUごとの「作らない」チェック */
@@ -751,7 +754,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v97";
+const BUILD = "v98";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1086,7 +1089,16 @@ function occupancy(){
 
 const leftOf = t => t.limit ? diff(TODAY, t.limit) : null;
 /* 出荷手配の指示が入っているのに、まだ手配が済んでいない出荷タスク */
-const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone;
+/* 自社配送。個口数の列（出荷手配の指示と同じ列）に「自社」を含む出荷です。
+   自社の車で運ぶので、
+   ・出荷日＝納品日でもよい（赤にしない）
+   ・住所からの輸送日数で「間に合うか」を見ない／住所判定不可も出さない
+   ・出荷手配は要らないので「出荷手配:自社」は出さない
+   ・出荷日の自動配置は、納品日と同じ日に置く
+   出荷日が納品日より後なら、今まで通り赤です */
+const isJisha = t => t.kind === "s" && /自社/.test(t.arrange || "");
+const jishaRow = row => tasks.some(x => x.row === row && isJisha(x));
+const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone && !isJisha(t);
 
 /* 完成品の在庫を引き終わった出荷。
    在庫ブックの22時の処理が付けます。ボードからは変えられません。
@@ -1130,7 +1142,9 @@ function lateReason(t){
   }
 
   if (t.kind === "m"){
-    if (t.due && t.ship && t.start === t.ship && t.ship === t.due){
+    /* 自社配送なら、その日に作って自分で運べるので赤にしません。
+       製造タスクには個口数の列が無いので、同じ行の出荷タスクで見ます */
+    if (t.due && t.ship && t.start === t.ship && t.ship === t.due && !jishaRow(t.row)){
       return "製造日・出荷日・納品日が全部 " + md(t.start)
            + "（当日に作って当日に届くのは無理）";
     }
@@ -1138,6 +1152,7 @@ function lateReason(t){
   }
 
   if (!t.due) return "";
+  if (isJisha(t)) return "";        // 自社配送。出荷日が納品日より後かどうかは上で見ています
   if (t.start >= t.due){
     return "出荷日と納品日が同じ " + md(t.due) + "（当日には届かない）";
   }
@@ -1165,7 +1180,7 @@ const isLate = t => !!lateReason(t);
      納品先が複数あって、住所をわざと入れていないものです */
 function leadReason(t){
   if (t.kind !== "s" || !t.start || !t.due) return "";
-  if (t.leadKnown !== false || t.multi) return "";
+  if (t.leadKnown !== false || t.multi || isJisha(t)) return "";
   if (isLate(t)) return "";
   if (t.start > add(TODAY, LEAD_UNKNOWN_GRACE)) return "";
   return "住所からリードタイム判定不可";
@@ -1383,6 +1398,7 @@ function renderCal(){
         + (late ? "\n\n⚠ 赤い理由：" + lateReason(t) : "")
         + (leadq ? "\n\n⚠ " + leadReason(t) : "")
         + (t.multi ? "\n複数箇所納品" : "")
+        + (isJisha(t) ? "\n自社配送" : "")
         + (t.label === false ? "\nラベル未発行" : "")
         + (t.code ? "\n管理番号 " + t.code : "") + "\nシート " + t.row + " 行目";
       /* バーの末尾には何も出しません。数量は日付を開けば読めます */
@@ -1467,6 +1483,12 @@ function chipEl(t, done){
     mu.textContent = "複数箇所納品";
     lim.appendChild(mu);
   }
+  if (isJisha(t)){
+    const js = document.createElement("span");
+    js.className = "jisha";
+    js.textContent = "自社配送";
+    lim.appendChild(js);
+  }
   limitChips(t).forEach(function(c){
     const s = document.createElement("span");
     /* 完了したものに「遅れ」は出しません（もう終わっているため） */
@@ -1482,7 +1504,7 @@ function chipEl(t, done){
   /* 製造だけ「在庫から消費」のチェックを出します */
   if (t.kind === "m") buildChipSkus(el, t);
   /* 出荷手配の指示がある出荷は、済にするチェックを出します */
-  else if (t.arrange) el.appendChild(arrangeCheck(t, "cs", "cs-row"));
+  else if (t.arrange && !isJisha(t)) el.appendChild(arrangeCheck(t, "cs", "cs-row"));
   return el;
 }
 
@@ -1888,6 +1910,12 @@ function dayRow(t){
     mu.textContent = "複数箇所納品";
     lim.appendChild(mu);
   }
+  if (isJisha(t)){
+    const js = document.createElement("span");
+    js.className = "jisha";
+    js.textContent = "自社配送";
+    lim.appendChild(js);
+  }
   if (needArrange(t)){
     const ar = document.createElement("span");
     ar.className = "arrange";
@@ -1937,7 +1965,7 @@ function dayRow(t){
        住所からリードタイムが出せない出荷（と、もう付いているもの）には
        「複数箇所納品」のチェックを出します */
     const box = el.querySelector(".dv-skus");
-    if (t.arrange){
+    if (t.arrange && !isJisha(t)){
       box.hidden = false;
       box.appendChild(arrangeCheck(t, "", "dv-sku"));
     }
@@ -2733,6 +2761,12 @@ document.getElementById("undo").onclick = () => {
    土日は出荷しないので、その分さらに前へずらします。
    製造は現場の都合があるので対象にしません。 */
 function shipDateFor(t){
+  /* 自社配送は納品日に自分で運ぶので、納品日と同じ日に置きます（土日なら前の平日） */
+  if (isJisha(t)){
+    let j = t.due;
+    while (isOff(j)) j = add(j, -1);
+    return j;
+  }
   let d = t.due;
   let n = Math.max(1, Number(t.lead) || 2);
   while (n > 0){ d = add(d, -1); if (!isOff(d)) n--; }   // 稼働日で n 日さかのぼる
@@ -2749,7 +2783,8 @@ document.getElementById("auto").onclick = () => {
 
   const msg = "出荷タスク " + pool.length + "件に出荷日を入れます。\n\n"
     + "実際に届く日の1日前になるように、納品日からさかのぼります\n"
-    + "（関東〜兵庫は2稼働日前、それより西・東北・北海道は3稼働日前。土日祝は数えません）\n\n"
+    + "（関東〜兵庫は2稼働日前、それより西・東北・北海道は3稼働日前。土日祝は数えません）\n"
+    + "自社配送は、納品日と同じ日に置きます\n\n"
     + (past ? "※ うち " + past + "件は計算上すでに過去の日付になります\n\n" : "")
     + "製造タスクは対象外です。よろしいですか？";
   if (!confirm(msg)) return;
