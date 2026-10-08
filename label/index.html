@@ -12,7 +12,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#9FB0AA;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 出荷ボードと同じ白の75%。灰色だと黒地で読みにくい */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --edit:#7FAAF2; --edit-soft:#16294A;
@@ -179,7 +179,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v34</span>
+  <span class="ver">v35</span>
 </header>
 
 <main>
@@ -288,8 +288,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=34"></script>
-<script src="app.js?v=34"></script>
-<script src="issued.js?v=34"></script>
+<script src="addr.js?v=35"></script>
+<script src="app.js?v=35"></script>
+<script src="issued.js?v=35"></script>
 </body>
 </html>
