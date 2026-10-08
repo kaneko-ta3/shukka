@@ -941,8 +941,6 @@ function downloadCsv() {
     box.onclick = e => { const b = e.target.closest('[data-part]'); if (b) { const p = parts[Number(b.dataset.part)]; download(p.name, p.text); } };
   } else box.innerHTML = '';
 
-  /* 発行済データと照合するための控え（〒・名前・店名・出荷日だけ）。このブラウザに保存します */
-  Issued.saveBatch('ラベル_' + stamp + '.csv', S.rows.filter(included).map(r => r.out));
   toast('CSVを保存しました（' + rows.length + '件' + (parts.length > 1 ? '・' + parts.length + 'ファイル' : '') + '）');
 }
 
@@ -1711,7 +1709,6 @@ function init() {
   /* 先頭の「選ぶ」は何も入れない印。時間を入れたらここに戻します */
   $('#vTime').innerHTML = '<option value="__">（選ぶ）</option>' + CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();
-  Issued.bind();
   renderAll();
   loadAddrMaster().then(() => { if (S.rows.length) { S.checks = {}; recompute(); } });
   Addr.loadIndex().then(() => { $('#dataVer').textContent = Addr.ver ? '郵便番号データ ' + Addr.ver + ' 版' : ''; })

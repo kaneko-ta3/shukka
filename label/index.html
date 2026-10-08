@@ -179,7 +179,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v36</span>
+  <span class="ver">v37</span>
 </header>
 
 <main>
@@ -257,13 +257,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
     </details>
   </section>
 
-  <section id="step5">
-    <h2><span class="n">5</span>発行済データから返却用ファイル</h2>
-    <p class="tiny muted" style="margin:0 0 8px">B2で発行したあと、発行済データをここに入れると、取引先に返す一覧（1宛先1行、全口の伝票番号つき）を作ります。ほかの案件の行が混ざっていても、このブラウザで作ったCSVと照合して今回の分だけを拾います。</p>
-    <div class="drop small" id="issuedDrop">発行済データ（CSV・Excel）をここにドラッグ　または
-      <label class="btn small">ファイルを選ぶ<input type="file" id="issuedFile" accept=".csv,.txt,.xlsx,.xls" hidden></label></div>
-    <div id="issuedBody"></div>
-  </section>
+  <!-- 「5 発行済データから返却用」は v37 でなくした。取引先に返す一覧は 追跡番号出力（../tracking/）で作る -->
 </main>
 
 <dialog id="senderDlg">
@@ -288,8 +282,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=36"></script>
-<script src="app.js?v=36"></script>
-<script src="issued.js?v=36"></script>
+<script src="addr.js?v=37"></script>
+<script src="app.js?v=37"></script>
+<script src="issued.js?v=37"></script>
 </body>
 </html>

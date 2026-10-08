@@ -1,4 +1,8 @@
 /* =============================================================
+ *  【v37〜】返却用の画面はなくした（追跡番号出力 ../tracking/ にまとめた）。
+ *  今使っているのは 請求先アカウントの保存（importAccounts / accounts。ラベル設定.csv の読み込み・書き出し）だけ。
+ *  追跡番号出力も同じ保存（label.accounts.v1）を読んで、どのアカウントの出荷かを出す
+ *
  *  発行済データ → 取引先への返却用ファイル
  *
  *  B2で発行したあとの「発行済データ」を入れると、1宛先1行の一覧を作ります。
@@ -14,6 +18,8 @@
 
 const Issued = (() => {
   const LS_BATCHES = 'label.batches.v1';
+  // v37〜 照合用の控え（〒・名前など）はもう使わないので、ブラウザに残っていれば消す
+  try { localStorage.removeItem(LS_BATCHES); } catch (e) { /* 消せなくても動く */ }
   const KEEP = 10;
   /* 請求先アカウント。ご請求先顧客コード（AN列）＋分類コード（AO列）で見分けます。
      コードは電話番号なので、ここには書きません。設定CSVを読み込んで、このブラウザにだけ保存します。
@@ -181,6 +187,7 @@ const Issued = (() => {
   /* ---- 画面 ---- */
   function render() {
     const box = $('#issuedBody');
+    if (!box) return;                                   // v37〜 返却用の画面は無い
     if (!st.groups.length) { box.innerHTML = ''; return; }
     const bs = batches();
     const sel = selected();

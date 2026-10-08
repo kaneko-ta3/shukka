@@ -83,7 +83,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSV・Excelを作ります（取引先への返却用）。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v9</span>
+  <span class="ver">v10</span>
 </header>
 
 <main>
@@ -97,11 +97,6 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   </section>
 
   <section id="pickSec" hidden>
-    <h2>1行の単位</h2>
-    <div class="picks" style="margin-bottom:12px">
-      <label class="pk"><input type="radio" name="unit" value="slip">送り状1通で1行<span class="col">複数口も1行</span></label>
-      <label class="pk"><input type="radio" name="unit" value="label">送り状1枚で1行<span class="col">複数口は口の数だけ</span></label>
-    </div>
     <h2>出す列</h2>
     <div class="picks" id="picks"></div>
     <details class="more">
@@ -139,7 +134,9 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v9
+   追跡番号出力  v10
+   v10 1行の単位は「送り状1枚で1行」に固定（本人：全部の番号を返す。1行に詰める理由はない）。
+       v7 の切り替え・「伝票番号（全口）」「個口数」の列はなくした。アカウント表示とExcelは残す
    v9 薄い文字をもう一段明るく（白の85%くらい）
    v8 薄い文字の色を出荷ボードと同じに
    v7 印刷マンの「返却用」をこちらにまとめた：1行の単位（送り状1通で1行＝最初／1枚で1行）、
@@ -178,10 +175,7 @@ const MAIN = [
   {key: 'ship', label: '出荷予定日', cols: ['出荷予定日']},
   {key: 'due', label: 'お届け予定日', cols: ['お届け予定（指定）日']},
   {key: 'memo', label: '記事', cols: ['記事']},
-  {key: 'allnos', label: '伝票番号（全口）', virtual: true, slipOnly: true},
-  {key: 'boxes', label: '個口数', virtual: true, slipOnly: true},
 ];
-const LS_UNIT = 'tracking_unit_v1';
 // 請求先アカウントの名前は、印刷マンが ラベル設定.csv を読んだときにこのブラウザへ保存したものを借りる
 // （コードは電話番号なのでここには書かない）
 const LS_ACCOUNTS = 'label.accounts.v1';
@@ -195,14 +189,7 @@ const norm = s => String(s == null ? '' : s).normalize('NFKC').replace(/\s+/g, '
 const digits = s => String(s == null ? '' : s).replace(/[^0-9]/g, '');
 
 const st = {head: [], body: [], file: '', pick: null, order: null, text: '', name: '', aoa: null,
-  rowGroup: [], groups: [], gsel: new Set(), unit: 'slip'};
-
-function loadUnit() {
-  try { return localStorage.getItem(LS_UNIT) === 'label' ? 'label' : 'slip'; } catch (e) { return 'slip'; }
-}
-function saveUnit() {
-  try { localStorage.setItem(LS_UNIT, st.unit); } catch (e) { /* 覚えられなくても動く */ }
-}
+  rowGroup: [], groups: [], gsel: new Set()};
 
 /* 請求先アカウント（顧客コード11桁｜分類コード2桁）→ 名前。印刷マンで読み込んだ設定 */
 const acctKey = (code, cls) => digits(code).padStart(11, '0') + '｜' + (digits(cls) ? digits(cls).padStart(2, '0') : '');
@@ -375,10 +362,10 @@ function renderPicks() {
   const op = options();
   const filled = i => i >= 0 && st.body.some(r => cell(r, i).trim());
   const item = (o) => {
-    const ok = (o.virtual && !(o.slipOnly && st.unit !== 'slip')) || (!o.virtual && o.idx.some(i => i >= 0));
+    const ok = o.virtual || o.idx.some(i => i >= 0);
     const has = o.virtual || o.idx.some(filled);
     const where = o.virtual ? '' : o.idx.filter(i => i >= 0).map(LETTER).join('・');
-    const tip = !ok && o.slipOnly ? '送り状1通で1行のときだけ出せます' : has ? '' : 'このファイルでは全部空です';
+    const tip = has ? '' : 'このファイルでは全部空です';
     return '<label class="pk' + (has && ok ? '' : ' empty') + '" title="' + tip + '">' +
       '<input type="checkbox" data-key="' + esc(o.key) + '"' + (st.pick.has(o.key) ? ' checked' : '') + (ok ? '' : ' disabled') + '>' +
       esc(o.label) + (where ? '<span class="col">' + where + '</span>' : '') + '</label>';
@@ -386,7 +373,6 @@ function renderPicks() {
   $('#picks').innerHTML = op.main.map(item).join('');
   $('#morePicks').innerHTML = op.more.map(item).join('');
   $('#moreCount').textContent = op.more.length + '列';
-  document.querySelectorAll('input[name="unit"]').forEach(el => { el.checked = el.value === st.unit; });
 }
 
 async function open(file) {
@@ -406,7 +392,6 @@ async function open(file) {
   if (!st.body.length) { setMsg('#msg', '見出しの下にデータがありません', 'err'); return; }
   if (!st.pick) st.pick = loadPick();
   if (!st.order) st.order = loadOrder();
-  st.unit = loadUnit();
   makeGroups();
   renderPicks();
   renderGroups();
@@ -429,18 +414,8 @@ function build() {
 
   // 選んだグループの行だけ出す。n はファイルでの行の順番（グループ番号と表の行番号に使う）
   const rowGroup = st.rowGroup;
-  let rows = [];
+  const rows = [];
   st.body.forEach((r, n) => { if (st.gsel.has(rowGroup[n])) rows.push({r: r, n: n}); });
-  // 送り状1通で1行：くくりキーが同じ行を1行にまとめる。中身は親の行（伝票番号＝くくりキー）、無ければ最初の行
-  if (st.unit === 'slip') {
-    const by = new Map();
-    rows.forEach(x => { const g = rowGroup[x.n]; if (!by.has(g)) by.set(g, []); by.get(g).push(x); });
-    rows = Array.from(by.entries()).map(([g, list]) => {
-      const key = digits(st.groups[g - 1].key);
-      const rep = list.find(x => digits(cell(x.r, iNo)) === key) || list[0];
-      return {r: rep.r, n: rep.n, list: list};
-    });
-  }
   if (!rows.length) {
     $('#out').hidden = true;
     setMsg('#msg', '出すグループが1つも選ばれていません', 'warn');
@@ -449,18 +424,17 @@ function build() {
   const gOut = new Set(rows.map(x => rowGroup[x.n]));
   // グループが1つしか出ないときは、グループの列は要らないので出さない。
   // 「出す列」のグループはチェックを残したまま灰色にして、出さないことを添える（2つ以上に戻れば元どおり）
-  // 1通1行なら1行が1グループなので、グループの列も出さない
-  const noGroup = gOut.size <= 1 || st.unit === 'slip';
+  const noGroup = gOut.size <= 1;
   if (st.pick.has('group') && !noGroup) all.unshift(byKey.get('group'));
   const gChip = document.querySelector('#picks input[data-key="group"]');
   if (gChip) {
     const lab = gChip.closest('label');
     lab.classList.toggle('na', noGroup);
-    lab.title = noGroup ? (st.unit === 'slip' ? '送り状1通で1行のときは、1行が1グループなので出しません' : '送り状が1つだけなので、グループの列は出しません') : '';
+    lab.title = noGroup ? '送り状が1つだけなので、グループの列は出しません' : '';
     let w = lab.querySelector('.why');
     if (noGroup) {
       if (!w) { w = document.createElement('span'); w.className = 'why'; lab.appendChild(w); }
-      w.textContent = st.unit === 'slip' ? '1通1行なので出しません' : '1つだけなので出しません';
+      w.textContent = '1つだけなので出しません';
     } else if (w) w.remove();
   }
 
@@ -476,17 +450,6 @@ function build() {
   const cols = [];
   all.forEach(o => {
     if (o.key === 'group') { cols.push({head: 'グループ', key: o.key, val: (r, n) => String(rowGroup[n])}); return; }
-    if (o.slipOnly) {
-      if (st.unit !== 'slip') return;
-      if (o.key === 'boxes') cols.push({head: '個口数', key: o.key, val: (r, n, x) => String(x.list.length)});
-      else cols.push({head: '伝票番号（全口）', key: o.key, val: (r, n, x) => {
-        const key = digits(st.groups[rowGroup[n] - 1].key);
-        const nos = x.list.map(y => cell(y.r, iNo).trim());
-        nos.sort((a, b) => (digits(a) === key ? -1 : digits(b) === key ? 1 : a.localeCompare(b)));   // 親を先頭に
-        return nos.join('、');
-      }});
-      return;
-    }
     o.idx.forEach((i, j) => {
       if (i < 0) return;
       const label = st.head[i] || o.cols[j];
@@ -506,15 +469,13 @@ function build() {
   const first = cell(rows[0].r, iName).trim();
   const base = safeName(first);
   st.name = (base ? base.replace(/様$/, '') + '様' : '発行済データ') + (dests.size > 1 ? ' 他' : '') + '.csv';
-  const out = [cols.map(c => c.head)].concat(rows.map(x => cols.map(c => c.val(x.r, x.n, x))));
+  const out = [cols.map(c => c.head)].concat(rows.map(x => cols.map(c => c.val(x.r, x.n))));
   st.aoa = out;
   st.text = out.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 
   $('#fname').textContent = st.name;
-  const labels = rows.reduce((s, x) => s + (x.list ? x.list.length : 1), 0);
-  $('#count').textContent = '見出し1行 ＋ データ ' + rows.length + '行' +
-    (st.unit === 'slip' && labels !== rows.length ? '（送り状 ' + labels + '枚）' : '') +
-    '　／　' + cols.length + '列' + (labels < st.body.length ? '（ファイル全体では ' + st.body.length + '枚）' : '');
+  $('#count').textContent = '見出し1行 ＋ データ ' + rows.length + '行　／　' + cols.length + '列' +
+    (rows.length < st.body.length ? '（ファイル全体では ' + st.body.length + '行）' : '');
   // どのアカウントでの出荷か（出す送り状だけで数える）
   const acc = new Map();
   gOut.forEach(g => { const a = st.groups[g - 1].acct; acc.set(a, (acc.get(a) || 0) + 1); });
@@ -530,7 +491,7 @@ function build() {
     show.map((x, m) => {
       const g = rowGroup[x.n], top = m > 0 && rowGroup[show[m - 1].n] !== g;
       return '<tr class="' + (g % 2 ? '' : 'g1') + (top ? ' gtop' : '') + '"><td class="rn">' + (x.n + st.hr + 2) + '</td>' +
-        cols.map(c => '<td>' + esc(c.val(x.r, x.n, x)) + '</td>').join('') + '</tr>';
+        cols.map(c => '<td>' + esc(c.val(x.r, x.n)) + '</td>').join('') + '</tr>';
     }).join('') + '</table>' +
     (rows.length > show.length ? '<div class="tiny muted" style="padding:6px">ほか ' + (rows.length - show.length) + '行</div>' : '');
   $('#out').hidden = false;
@@ -571,13 +532,6 @@ $('#file').addEventListener('change', e => { if (e.target.files[0]) open(e.targe
 $('#save').addEventListener('click', save);
 $('#saveXlsx').addEventListener('click', saveXlsx);
 document.addEventListener('change', e => {
-  if (e.target.name === 'unit') {
-    st.unit = e.target.value;
-    saveUnit();
-    renderPicks();
-    build();
-    return;
-  }
   const g = e.target.dataset && e.target.dataset.g;
   if (g) {
     if (e.target.checked) st.gsel.add(+g); else st.gsel.delete(+g);
@@ -639,8 +593,7 @@ $('#resetPick').addEventListener('click', () => {
 });
 
 // 確かめる用（画面の動きには関係しない）
-window.TRACKING = {open: open, state: st, move: moveKey, setPick: keys => { st.pick = new Set(keys); renderPicks(); build(); },
-  setUnit: u => { st.unit = u; renderPicks(); build(); }};
+window.TRACKING = {open: open, state: st, move: moveKey, setPick: keys => { st.pick = new Set(keys); renderPicks(); build(); }};
 })();
 </script>
 </body>
