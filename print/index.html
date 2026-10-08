@@ -12,7 +12,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 出荷ボードと同じ白の75%。灰色だと黒地で読みにくい */
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#DCE3DF;   /* 白の85%くらい。灰色だと黒地で読みにくい（出荷ボードの75%より一段明るく） */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
 }
@@ -45,14 +45,15 @@ nav button[aria-selected="true"]{color:var(--accent-ink); background:var(--accen
   </nav>
   <div class="drop" id="drop">ここにファイルを落とすと、合うタブで開きます（別紙→印刷マン／送り状PDF→余白書き換え／発行済データ→追跡番号出力）</div>
   <!-- 版番号。push するたびに上げます（中の3つのページとは別に数えます） -->
-  <span class="ver">v2</span>
+  <span class="ver">v3</span>
 </header>
 <div id="msg" hidden></div>
 <div class="frames" id="frames"></div>
 
 <script>
 /* ===================================================================
-   ラベル印刷補助  v2
+   ラベル印刷補助  v3
+   v3 薄い文字をもう一段明るく（白の85%くらい）
    v2 薄い文字の色を出荷ボードと同じに
 
    印刷マン（label/）・送り状 余白書き換え（hinmei/）・追跡番号出力（tracking/）を1つの入口にまとめる。

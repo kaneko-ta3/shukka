@@ -12,7 +12,7 @@
 :root{
   color-scheme: dark;
   --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
-  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#D1D9D5;   /* 出荷ボードと同じ白の75%。灰色だと黒地で読みにくい */
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#DCE3DF;   /* 白の85%くらい。灰色だと黒地で読みにくい（出荷ボードの75%より一段明るく） */
   --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
   --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
   --radius:8px;
@@ -83,7 +83,7 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSV・Excelを作ります（取引先への返却用）。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v8</span>
+  <span class="ver">v9</span>
 </header>
 
 <main>
@@ -139,7 +139,8 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v8
+   追跡番号出力  v9
+   v9 薄い文字をもう一段明るく（白の85%くらい）
    v8 薄い文字の色を出荷ボードと同じに
    v7 印刷マンの「返却用」をこちらにまとめた：1行の単位（送り状1通で1行＝最初／1枚で1行）、
       1通1行のときだけ選べる列「伝票番号（全口）」「個口数」、どのアカウントの出荷かの表示、Excelで保存。
