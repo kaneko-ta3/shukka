@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ラベル印刷補助</title>
+<!-- タブのマーク（印刷マンと同じ、横長の送り状が2枚重なる）。ファイルを増やさないようページに直接書いている -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='11' y='5' width='50' height='35' rx='3' fill='%23ffffff' stroke='%231D2523' stroke-width='2.5'/%3E%3Cpath d='M36 7 L36 38 M13 22.5 L59 22.5' stroke='%23B9C3C0' stroke-width='1'/%3E%3Crect x='3' y='21' width='52' height='37' rx='3' fill='%23ffffff' stroke='%231D2523' stroke-width='2.5'/%3E%3Cpath d='M29 23 L29 56 M5 39.5 L53 39.5' stroke='%23B9C3C0' stroke-width='1'/%3E%3Crect x='6.5' y='24.5' width='2.2' height='11.5' fill='%231D2523'/%3E%3Crect x='10.1' y='24.5' width='1.2' height='11.5' fill='%231D2523'/%3E%3Crect x='12.7' y='24.5' width='2.2' height='11.5' fill='%231D2523'/%3E%3Crect x='16.3' y='24.5' width='1.2' height='11.5' fill='%231D2523'/%3E%3Crect x='18.9' y='24.5' width='2.2' height='11.5' fill='%231D2523'/%3E%3Crect x='32.5' y='25.5' width='18' height='2.6' rx='1' fill='%2348BFA6'/%3E%3Crect x='32.5' y='31' width='14' height='2.6' rx='1' fill='%2348BFA6'/%3E%3Crect x='32.5' y='44' width='17' height='2.6' rx='1' fill='%2348BFA6'/%3E%3Crect x='32.5' y='49.5' width='12' height='2.6' rx='1' fill='%2348BFA6'/%3E%3Crect x='6' y='42.5' width='20' height='12.5' rx='1.5' fill='%23F2C94C'/%3E%3C/svg%3E">
+<style>
+/* 出荷ボード・印刷マンと同じ色。いつもダークで表示します */
+:root{
+  color-scheme: dark;
+  --ground:#0E1312; --surface:#161D1B; --surface-2:#1D2523;
+  --line:#3E4C48; --line-strong:#647672; --ink:#E7EDEA; --muted:#9FB0AA;
+  --accent:#48BFA6; --accent-ink:#08201C; --accent-soft:#11332C;
+  --warn:#D9A445; --warn-soft:#30260F; --danger:#E4695C; --danger-soft:#391C19;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important;}
+html, body{height:100%;}
+body{margin:0; background:var(--ground); color:var(--ink); display:flex; flex-direction:column;
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif; font-size:14px; line-height:1.5;}
+header{padding:8px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:var(--surface);}
+header h1{font-size:17px; margin:0; white-space:nowrap;}
+nav{display:flex; gap:6px; flex-wrap:wrap;}
+nav button{font:inherit; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:6px 14px; cursor:pointer;}
+nav button:hover{border-color:var(--accent);}
+nav button[aria-selected="true"]{color:var(--accent-ink); background:var(--accent); border-color:var(--accent); font-weight:700;}
+.drop{flex:1 1 220px; min-width:200px; border:2px dashed var(--line-strong); border-radius:7px; padding:5px 12px; color:var(--muted); font-size:12px; text-align:center;}
+.drop.over{border-color:var(--accent); background:var(--accent-soft); color:var(--ink);}
+.ver{font-size:13px; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:0 8px;}
+#msg{font-size:12px; padding:4px 16px; background:var(--warn-soft); color:var(--warn);}
+.frames{flex:1; position:relative; min-height:0;}
+.frames iframe{position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--ground);}
+</style>
+</head>
+<body>
+<header>
+  <h1>ラベル印刷補助</h1>
+  <nav role="tablist">
+    <button role="tab" data-tab="label">印刷マン</button>
+    <button role="tab" data-tab="hinmei">送り状 余白書き換え</button>
+    <button role="tab" data-tab="tracking">追跡番号出力</button>
+  </nav>
+  <div class="drop" id="drop">ここにファイルを落とすと、合うタブで開きます（別紙→印刷マン／送り状PDF→余白書き換え／発行済データ→追跡番号出力）</div>
+  <!-- 版番号。push するたびに上げます（中の3つのページとは別に数えます） -->
+  <span class="ver">v1</span>
+</header>
+<div id="msg" hidden></div>
+<div class="frames" id="frames"></div>
+
+<script>
+/* ===================================================================
+   ラベル印刷補助  v1
+
+   印刷マン（label/）・送り状 余白書き換え（hinmei/）・追跡番号出力（tracking/）を1つの入口にまとめる。
+   ・中の3つは今のページをそのまま枠（iframe）で出す。開いたタブだけ読み込み、切り替えても中身は残る
+   ・上の帯にファイルを落とすと、中身を見て合うタブへ渡す
+       PDF → 余白書き換え ／ 見出しに「伝票番号」「お届け先名」がある表 → 追跡番号出力 ／ それ以外の表 → 印刷マン
+   ・前に開いていたタブを覚える。URLの #label #hinmei #tracking でも開ける
+   ・今の3つのURLはそのまま残す（ほかの人のブックマーク用）
+   =================================================================== */
+(function () {
+'use strict';
+
+const PAGES = {label: '../label/', hinmei: '../hinmei/', tracking: '../tracking/'};
+const NAMES = {label: '印刷マン', hinmei: '送り状 余白書き換え', tracking: '追跡番号出力'};
+const LS_TAB = 'print_tab_v1';
+const $ = s => document.querySelector(s);
+const frames = {};
+
+function frameOf(tab) {
+  if (!frames[tab]) {
+    const f = document.createElement('iframe');
+    f.src = PAGES[tab];
+    f.title = NAMES[tab];
+    f.loaded = new Promise(ok => f.addEventListener('load', ok, {once: true}));
+    $('#frames').appendChild(f);
+    frames[tab] = f;
+  }
+  return frames[tab];
+}
+
+function show(tab) {
+  if (!PAGES[tab]) tab = 'label';
+  frameOf(tab);
+  Object.keys(frames).forEach(k => { frames[k].hidden = k !== tab; });
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  document.title = NAMES[tab] + '｜ラベル印刷補助';
+  try { localStorage.setItem(LS_TAB, tab); } catch (e) { /* 覚えられなくても動く */ }
+  if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab);
+}
+
+function msg(text) {
+  $('#msg').textContent = text;
+  $('#msg').hidden = !text;
+}
+
+/* ファイルの中身から、どのタブで開くかを決める */
+async function tabFor(file) {
+  const head = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+  if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) return 'hinmei';   // %PDF
+  if (head[0] === 0x50 && head[1] === 0x4B) return 'label';                                            // xlsx（zip）は別紙
+  let text;
+  try { text = new TextDecoder('utf-8', {fatal: true}).decode(head); }
+  catch (e) { text = new TextDecoder('shift_jis').decode(head); }
+  const top = text.split(/\r?\n/).slice(0, 3).join('\n');
+  return /伝票番号/.test(top) && /お届け先名/.test(top) ? 'tracking' : 'label';
+}
+
+/* 中のページのドロップ欄に、落としたのと同じようにファイルを渡す */
+async function handOver(file) {
+  msg('');
+  let tab;
+  try { tab = await tabFor(file); } catch (e) { msg('ファイルを読めませんでした：' + (e.message || e)); return; }
+  show(tab);
+  const f = frameOf(tab);
+  await f.loaded;
+  const W = f.contentWindow, target = W.document.getElementById('drop');
+  if (!target) { msg(NAMES[tab] + 'のページにファイルを渡せませんでした。中のページに直接落としてください'); return; }
+  const dt = new W.DataTransfer();
+  dt.items.add(file);
+  target.dispatchEvent(new W.DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));
+}
+
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handOver(f); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f && e.target !== drop) handOver(f); });
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => show(b.dataset.tab)));
+window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+
+let first = location.hash.slice(1);
+if (!PAGES[first]) { try { first = localStorage.getItem(LS_TAB) || 'label'; } catch (e) { first = 'label'; } }
+show(first);
+
+// 確かめる用（画面の動きには関係しない）
+window.PRINT = {show: show, handOver: handOver, tabFor: tabFor, frames: frames};
+})();
+</script>
+</body>
+</html>
