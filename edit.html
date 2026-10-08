@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v103";
+const BUILD = "v104";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1121,7 +1121,7 @@ const LEAD_UNKNOWN_GRACE = 14;
 
 /* 実際の輸送日数。
    t.lead は「出荷日 自動配置」が使う日数で、1日ぶん余裕を持たせてあります
-   （関東〜兵庫は翌日着だけど2日、それ以西・東北・北海道は2日着だけど3日）。
+   （関東〜兵庫・東北は翌日着だけど2日、それより西・北海道は2日着だけど3日）。
    赤の判定は余裕なしのぴったりで見たいので、1日引きます */
 function transitDays(t){
   return Math.max(1, (Number(t.lead) || 2) - 1);
@@ -2842,7 +2842,7 @@ document.getElementById("auto").onclick = () => {
 
   const msg = "出荷タスク " + pool.length + "件に出荷日を入れます。\n\n"
     + "実際に届く日の1日前になるように、納品日からさかのぼります\n"
-    + "（関東〜兵庫は2稼働日前、それより西・東北・北海道は3稼働日前。土日祝は数えません）\n"
+    + "（関東〜兵庫・東北は2稼働日前、それより西・北海道は3稼働日前。土日祝は数えません）\n"
     + "自社配送は、納品日と同じ日に置きます\n\n"
     + (past ? "※ うち " + past + "件は計算上すでに過去の日付になります\n\n" : "")
     + "製造タスクは対象外です。よろしいですか？";
