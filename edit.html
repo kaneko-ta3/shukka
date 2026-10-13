@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v104";
+const BUILD = "v105";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1403,7 +1403,8 @@ function renderCal(){
       b.dataset.id = t.id;
       b.title = "【" + kindName(t.kind) + "】" + t.name + "\n" + t.cust + (t.qty ? "　" + t.qty : "")
         + "\n実施 " + md(t.start) + (t.days > 1 ? "〜" + md(endOf(t)) + "（" + t.days + "日）" : "")
-        + (t.limit ? "\n期限 " + md(t.limit) : "\n期限 未設定")
+        + (t.limit ? "\n期限 " + md(t.limit)
+                   : "\n期限 未設定" + (t.dueMonth ? "（" + monthText(t.dueMonth) + "）" : ""))
         + (late ? "\n\n⚠ 赤い理由：" + lateReason(t) : "")
         + (leadq ? "\n\n⚠ " + leadReason(t) : "")
         + (t.multi ? "\n複数箇所納品" : "")
@@ -1429,15 +1430,26 @@ function renderCal(){
   }
 }
 
+/* 納品日が月までしか決まっていないもの（出荷指示に「2026/11予定」）。
+   期限としては未設定のまま扱い、「期限 未設定（11月予定）」と出します。
+   並べ替えではその月の末日に置き、その月に入ったら注意の色（橙）にします */
+const monthEnd = ym => { const a = ym.split("-").map(Number); return iso(new Date(a[0], a[1], 0)); };
+const monthText = ym => Number(ym.split("-")[1]) + "月予定";
+const monthWarn = t => !!t.dueMonth && TODAY >= t.dueMonth + "-01";
+
 function limitChips(t){
   const out = [];
   if (t.kind === "m"){
     if (t.ship) out.push({label:"出荷 " + md(t.ship), left:diff(TODAY, t.ship)});
     if (t.due)  out.push({label:"納品 " + md(t.due),  left:diff(TODAY, t.due)});
+    else if (t.dueMonth && out.length)
+      out.push({label:"納品 " + monthText(t.dueMonth), left:null, warn:monthWarn(t)});
   } else {
     if (t.due)  out.push({label:"納品 " + md(t.due),  left:diff(TODAY, t.due)});
   }
-  if (!out.length) out.push({label:"期限 未設定", left:null});
+  if (!out.length) out.push(t.dueMonth
+    ? {label:"期限 未設定（" + monthText(t.dueMonth) + "）", left:null, warn:monthWarn(t)}
+    : {label:"期限 未設定", left:null});
   return out;
 }
 
@@ -1503,6 +1515,7 @@ function chipEl(t, done){
     /* 完了したものに「遅れ」は出しません（もう終わっているため） */
     s.textContent = c.label + ((done || c.left === null) ? "" : "　" + remainText(c.left));
     if (!done && c.left !== null) s.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
+    else if (!done && c.warn) s.className = "near";        // 月までの期限で、その月に入った
     lim.appendChild(s);
   });
 
@@ -1690,10 +1703,13 @@ function buildChipSkus(chip, t){
 }
 
 function byLimit(a, b){
-  if (!a.limit && !b.limit) return a.row - b.row;
-  if (!a.limit) return 1;
-  if (!b.limit) return -1;
-  return a.limit < b.limit ? -1 : (a.limit > b.limit ? 1 : a.row - b.row);
+  /* 期限が月までのもの（2026/11予定）は、その月の末日として並べます */
+  const la = a.limit || (a.dueMonth ? monthEnd(a.dueMonth) : null);
+  const lb = b.limit || (b.dueMonth ? monthEnd(b.dueMonth) : null);
+  if (!la && !lb) return a.row - b.row;
+  if (!la) return 1;
+  if (!lb) return -1;
+  return la < lb ? -1 : (la > lb ? 1 : a.row - b.row);
 }
 
 function renderPool(kind){
@@ -1998,6 +2014,7 @@ function dayRow(t){
     /* 完了したものに「遅れ」は出しません */
     sp.textContent = c.label + ((t.done || c.left === null) ? "" : "　" + remainText(c.left));
     if (!t.done && c.left !== null) sp.className = c.left < 0 ? "over" : (c.left <= 3 ? "near" : "");
+    else if (!t.done && c.warn) sp.className = "near";     // 月までの期限で、その月に入った
     lim.appendChild(sp);
   });
   if (t.done && t.start){
