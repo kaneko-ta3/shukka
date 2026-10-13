@@ -445,7 +445,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v105";
+const BUILD = "v106";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1361,7 +1361,31 @@ function memoEl(j){
   return box;
 }
 
+/* 製造の完了を取り消す前の確認。在庫に関わるときだけ聞きます。
+   ・22時の処理で在庫に入っている（累計作成数がある）→ 今夜22時に戻すことを伝える
+   ・タスク進捗に行が無い（出荷済でタスク完了へ移った など）→ 自動では戻らないことを伝える
+   どちらでもない（まだ22時の前）ときは、今まで通り聞かずに取り消します */
+function undoNotice(t){
+  if (t.kind !== "m" || !t.done) return "";
+  const own = (t.skus || []).filter(x => !x.missing && !x.other);
+  if (own.some(x => (Number(x.total) || 0) > 0)){
+    return "この製造は22時の処理で在庫に入っています。\n"
+         + "取り消すと、今夜22時に製品を減らし、資材と作業費を戻します（出荷の引当も戻ります）。\n\n"
+         + "取り消しますか？";
+  }
+  if (!own.length && t.doneOn){
+    return "この案件は、在庫ブックのタスク進捗に行がありません（出荷済でタスク完了へ移った など）。\n"
+         + "在庫・資材・作業費は自動では戻りません。手動変更で直してください。\n\n"
+         + "完了のチェックだけ取り消しますか？";
+  }
+  return "";
+}
+
 function commit(j, done){
+  if (!done){
+    const notice = undoNotice(j);
+    if (notice && !confirm(notice)) return;
+  }
   const task = app.querySelector('.task[data-row="' + j.row + '"]');
   if (task) task.classList.add('busy');
   pending++;
