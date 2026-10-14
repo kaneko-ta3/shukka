@@ -36,6 +36,7 @@
   --memo:#F59AC6; --memo-soft:#3A1F2E;
   /* 住所からリードタイムが出せない出荷＝サーモン。期限オーバーの赤とは別枠です */
   --leadq:#FF9E8A; --leadq-soft:#3A221D;
+  --noaddr:#A3E635;   /* 住所未入力で、出荷・納品が近いもの。文字の色だけに使います */
   --off-ink:#A85F57; --ago-ink:#8CBBD4; --ago-soft:#16303C;
   /* 曜日の見出しと日付の数字。日曜は明るい赤と濃い赤、土曜は明るい青と濃い青 */
   --sat:#5DB1E5; --sat-ink:#5C8EAD;
@@ -64,6 +65,7 @@ h1 .sub{display:block; font-size:10.5px; font-weight:500; letter-spacing:.14em; 
 .stat .v small{font-size:10px; font-weight:500; color:var(--muted);}
 .stat.is-warn .v{color:var(--warn)} .stat.is-danger .v{color:var(--danger)}
 .stat.is-leadq .v{color:var(--leadq)}
+.stat.is-noaddr .v{color:var(--noaddr)}
 /* 押すと一覧が開く2つ（未配置3日以内・期限オーバー）だけ、
    枠を濃いグレーにして見分けられるようにします */
 .stat.tap{cursor:pointer; box-shadow:inset 0 0 0 1px var(--line-strong);}
@@ -189,6 +191,11 @@ body.fold-log{--w-log:28px}
 .bar.late{border:2px solid var(--danger); border-left:3px solid var(--danger);}
 /* 住所からリードタイムが出せない出荷。遅れではないので、赤とは別の色の枠にします */
 .bar.leadq{border:2px solid var(--leadq); border-left:3px solid var(--leadq);}
+/* 住所未入力で、出荷・納品が近いもの。枠は変えず文字だけライムにします
+   （期限オーバーの赤枠と同時に付けられるように） */
+.bar.noaddr .nm, .chip.noaddr .nmtxt{color:var(--noaddr)}
+/* 開いたカードでは名前はふつうの色のまま。理由の行（ライム）で分かるので */
+.dv-why.noaddr{color:var(--noaddr)}
 .bar.pending{opacity:.55}
 /* 指で長押しして「持ち上げた」状態。動かせることが分かるようにします */
 .bar.held, .chip.held{
@@ -656,7 +663,7 @@ body.resizing{cursor:col-resize; user-select:none;}
       <div class="stat"><span class="k">出荷 未配置</span><span class="v mono" id="s-ps">–</span></div>
       <div class="stat" id="st-soon"><span class="k">未配置3日以内</span><span class="v mono" id="s-soon">–</span></div>
       <div class="stat" id="st-late"><span class="k">期限オーバー</span><span class="v mono" id="s-late">–</span></div>
-      <div class="stat" id="st-lead"><span class="k">住所判定不可</span><span class="v mono" id="s-lead">–</span></div>
+      <div class="stat" id="st-lead"><span class="k">住所未入力</span><span class="v mono" id="s-lead">–</span></div>
       <div class="stat"><span class="k">表示中の配置済</span><span class="v mono" id="s-set">–</span></div>
     </div>
 
@@ -755,7 +762,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v108";
+const BUILD = "v109";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1129,10 +1136,11 @@ const needArrange = t => t.kind === "s" && !!t.arrange && !t.arrangeDone && !isJ
    alloc が null のときは出荷指示シートに列が無いので、何も出しません */
 const isAllocated = t => t.kind === "s" && t.alloc === true;
 
-/* 納品先が読み取れない出荷を赤くし始める日数。
-   出荷がこれより先なら、まだ埋まる余地があるので赤くしません。
-   納品先が読み取れている行には効きません（そちらは今まで通り赤くします） */
-const LEAD_UNKNOWN_GRACE = 14;
+/* ★v109 住所未入力のうち、急ぐもの。
+   出荷日が7日以内、または納品日が10日以内なら文字をライムにします。
+   まだ置いていない（出荷日が無い）出荷も、納品日のほうで拾えます */
+const NOADDR_SHIP_DAYS = 7;
+const NOADDR_DUE_DAYS  = 10;
 
 /* 実際の輸送日数。
    t.lead は「出荷日 自動配置」が使う日数で、1日ぶん余裕を持たせてあります
@@ -1180,36 +1188,48 @@ function lateReason(t){
   if (t.start >= t.due){
     return "出荷日と納品日が同じ " + md(t.due) + "（当日には届かない）";
   }
-  /* 納品先が書かれておらず、輸送日数が出せないもの。
-     黙って遠方あつかいにすると当てにならないので、ここでは判定しません。
-     「判定できていない」ことは leadReason が別枠（サーモン）で知らせます */
-  if (t.leadKnown === false) return "";
-
+  /* ★v109 住所から地域が読めないものは、遠方（輸送2日）とみなして判定します。
+     サーバーが lead を遠い側の日数で送ってくるので、そのまま計算すれば遠方になります */
   const n = transitDays(t);
   const arr = arriveDate(t);
   if (arr > t.due){
     return "出荷日 " + md(t.start) + " ＋ 輸送 " + n + "日 ＝ " + md(arr)
-         + " で、納品日 " + md(t.due) + " に間に合わない";
+         + " で、納品日 " + md(t.due) + " に間に合わない"
+         + (t.leadKnown === false ? "（住所から地域が読めないので遠方で計算）" : "");
   }
   return "";
 }
 
 const isLate = t => !!lateReason(t);
 
-/* 住所からリードタイムが出せない出荷。期限オーバーとは別枠で、帯はサーモンの枠です。
-   ・期限オーバーの理由がほかにあれば、そちら（赤）を優先して、ここでは出しません
-   ・出荷が2週間より先なら急かしません。納品先は出荷までに埋まるので、
-     今の時点で出しても直しようがなく、印が増えるだけです
-   ・「複数箇所納品」にチェックがある出荷は出しません。
-     納品先が複数あって、住所をわざと入れていないものです */
-function leadReason(t){
-  if (t.kind !== "s" || !t.start || !t.due) return "";
-  if (t.leadKnown !== false || t.multi || isJisha(t)) return "";
-  if (isLate(t)) return "";
-  if (t.start > add(TODAY, LEAD_UNKNOWN_GRACE)) return "";
-  return "住所からリードタイム判定不可";
+/* ★v109 住所未入力の出荷（納品先住所1・2がどちらも空）。上の「住所未入力」の箱で数えます。
+   数えないもの：
+   ・「複数箇所納品」にチェックがあるもの（納品先が複数で、住所をわざと入れていない）
+   ・自社配送（自分で運ぶので送り状の住所は要らない）
+   ・ラベル発行済（送り状を出した時点で住所は入っていた）
+   置いていない出荷も数えます。急ぐもの（noAddrUrgent）だけ文字をライムにします */
+const isNoAddr = t => t.kind === "s" && !t.done && t.noAddr === true
+  && !t.multi && !isJisha(t) && t.label !== true;
+function noAddrUrgent(t){
+  if (!isNoAddr(t)) return false;
+  return (!!t.start && t.start <= add(TODAY, NOADDR_SHIP_DAYS))
+      || (!!t.due && t.due <= add(TODAY, NOADDR_DUE_DAYS));
 }
-const isLeadQ = t => !!leadReason(t);
+/* 文字をライムにするかどうか。期限オーバー（赤）と重なったものは赤を優先して、ライムにしません */
+const isLime = t => noAddrUrgent(t) && !isLate(t);
+function noAddrReason(t){
+  return "住所が入っていません（"
+    + [t.start ? "出荷 " + md(t.start) : "未配置", t.due ? "納品 " + md(t.due) : ""]
+        .filter(Boolean).join("・") + "）";
+}
+/* 住所未入力の一覧の並び。急ぐものが先、そのあとは納品日が近い順 */
+function byNoAddr(a, b){
+  const ua = noAddrUrgent(a), ub = noAddrUrgent(b);
+  if (ua !== ub) return ua ? -1 : 1;
+  const da = a.due || a.start || "9999", db = b.due || b.start || "9999";
+  if (da !== db) return da < db ? -1 : 1;
+  return a.row - b.row;
+}
 
 function renderSummary(){
   const pm = tasks.filter(t => t.kind === "m" && !t.start && !t.done);
@@ -1222,9 +1242,9 @@ function renderSummary(){
   const lateList = tasks.filter(t => onCal(t) && isLate(t))
     .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
   const late = lateList.length;
-  const leadList = tasks.filter(t => onCal(t) && isLeadQ(t))
-    .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
+  const leadList = tasks.filter(isNoAddr).sort(byNoAddr);
   const lead = leadList.length;
+  const leadUrgent = leadList.filter(noAddrUrgent).length;
   const from = anchor, to = anchorEnd();
   const set = tasks.filter(t => onCal(t) && t.start >= from && t.start <= to).length;
 
@@ -1258,13 +1278,17 @@ function renderSummary(){
         ).join("\n")
       + (late > CAP ? "\n\n…ほか " + (late - CAP) + "件" : "")
     : "期限を過ぎているタスクはありません";
-  document.getElementById("st-lead").className = "stat" + (lead ? " is-leadq tap" : "");
+  /* ふだんは白。出荷・納品が近いものがあるときだけライムにします */
+  document.getElementById("st-lead").className = "stat"
+    + (leadUrgent ? " is-noaddr" : "") + (lead ? " tap" : "");
   document.getElementById("st-lead").title = lead
-    ? "住所判定不可 " + lead + "件\n\n"
-      + leadList.slice(0, CAP).map(t => md(t.start) + "　出荷　" + t.name).join("\n")
+    ? "住所未入力 " + lead + "件（うち急ぎ " + leadUrgent + "件）\n\n"
+      + leadList.slice(0, CAP).map(t => (noAddrUrgent(t) ? "急　" : "　　")
+          + (t.start ? md(t.start) : "未配置") + "　" + t.name
+          + (t.due ? "　納品 " + md(t.due) : "")).join("\n")
       + (lead > CAP ? "\n\n…ほか " + (lead - CAP) + "件" : "")
       + "\n\n納品先が複数で住所を入れないものは、開いて「複数箇所納品」にチェックを付けてください"
-    : "住所からリードタイムが出せない出荷はありません";
+    : "住所が空の出荷はありません";
   document.getElementById("pm-count").textContent = pm.length + "件";
   document.getElementById("ps-count").textContent = ps.length + "件";
   document.getElementById("pm-count2").textContent = pm.length + "件";
@@ -1405,9 +1429,10 @@ function renderCal(){
       }
       const t = sg.t;
       const late = isLate(t);
-      const leadq = !late && isLeadQ(t);
+      const noaddr = noAddrUrgent(t);
       const b = document.createElement("div");
-      b.className = "bar k-" + t.kind + (late ? " late" : "") + (leadq ? " leadq" : "")
+      const lime = noaddr && !late;   // 期限オーバーと重なったら赤を優先
+      b.className = "bar k-" + t.kind + (late ? " late" : "") + (lime ? " noaddr" : "")
         + (t.label === false ? " nolabel" : "")
         + (needArrange(t) ? " arrange" : "")
         + (sg.contL ? " cont-l" : "") + (sg.contR ? " cont-r" : "")
@@ -1421,7 +1446,7 @@ function renderCal(){
         + (t.limit ? "\n期限 " + md(t.limit)
                    : "\n期限 未設定" + (t.dueMonth ? "（" + monthText(t.dueMonth) + "）" : ""))
         + (late ? "\n\n⚠ 赤い理由：" + lateReason(t) : "")
-        + (leadq ? "\n\n⚠ " + leadReason(t) : "")
+        + (noaddr ? "\n\n⚠ " + noAddrReason(t) : "")
         + (t.multi ? "\n複数箇所納品" : "")
         + (isJisha(t) ? "\n自社配送" : "")
         + (t.label === false ? "\nラベル未発行" : "")
@@ -1471,7 +1496,8 @@ function limitChips(t){
 function chipEl(t, done){
   const el = document.createElement("div");
   el.className = "chip k-" + t.kind + (done ? " is-done" : "")
-    + (selected === t.id ? " sel" : "") + (t._pending ? " pending" : "");
+    + (selected === t.id ? " sel" : "") + (t._pending ? " pending" : "")
+    + (isLime(t) ? " noaddr" : "");
   el.tabIndex = 0;
   el.dataset.id = t.id;
 
@@ -1950,8 +1976,7 @@ function statTasks(mode){
       .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
   }
   if (mode === "lead"){
-    return tasks.filter(t => onCal(t) && isLeadQ(t))
-      .sort((a, b) => a.start < b.start ? -1 : (a.start > b.start ? 1 : a.row - b.row));
+    return tasks.filter(isNoAddr).sort(byNoAddr);
   }
   return tasks.filter(t => !t.start && !t.done)
     .filter(t => { const l = leftOf(t); return l !== null && l <= 3; })
@@ -1971,7 +1996,7 @@ function renderStatView(){
 
   const head = {
     late: {t: "期限オーバー",   c: "日付の置き方に無理があるものです。カードの「配置を解除」で外せます"},
-    lead: {t: "住所判定不可",   c: "住所からリードタイムが出せない出荷です。納品先が複数で住所を入れないものは「複数箇所納品」にチェックを付けてください"},
+    lead: {t: "住所未入力",     c: "納品先住所が空の出荷です。出荷7日前・納品10日前を切ったものは文字がライムです。納品先が複数で住所を入れないものは「複数箇所納品」にチェックを付けてください"},
     soon: {t: "未配置3日以内", c: "まだカレンダーに置いていないものです。閉じてから枠からドラッグして置いてください"},
     one:  {t: (list[0].kind === "m" ? "製造タスク" : "出荷タスク"), c: ""}
   }[statView];
@@ -1991,12 +2016,8 @@ function renderStatView(){
       const why = document.createElement("div");
       why.className = "dv-why";
       why.textContent = "⚠ " + lateReason(t);
-      row.insertBefore(why, row.querySelector(".dv-act"));
-    } else if (statView !== "soon" && isLeadQ(t)){
-      const why = document.createElement("div");
-      why.className = "dv-why leadq";
-      why.textContent = "⚠ " + leadReason(t);
-      row.insertBefore(why, row.querySelector(".dv-act"));
+      /* 住所が無い行（dayRow が付けます）より上に出します */
+      row.insertBefore(why, row.querySelector(".why-addr") || row.querySelector(".dv-act"));
     }
     ul.appendChild(row);
   });
@@ -2004,12 +2025,22 @@ function renderStatView(){
 
 function dayRow(t){
   const el = document.createElement("div");
-  el.className = "dv-row k-" + t.kind + (t.done ? " is-done" : "") + (t._pending ? " pending" : "");
+  el.className = "dv-row k-" + t.kind + (t.done ? " is-done" : "") + (t._pending ? " pending" : "")
+    + (isLime(t) ? " noaddr" : "");
 
   el.innerHTML = '<div class="dv-nm"><span class="dv-kind"></span><span class="dv-nmtxt"></span></div>'
     + '<div class="dv-sub"></div><div class="dv-lim"></div>'
     + '<div class="dv-memo-slot"></div>'
     + '<div class="dv-skus" hidden></div><div class="dv-act"></div>';
+
+  /* ★v109 住所未入力で急ぐもの。日付を開いたときも一覧でも出します。
+     期限オーバーと重なったものは赤の行にします（ライムは使いません） */
+  if (noAddrUrgent(t)){
+    const why = document.createElement("div");
+    why.className = "dv-why" + (isLime(t) ? " noaddr" : "") + " why-addr";
+    why.textContent = "⚠ " + noAddrReason(t);
+    el.insertBefore(why, el.querySelector(".dv-act"));
+  }
 
   const kd = el.querySelector(".dv-kind");
   kd.textContent = (t.kind === "m" ? "造" : "出");
@@ -2086,7 +2117,8 @@ function dayRow(t){
       box.hidden = false;
       box.appendChild(arrangeCheck(t, "", "dv-sku"));
     }
-    if (t.leadKnown === false || t.multi){
+    /* ★v109 住所が空の出荷に出します（付けると住所未入力に数えなくなります） */
+    if (t.noAddr || t.multi){
       box.hidden = false;
       box.appendChild(multiCheck(t));
     }
