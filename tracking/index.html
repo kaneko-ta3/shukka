@@ -83,15 +83,15 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
   <h1>追跡番号出力</h1>
   <span class="tiny muted">B2の発行済データから、伝票番号とお届け先名（と選んだ列）だけのCSV・Excelを作ります（取引先への返却用）。ファイルはこのブラウザの中で読むだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（ほかのページとは別に数えます） -->
-  <span class="ver">v10</span>
+  <span class="ver">v11</span>
 </header>
 
 <main>
   <section>
     <div class="drop" id="drop">
-      B2の発行済データ（CSV）をここにドロップ
+      B2の発行済データ（CSV）か、送り状のファイル（UMIN～）をここにドロップ
       <div class="or tiny">または</div>
-      <label class="btn">ファイルを選ぶ<input type="file" id="file" accept=".csv,.txt,.tsv,.xlsx,.xls" hidden></label>
+      <label class="btn">ファイルを選ぶ<input type="file" id="file" accept=".csv,.txt,.tsv,.xlsx,.xls,.pdf" hidden></label>
     </div>
     <div id="msg" class="notice" hidden></div>
   </section>
@@ -134,7 +134,10 @@ label.gk .gn{color:var(--muted); font-size:12px; margin-left:auto;}
 
 <script>
 /* ===================================================================
-   追跡番号出力  v10
+   追跡番号出力  v11
+   v11 送り状のPDF（UMIN…）からも作れる。PDFの文字から 伝票番号・お届け先名・品名１/２・郵便番号・親番号 を読む
+       （余白書き換えの読み方を借りる。pdf.js は ../hinmei/vendor のものを使う）。PDFに無い列（アカウントなど）は出せない。
+       並びは送り状番号の小さい順（＝発行済データの順。B2のPDFは地域で並びが割れることがあるため）
    v10 1行の単位は「送り状1枚で1行」に固定（本人：全部の番号を返す。1行に詰める理由はない）。
        v7 の切り替え・「伝票番号（全口）」「個口数」の列はなくした。アカウント表示とExcelは残す
    v9 薄い文字をもう一段明るく（白の85%くらい）
@@ -235,8 +238,92 @@ function loadScript(src) {
   });
 }
 
+/* ---------- 送り状のPDF（UMIN…）から読む。余白書き換え（hinmei/app.js）と同じ読み方 ---------- */
+const SLIP_NO = /\d{4}-\d{4}-\d{4}/;
+const HARI_TODOKE = [330, 28, 540, 110];   // 貼付票の「お届け先」
+const HIN_FIELD = [340, 162, 520, 184];    // 貼付票の「品名」
+
+/** 四角の中の文字を行にする（文字のかたまりの中心で判定） */
+function linesIn(items, box) {
+  const inside = items.filter(it => {
+    if (!it.str.trim()) return false;
+    const cx = it.x + it.w / 2, cy = it.y - it.size * 0.35;
+    return cx >= box[0] && cx <= box[2] && cy >= box[1] && cy <= box[3];
+  }).sort((a, b) => a.y - b.y || a.x - b.x);
+  const rows = [];
+  for (const it of inside) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(last.y - it.y) < 1.5) last.items.push(it);
+    else rows.push({y: it.y, items: [it]});
+  }
+  return rows.map(r => {
+    r.items.sort((a, b) => a.x - b.x);
+    let s = '', x1 = null;
+    for (const it of r.items) {
+      if (x1 !== null && it.x - x1 > it.size * 0.3) s += ' ';
+      s += it.str;
+      x1 = it.x + it.w;
+    }
+    return s.replace(/\s+/g, ' ').trim();
+  }).filter(Boolean);
+}
+
+/** 1枚ぶん：自分の送り状番号（3か所印字されるので一番多い番号）、親番号（子に印字される「親伝票」の番号）、お届け先名、〒、品名 */
+function readSlipPage(items) {
+  const nums = items.filter(it => SLIP_NO.test(it.str)).map(it => ({no: it.str.match(SLIP_NO)[0], x: it.x, y: it.y}));
+  const cnt = {};
+  nums.forEach(n => { cnt[n.no] = (cnt[n.no] || 0) + 1; });
+  const own = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || '';
+  let parent = '';
+  const label = items.find(it => /親伝票/.test(it.str));
+  if (label) {
+    let bd = Infinity;
+    for (const n of nums) {
+      const dx = n.x - label.x, dy = Math.abs(n.y - label.y);
+      if (dx > 0 && dx < 120 && dy < 16 && dx + dy * 4 < bd) { bd = dx + dy * 4; parent = n.no; }
+    }
+  }
+  const hari = linesIn(items, HARI_TODOKE);
+  const zl = hari.find(s => /^(〒\s*)?\d{3}-\d{4}$/.test(s)) || '';
+  const nl = hari.find(s => /(様|御中)$/.test(s)) || '';
+  const hin = linesIn(items, HIN_FIELD).filter(s => ['品', '名', '品名', '品 名'].indexOf(s) < 0 && !/(様|御中)$/.test(s));
+  const d = s => s.replace(/\D/g, '');
+  return {no: d(own), parent: d(parent || own), zip: d(zl), name: nl.replace(/\s*(様|御中)$/, ''), h1: hin[0] || '', h2: hin[1] || ''};
+}
+
+async function readPdf(buf) {
+  if (typeof pdfjsLib === 'undefined') await loadScript('../hinmei/vendor/pdf.min.js');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '../hinmei/vendor/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({scale: 1});
+    const tc = await page.getTextContent();
+    const items = [];
+    for (const it of tc.items) {
+      if (typeof it.str !== 'string' || !it.str) continue;
+      const tr = it.transform, pt = vp.convertToViewportPoint(tr[4], tr[5]);
+      items.push({str: it.str, x: pt[0], y: pt[1], w: it.width, size: Math.hypot(tr[2], tr[3]) || Math.hypot(tr[0], tr[1])});
+    }
+    pages.push(readSlipPage(items));
+    page.cleanup();
+  }
+  await pdf.destroy();
+  const bad = pages.map((p, i) => (p.no ? 0 : i + 1)).filter(Boolean);
+  if (bad.length) throw new Error(bad.slice(0, 10).join('・') + '枚目の送り状番号が読めません。ヤマトの送り状（A5）のPDFか確かめてください');
+  // 送り状番号の小さい順（親でまとめてから自分の番号。最後の1桁はチェック数字なので比べない）
+  const k = n => n.slice(0, -1);
+  pages.sort((a, b) => (k(a.parent) < k(b.parent) ? -1 : k(a.parent) > k(b.parent) ? 1 : 0) || (k(a.no) < k(b.no) ? -1 : k(a.no) > k(b.no) ? 1 : 0));
+  return [['伝票番号', 'お届け先名', '品名１', '品名２', 'お届け先郵便番号', '複数口くくりキー']]
+    .concat(pages.map(p => [p.no, p.name, p.h1, p.h2, p.zip, p.parent]));
+}
+
 async function read(file) {
   const buf = await file.arrayBuffer();
+  const sig = new Uint8Array(buf.slice(0, 4));
+  st.fromPdf = sig[0] === 0x25 && sig[1] === 0x50 && sig[2] === 0x44 && sig[3] === 0x46;   // %PDF
+  if (st.fromPdf) return readPdf(buf);
   if (/\.xlsx?$/i.test(file.name)) {
     // Excelで来たときだけ、複数宛先ラベルに置いてある読み取り部品を借りる
     if (typeof XLSX === 'undefined') await loadScript('../label/vendor/xlsx.full.min.js');
@@ -264,6 +351,7 @@ function safeName(s) {
 function colOf(label) {
   const i = st.head.indexOf(label);
   if (i >= 0) return i;
+  if (st.fromPdf) return -1;                       // PDFから作った表は、ある列だけ
   return STD[label] !== undefined && STD[label] < st.head.length ? STD[label] : -1;
 }
 const cell = (r, i) => (i < 0 || r[i] == null ? '' : String(r[i]));
@@ -338,7 +426,7 @@ function makeGroups() {
       gno.set(k, gno.size + 1);
       const code = digits(cell(r, iBill));
       st.groups.push({no: gno.size, key: k, name: cell(r, iName).trim(), dept2: cell(r, iDept2).trim(), rows: 0,
-                      acct: code ? (names.get(acctKey(code, cell(r, iCls))) || '未登録のアカウント') : '（請求先なし）'});
+                      acct: st.fromPdf ? '送り状のPDFからは分かりません' : code ? (names.get(acctKey(code, cell(r, iCls))) || '未登録のアカウント') : '（請求先なし）'});
     }
     const g = gno.get(k);
     st.rowGroup.push(g);
@@ -409,7 +497,7 @@ function build() {
   const notes = [];
   if (st.hr !== 0) notes.push('見出しが ' + (st.hr + 1) + '行目にありました。それより上の行は入れていません');
   const iNo = colOf('伝票番号'), iName = colOf('お届け先名');
-  if (iNo !== 3 || iName !== 15) notes.push('伝票番号が ' + LETTER(iNo) + '列、お届け先名が ' + LETTER(iName) + '列にありました（いつもは D列・P列）。見出しの名前で探した列を使っています');
+  if (!st.fromPdf && (iNo !== 3 || iName !== 15)) notes.push('伝票番号が ' + LETTER(iNo) + '列、お届け先名が ' + LETTER(iName) + '列にありました（いつもは D列・P列）。見出しの名前で探した列を使っています');
   if (st.noKey && st.pick.has('group')) notes.push('「複数口くくりキー」の列がないので、グループは伝票番号ごとにしています');
 
   // 選んだグループの行だけ出す。n はファイルでの行の順番（グループ番号と表の行番号に使う）
@@ -480,7 +568,8 @@ function build() {
   const acc = new Map();
   gOut.forEach(g => { const a = st.groups[g - 1].acct; acc.set(a, (acc.get(a) || 0) + 1); });
   $('#accts').textContent = Array.from(acc.entries()).map(([a, k]) => a + '　' + k + '通').join('、') +
-    (acc.has('未登録のアカウント') ? '（名前は印刷マンで ラベル設定.csv を読み込むと出ます）' : '');
+    (acc.has('未登録のアカウント') ? '（名前は印刷マンで ラベル設定.csv を読み込むと出ます）' : '') +
+    (st.fromPdf ? '（発行済データを入れると出ます）' : '');
   const names = Array.from(dests.values());
   $('#dests').textContent = dests.size + 'か所（送り状 ' + gOut.size + '通）' +
     '　' + names.slice(0, 5).join('、') + (names.length > 5 ? ' ほか' : '');
@@ -496,7 +585,7 @@ function build() {
     (rows.length > show.length ? '<div class="tiny muted" style="padding:6px">ほか ' + (rows.length - show.length) + '行</div>' : '');
   $('#out').hidden = false;
   setMsg('#note', notes.join('。'), 'warn');
-  setMsg('#msg', st.file + ' を読みました', 'ok');
+  setMsg('#msg', st.file + ' を読みました' + (st.fromPdf ? '（送り状のPDFから。並びは送り状番号の順）' : ''), 'ok');
 }
 
 function save() {
