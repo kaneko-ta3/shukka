@@ -755,7 +755,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v106";
+const BUILD = "v108";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -813,10 +813,24 @@ function call(api, params){
       return r.json();
     })
     .then(function(j){
-      if (j && j.error) throw new Error(j.error);
+      if (j && j.error){
+        /* 出荷指示の行が動いていた（サーバーが書き込まずに止めた）。最新を読み直します */
+        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false); }, 0);
+        throw new Error(j.error);
+      }
       return j;
     });
 }
+
+/* 書き込むときに、そのタスクの自社確認用番号（無ければ案件名）を添えます。
+   サーバーが、いまのシートの同じ行が同じ案件かを確かめるためです */
+function withKey(t, params){
+  params.cno = t.code || "";
+  if (!t.code) params.cnm = t.name || "";
+  return params;
+}
+/* まとめて送るとき用。items と同じ並びで [番号] か ["", 案件名] を並べます */
+const keyOf = t => t.code ? [t.code] : ["", t.name || ""];
 
 /* 本文に載せて送ります。発行済データCSVはURLに乗る長さを超えるためです。
    Content-Type を text/plain にしておくと、事前確認（preflight）が走りません */
@@ -926,7 +940,8 @@ const onCal = t => t.start && !t.done;
 const kindName = k => k === "s" ? "出荷" : "製造";
 
 const snapshot = () => tasks.map(t => ({id:t.id, row:t.row, kind:t.kind,
-                                        start:t.start, days:t.days, done:!!t.done}));
+                                        start:t.start, days:t.days, done:!!t.done,
+                                        code:t.code || "", name:t.name || ""}));
 function pushHistory(){
   history.push(snapshot());
   if (history.length > 30) history.shift();
@@ -1563,7 +1578,7 @@ function multiCheck(t){
     const on = cb.checked;
     row.classList.add("busy");
     busy(true);
-    call("setMulti", {row: t.row, on: on ? 1 : 0})
+    call("setMulti", withKey(t, {row: t.row, on: on ? 1 : 0}))
       .then(function(r){
         busy(false);
         row.classList.remove("busy");
@@ -1603,7 +1618,7 @@ function jishaCheck(t){
     }
     row.classList.add("busy");
     busy(true);
-    call("setJisha", {row: t.row, on: on ? 1 : 0})
+    call("setJisha", withKey(t, {row: t.row, on: on ? 1 : 0}))
       .then(function(r){
         busy(false);
         row.classList.remove("busy");
@@ -1629,7 +1644,7 @@ function toggleArrange(t, row, cb){
   const on = cb.checked;
   row.classList.add("busy");
   busy(true);
-  call("setArrange", {row: t.row, on: on ? 1 : 0})
+  call("setArrange", withKey(t, {row: t.row, on: on ? 1 : 0}))
     .then(function(r){
       busy(false);
       row.classList.remove("busy");
@@ -1764,7 +1779,7 @@ function place(id, date){
   selected = null;
   render();
   busy(true);
-  call("setStart", {row:t.row, kind:t.kind, date:date, days:t.days, undone:undone ? 1 : 0})
+  call("setStart", withKey(t, {row:t.row, kind:t.kind, date:date, days:t.days, undone:undone ? 1 : 0}))
     .then(function(res){
       t.done = res.done; t._pending = false;
       if (t.kind === "s"){ t.ship = date; syncShip(t); }
@@ -1791,7 +1806,7 @@ function unplace(id){
   t._pending = true;
   render();
   busy(true);
-  call("clearStart", {row:t.row, kind:t.kind, undone:undone ? 1 : 0})
+  call("clearStart", withKey(t, {row:t.row, kind:t.kind, undone:undone ? 1 : 0}))
     .then(function(res){
       t.done = res.done; t._pending = false;
       if (t.kind === "s"){ t.ship = null; syncShip(t); }
@@ -1807,7 +1822,7 @@ function unplace(id){
 
 function markDone(id){
   const t = byId(id);
-  if (!t || t.done) return;
+  if (!t || t.done || t._pending) return;
   pushHistory();
   markMoved(id);          // 完了枠の一番上に出す
   t.done = true;
@@ -1815,7 +1830,7 @@ function markDone(id){
   selected = null;
   render();
   busy(true);
-  call("setDone", {row:t.row, kind:t.kind, done:1})
+  call("setDone", withKey(t, {row:t.row, kind:t.kind, done:1}))
     .then(function(res){
       t.done = res.done; t._pending = false; busy(false); render();
       log(res.message, res.stock ? "在庫も更新" : "シート更新");
@@ -1848,7 +1863,7 @@ function undoNotice(t){
 
 function markUndone(id){
   const t = byId(id);
-  if (!t || !t.done) return;
+  if (!t || !t.done || t._pending) return;
   const notice = undoNotice(t);
   if (notice && !confirm(notice)) return;
   pushHistory();
@@ -1858,7 +1873,7 @@ function markUndone(id){
   selected = null;
   render();
   busy(true);
-  call("setDone", {row:t.row, kind:t.kind, done:0})
+  call("setDone", withKey(t, {row:t.row, kind:t.kind, done:0}))
     .then(function(res){
       t.done = res.done; t._pending = false; busy(false); render();
       log(res.message, res.stock ? "在庫も更新" : "シート更新");
@@ -1871,7 +1886,7 @@ function markUndone(id){
 
 function saveDays(t, prevDays){
   t._pending = true; render(); busy(true);
-  call("setStart", {row:t.row, kind:t.kind, date:t.start, days:t.days, undone:0})
+  call("setStart", withKey(t, {row:t.row, kind:t.kind, date:t.start, days:t.days, undone:0}))
     .then(function(res){ t._pending = false; busy(false); render(); log(res.message, "カレンダー更新"); })
     .catch(function(e){ t.days = prevDays; t._pending = false; busy(false); render();
       log("日数を変更できませんでした：" + e.message, "", true); });
@@ -1893,7 +1908,18 @@ function tasksOn(date){
     });
 }
 
-function showDay(date){ openDay = date; statView = ""; focusId = null; renderDayView(); }
+/* 日付や上の数字から開いた一覧は、閉じるまで並びを固定します。
+   完了にしたカードや、期限オーバーでなくなったカードもその場に残します。
+   保存が返ってきた瞬間にカードが動くと、次に押そうとしていた場所に
+   別のカードが来て、違うタスクを完了にしてしまうためです */
+let FROZEN = null;   /* {key, ids: [...]} */
+function frozenList(key, list){
+  if (!FROZEN || FROZEN.key !== key) FROZEN = {key: key, ids: []};
+  list.forEach(t => { if (FROZEN.ids.indexOf(t.id) < 0) FROZEN.ids.push(t.id); });
+  return FROZEN.ids.map(byId).filter(Boolean);
+}
+
+function showDay(date){ openDay = date; statView = ""; focusId = null; FROZEN = null; renderDayView(); }
 
 /* 上のバーの数字を押して開く一覧。
    指ではマウスを乗せられないので、押しても開けるようにしてあります。
@@ -1933,14 +1959,14 @@ function statTasks(mode){
 }
 
 function closeDay(){
-  openDay = null; statView = ""; focusId = null;
+  openDay = null; statView = ""; focusId = null; FROZEN = null;
   document.getElementById("dayview").hidden = true;
 }
 
 /* 上のバーの数字から開く一覧。日付を開いたときと同じ枠を使い回します */
 function renderStatView(){
   const box = document.getElementById("dayview");
-  const list = statTasks(statView);
+  const list = frozenList("stat:" + statView + ":" + (focusId || ""), statTasks(statView));
   if (!list.length){ closeDay(); return; }
 
   const head = {
@@ -2085,14 +2111,18 @@ function dayRow(t){
     return el;
   }
 
+  /* 保存が返ってくるまでは押せなくします。カードがその場に残るので、
+     2度押しすると完了の取り消しになってしまうためです */
   const b1 = document.createElement("button");
-  b1.textContent = t.done ? "完了を取り消す" : "完了にする";
-  b1.onclick = () => { t.done ? markUndone(t.id) : markDone(t.id); };
+  b1.textContent = t._pending ? "保存中…" : (t.done ? "完了を取り消す" : "完了にする");
+  b1.disabled = !!t._pending;
+  b1.onclick = () => { if (t._pending) return; t.done ? markUndone(t.id) : markDone(t.id); };
   act.appendChild(b1);
 
   const b2 = document.createElement("button");
   b2.textContent = "配置を解除";
-  b2.onclick = () => { unplace(t.id); };
+  b2.disabled = !!t._pending;
+  b2.onclick = () => { if (t._pending) return; unplace(t.id); };
   act.appendChild(b2);
 
   return el;
@@ -2159,7 +2189,7 @@ function memoEl(j){
     inflight = true;
     status('保存中…');
     busy(true);
-    call("setMemo", {row: j.row, kind: j.kind, text: v})
+    call("setMemo", withKey(j, {row: j.row, kind: j.kind, text: v}))
       .then(function(res){
         inflight = false;
         busy(false);
@@ -2339,7 +2369,7 @@ function renderDayView(){
   document.getElementById("dv-w").textContent =
     WD[dt.getDay()] + "曜日" + (openDay === TODAY ? "・本日" : "") + (isOff(openDay) ? "・休み" : "");
 
-  const list = tasksOn(openDay);
+  const list = frozenList("day:" + openDay, tasksOn(openDay));
   const other = miscOn(openDay);
   const undone = list.filter(t => !t.done).length;
   document.getElementById("dv-counts").innerHTML =
@@ -2640,8 +2670,7 @@ document.addEventListener("pointerup", () => {
   document.body.classList.remove("resizing");
   rz = null;
   if (t.days !== days0){
-    history.push(snapshot().map(s => s.id === t.id
-      ? {id:s.id, row:s.row, kind:s.kind, start:s.start, days:days0, done:s.done} : s));
+    history.push(snapshot().map(s => s.id === t.id ? Object.assign({}, s, {days:days0}) : s));
     document.getElementById("undo").disabled = false;
     saveDays(t, days0);
   } else render();
@@ -2843,17 +2872,19 @@ document.getElementById("undo").onclick = () => {
   if (!prev) return;
   document.getElementById("undo").disabled = history.length === 0;
   const items = [];
+  const chk = [];
   prev.forEach(s => {
     const t = byId(s.id);
     if (!t) return;
     if (t.start === s.start && t.days === s.days && !!t.done === s.done) return;
     t.start = s.start; t.days = s.days; t.done = s.done;
     items.push(s.row + "|" + s.kind + "|" + (s.start || "") + "|" + s.days + "|" + (s.done ? 1 : 0));
+    chk.push(s.code ? [s.code] : ["", s.name || ""]);   // 控えたときの案件で確かめます
   });
   render();
   if (!items.length) return;
   busy(true);
-  call("restore", {items: items.join(",")})
+  call("restore", {items: items.join(","), chk: JSON.stringify(chk)})
     .then(r => { busy(false); log("元に戻す：" + r.message, "更新"); load(false); })
     .catch(e => { busy(false); log("元に戻せませんでした：" + e.message, "", true); load(false); });
 };
@@ -2889,17 +2920,19 @@ document.getElementById("auto").onclick = () => {
 
   pushHistory();
   const items = [];
+  const chk = [];
   plan.forEach(x => {
     x.t.start = x.date;
     x.t.ship  = x.date;
     syncShip(x.t);
     items.push(x.t.row + "|s|" + x.date + "|1");
+    chk.push(keyOf(x.t));
   });
   render();
 
   log("出荷日 自動配置：" + items.length + "件を書き込み中…（カレンダーの予定を作るので少し待ちます）", "");
   busy(true);
-  call("batch", {kind:"s", items: items.join(",")})
+  call("batch", {kind:"s", items: items.join(","), chk: JSON.stringify(chk)})
     .then(r => { busy(false); log("出荷日 自動配置：" + r.message, "完了"); load(false); })
     .catch(e => { busy(false); log("自動配置に失敗：" + e.message, "", true); load(false); });
 };

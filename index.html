@@ -234,6 +234,11 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 }
 .task-card.snap{transition:transform .18s ease-out}
 .task.busy .task-card{opacity:.6}
+/* 日付を開いている間は、完了にしたカードもその場に残します（閉じると完了の枠へ移ります） */
+.col:not(.col-done) .task.done .t-name::after{
+  content:"✓ 完了"; margin-left:8px; font-size:12px; font-weight:700; color:var(--accent);
+}
+.act:disabled{opacity:.55; cursor:default}
 .t-row1{display:flex; align-items:baseline; gap:10px;}
 /* タイトルは種別の色、本文は白。色で製造／出荷を見分けられるようにします */
 .t-name{font-size:16px; font-weight:700; line-height:1.35; flex:1; color:var(--mfg);}
@@ -445,7 +450,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v106";
+const BUILD = "v108";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -514,9 +519,21 @@ function call(api, params){
       return r.json();
     })
     .then(function(j){
-      if (j && j.error) throw new Error(j.error);
+      if (j && j.error){
+        /* 出荷指示の行が動いていた（サーバーが書き込まずに止めた）。最新を読み直します */
+        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false); }, 0);
+        throw new Error(j.error);
+      }
       return j;
     });
+}
+
+/* 書き込むときに、そのタスクの自社確認用番号（無ければ案件名）を添えます。
+   サーバーが、いまのシートの同じ行が同じ案件かを確かめるためです */
+function withKey(j, params){
+  params.cno = j.code || "";
+  if (!j.code) params.cnm = j.name || "";
+  return params;
 }
 
 
@@ -902,9 +919,30 @@ function renderMonth(){
   app.appendChild(cal);
 }
 
+/* 日付を開いている間は、カードの並びと「未完了／完了」の枠を固定します。
+   完了にしたカードもその場に残し、閉じて開き直したときに完了の枠へ移します。
+   保存が返ってきた瞬間にカードが動くと、次に押そうとしていた指の下に
+   別のカードが来て、違うタスクを完了にしてしまうためです */
+let FROZEN = null;   /* {date, side: {id: 'u'|'d'}, ids: [...]} */
+function frozenDay(date, list){
+  if (!FROZEN || FROZEN.date !== date) FROZEN = {date: date, side: {}, ids: []};
+  list.forEach(function(j){
+    if (j.id in FROZEN.side) return;
+    FROZEN.side[j.id] = j.done ? 'd' : 'u';
+    FROZEN.ids.push(j.id);
+  });
+  const now = {};
+  jobs.forEach(function(j){ now[j.id] = j; });
+  const all = FROZEN.ids.map(function(id){ return now[id]; }).filter(Boolean);
+  return {all: all,
+          left:  all.filter(j => FROZEN.side[j.id] === 'u'),
+          right: all.filter(j => FROZEN.side[j.id] === 'd')};
+}
+
 function renderDay(){
   const dt = p(openDate);
-  const list = jobsOn(openDate);
+  const fz = frozenDay(openDate, jobsOn(openDate));
+  const list = fz.all;
   const undone = list.filter(j => !j.done);
   const done = list.filter(j => j.done);
   const other = miscOn(openDate);   /* 使う場所より前で宣言します */
@@ -912,7 +950,7 @@ function renderDay(){
   const bar = el('div', 'bar-top');
   bar.innerHTML = '<button class="ghost" id="back">‹ カレンダー</button><span class="sp" style="flex:1"></span><span class="state" id="state"></span>';
   app.appendChild(bar);
-  bar.querySelector("#back").onclick = () => { openDate = null; render(); };
+  bar.querySelector("#back").onclick = () => { openDate = null; FROZEN = null; render(); };
 
   const head = el('div', 'day-head');
   head.innerHTML = '<span class="d mono">' + (dt.getMonth()+1) + '月' + dt.getDate() + '日</span>'
@@ -947,15 +985,15 @@ function renderDay(){
 
   /* 左：これから作業するもの */
   const left = el('div', 'col');
-  if (undone.length){
+  if (fz.left.length){
     const hint = el('div', 'hint');
     hint.innerHTML = '<span class="lab">未完了 ' + undone.length + '件</span>'
       + '<span class="arrow">→→</span>'
       + '<span class="msg"><span class="p1">カードを右へスワイプすると、</span>'
-      + '<span class="p2">タスクが完了へ移動します</span></span>';
+      + '<span class="p2">完了になります</span></span>';
     left.appendChild(hint);
     const wrap = el('div', 'tasks');
-    undone.forEach(j => wrap.appendChild(taskEl(j)));
+    fz.left.forEach(j => wrap.appendChild(taskEl(j)));
     left.appendChild(wrap);
   } else {
     const e = el('div', 'empty-msg');
@@ -969,13 +1007,13 @@ function renderDay(){
   const lab = el('div', 'section-label');
   lab.textContent = '完了　' + done.length + '件';
   right.appendChild(lab);
-  if (done.length){
+  if (fz.right.length){
     const wrap = el('div', 'tasks');
-    done.forEach(j => wrap.appendChild(taskEl(j)));
+    fz.right.forEach(j => wrap.appendChild(taskEl(j)));
     right.appendChild(wrap);
   } else {
     const e = el('div', 'empty-msg');
-    e.textContent = 'まだありません。\n未完了のカードを右へスワイプすると\nここに移ります。';
+    e.textContent = 'まだありません。\n完了にしたカードは、カレンダーへ戻って\n開き直すとここに移ります。';
     e.style.whiteSpace = 'pre-line';
     right.appendChild(e);
   }
@@ -1090,11 +1128,15 @@ function taskEl(j){
   if (j.kind !== 's') buildSkus(card.querySelector('.t-skus'), j);
 
   const act = card.querySelector('.act');
-  act.textContent = j.done ? '完了を取り消す' : '完了にする';
-  act.onclick = e => { e.stopPropagation(); commit(j, !j.done); };
+  /* 保存が返ってくるまでは押せなくします。カードがその場に残るので、
+     2度押しすると完了の取り消しになってしまうためです */
+  act.textContent = j._pending ? '保存中…' : (j.done ? '完了を取り消す' : '完了にする');
+  act.disabled = !!j._pending;
+  act.onclick = e => { e.stopPropagation(); if (!j._pending) commit(j, !j.done); };
+  if (j._pending) t.classList.add('busy');
 
   t.appendChild(card);
-  if (!j.done) enableSwipe(t, card, j);
+  if (!j.done && !j._pending) enableSwipe(t, card, j);
   return t;
 }
 
@@ -1310,7 +1352,7 @@ function memoEl(j){
     status('保存中…');
     pending++;
     setState("保存中…", "busy");
-    call("setMemo", {row: j.row, kind: j.kind, text: v})
+    call("setMemo", withKey(j, {row: j.row, kind: j.kind, text: v}))
       .then(function(res){
         inflight = false;
         pending--;
@@ -1381,28 +1423,38 @@ function undoNotice(t){
   return "";
 }
 
+/* 同じタスクを直します。保存中に読み込み直して別の配列に入れ替わっていても届くように */
+function eachSame(j, f){
+  f(j);
+  jobs.forEach(function(x){ if (x !== j && x.id === j.id) f(x); });
+}
+
 function commit(j, done){
+  if (j._pending) return;
   if (!done){
     const notice = undoNotice(j);
     if (notice && !confirm(notice)) return;
   }
-  const task = app.querySelector('.task[data-row="' + j.row + '"]');
-  if (task) task.classList.add('busy');
+  /* 押した瞬間に、その場で完了（取り消し）の見た目にします。カードは動かしません */
+  const prev = !!j.done;
+  eachSame(j, function(x){ x.done = !!done; x._pending = true; });
   pending++;
   setState("保存中…", "busy");
+  render();
 
-  call("setDone", {row:j.row, kind:j.kind, done: done ? 1 : 0})
+  call("setDone", withKey(j, {row:j.row, kind:j.kind, done: done ? 1 : 0}))
     .then(function(res){
       pending--;
-      j.done = res.done;
+      eachSame(j, function(x){ x.done = res.done; x._pending = false; });
       setState((res.stock ? res.stock : "最終更新 " + hm()), res.stock ? "busy" : "");
       render();
     })
     .catch(function(e){
       pending--;
+      eachSame(j, function(x){ x.done = prev; x._pending = false; });
       setState("保存できませんでした", "err");
       render();
-      alert("保存できませんでした。通信を確認してもう一度お試しください。\n\n" + e.message);
+      alert("保存できませんでした。\n\n" + e.message);
     });
 }
 
