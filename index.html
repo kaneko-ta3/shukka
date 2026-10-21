@@ -145,8 +145,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    done-past … もう見なくていい日。全部完了した日と、タスクが無かった日
    overdue  … 作業の最終日が過ぎたのに終わっていないものがある
 
-   まだ作業中のまたぎタスクが乗っている日だけ、白のまま残します。
-   暗い＝もう見なくていい、白＝まだ動いている、という読み方になります */
+   ★v115 まだ作業中のまたぎタスクが乗っているだけの日も暗くします（件数の丸の灰色と合わせました）。
+   またぎタスクはまだ動いている日（今日以降）のマスで見えるためです */
 .cell.done-past .c-num{opacity:.55}
 .cell.overdue .c-num{color:var(--warn)}
 .cell.overdue:nth-child(7n) .c-num{color:var(--warn)}
@@ -172,14 +172,25 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .c-item.cont-l{border-left:0; padding-left:7px;
   border-top-left-radius:0; border-bottom-left-radius:0;}
 .c-item.bleed-l{margin-left:calc(-1 * var(--cpx) - 1px)}
-.c-item.cont-r{margin-right:calc(-1 * var(--cpx) - 1px); border-top-right-radius:0; border-bottom-right-radius:0;}
+.c-item.cont-r{margin-right:calc(-1 * var(--cpx) - 2px); border-top-right-radius:0; border-bottom-right-radius:0;}
 /* ★v114 はみ出しが切られて、隣のマスとつながっていませんでした（マスと中の枠が
    はみ出しを切っていたため）。左右ははみ出せるように、上下は今まで通り切ります。
    マスはそれぞれ1pxの枠を持つボタンなので、帯は余白＋自分の枠の上まで伸ばします。
    左右のマスの帯が、2本の枠をそれぞれ1本ずつ覆って、1本につながります。
+   ★v115 マスの境目が小数の位置になると、つなぎ目に薄い線が出ていたので、
+   右へ続く帯は隣のマスに1pxだけ重ねます（隣のマスがその上に描かれるので見えません）。
    --cpx はマスの左右の余白です。余白を変えるときは一緒に変えます */
-.cell{--cpx:5px; overflow:visible; min-height:0; clip-path:inset(0);}
+.cell{--cpx:5px; overflow:visible; min-height:0; clip-path:inset(0 -1px 0 0);}
 .c-list{overflow:visible; clip-path:inset(0 -12px 0 -12px);}
+/* ★v115 週をまたぐ帯の端の点線（前の週から続く＝左端、次の週へ続く＝右端） */
+.c-item.wrap-l{border-left:2px dashed var(--mfg); padding-left:4px;
+  border-top-left-radius:0; border-bottom-left-radius:0;}
+.c-item.wrap-r{border-right:2px dashed var(--mfg);
+  border-top-right-radius:0; border-bottom-right-radius:0;}
+.c-item.k-s.wrap-l{border-left-color:var(--ship)}
+.c-item.k-s.wrap-r{border-right-color:var(--ship)}
+.c-item.done.wrap-l{border-left-color:var(--muted)}
+.c-item.done.wrap-r{border-right-color:var(--muted)}
 /* ★v114 過ぎた日で、伸ばしている途中のタスクだけが乗っている日の件数 */
 .c-count.wip{background:var(--surface-2); color:var(--muted);}
 .c-more{font-size:10.5px; color:var(--muted); padding-left:3px;}
@@ -228,6 +239,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .col-done .empty-msg{background:transparent; border:0; padding:22px 8px; font-size:12.5px;}
 @media (max-width:760px){
   .day-cols{grid-template-columns:minmax(0,1fr);}
+  /* ★v115 土日の列は狭く、件数の丸がはみ出すので出しません（帯と名前は出ます） */
+  .cell.wkend .c-count{display:none}
 }
 
 .task{position:relative; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
@@ -459,7 +472,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v114";
+const BUILD = "v115";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -797,15 +810,12 @@ function render(){
    list は他予定を除いたタスクです。
 
    overdue  … 作業の最終日がその日で、まだ完了していないものがある＝遅れている
-   done-past … もう見なくていい日。全部完了した日も、タスクが無かった日も含みます
-   どちらでもない … まだ作業中のまたぎタスクが乗っている日。白のまま残します */
+   done-past … それ以外の過ぎた日。全部完了した日、タスクが無かった日、
+               ★v115 まだ作業中のまたぎタスクが乗っているだけの日（前は白のままでした） */
 function dayMark(date, list){
   if (date >= TODAY) return "";
   const overdue = list.some(j => !j.done && add(j.start, j.days - 1) === date);
-  if (overdue) return " overdue";
-  /* まだ作業中のまたぎタスクが乗っている日は、そのまま（白）にします。
-     暗い＝もう見なくていい日、白＝まだ動いているものがある日、になります */
-  return list.some(j => !j.done) ? "" : " done-past";
+  return overdue ? " overdue" : " done-past";
 }
 
 function renderMonth(){
@@ -871,7 +881,8 @@ function renderMonth(){
       + (otherMonth ? ' other' : '')
       + (date === TODAY ? ' today' : '')
       + dayMark(date, list)
-      + (list.length + other.length ? '' : ' empty');
+      + (list.length + other.length ? '' : ' empty')
+      + (w === 0 || w === 6 ? ' wkend' : '');      // ★v115 土日の列（スマホでは件数を出しません）
     cell.dataset.date = date;
     if (!list.length && !other.length) cell.disabled = true;
 
@@ -907,6 +918,10 @@ function renderMonth(){
       const isCont = (j.days > 1) && j.start < date;      // 続きの日か（曜日は関係ない）
       const bleedL = isCont && (i % 7 !== 0);             // 左へはみ出すのは週頭以外
       const contR  = (j.days > 1) && last > date && (i % 7 !== 6);
+      /* ★v115 週をまたぐ帯の端。日曜の列で前の週から続いている帯は左端を、
+         土曜の列で次の週へ続く帯は右端を点線にします（割り付け画面と同じ見せ方） */
+      const wrapL  = isCont && (i % 7 === 0);
+      const wrapR  = (j.days > 1) && last > date && (i % 7 === 6);
       /* ★v114 またがるタスクの名前は、その週の1回だけ出します（今日をまたぐなら今日、
          それ以外はその週で最初の日）。ほかの日は名前なしの帯にして、1本に見せます。
          前の日と段がずれた日は、どれの続きか分からなくなるので、もう一度名前を出します */
@@ -918,7 +933,7 @@ function renderMonth(){
       const showName = j.days <= 1 || date === nameDay || moved;
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : '')
                     + (isCont ? ' cont-l' : '') + (bleedL ? ' bleed-l' : '')
-                    + (contR ? ' cont-r' : ''));
+                    + (contR ? ' cont-r' : '') + (wrapL ? ' wrap-l' : '') + (wrapR ? ' wrap-r' : ''));
       /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
          代わりに背景色と左の線で見分けます */
       if (showName && j.memo) it.appendChild(el('span', 'memo-dot'));

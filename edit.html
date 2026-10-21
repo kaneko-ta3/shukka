@@ -618,6 +618,8 @@ body.resizing{cursor:col-resize; user-select:none;}
   .load{font-size:8.5px; padding:0 3px;}
   /* ★v114 狭いので「造」「出」の字は外し、数字の色で見分けます */
   .load .lk{display:none}
+  /* ★v115 土日の列は狭く、件数がはみ出すので出しません */
+  .day.wkend .loads{display:none}
   .loads{gap:2px}
   .day.today .dnum{padding:0 4px; min-width:1.3em;}
   .day.today .dnum.wide{padding:0 3px}
@@ -771,7 +773,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v114";
+const BUILD = "v115";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1407,6 +1409,7 @@ function renderCal(){
       const nM = occ.m.get(date) || 0, nS = occ.s.get(date) || 0;
       const cell = document.createElement("div");
       cell.className = "day" + (isOff(date) ? " off" : "")
+        + (i === 0 || i === 6 ? " wkend" : "")      // ★v115 土日の列（スマホでは件数を出しません）
         + (date < TODAY ? " past" : "") + (date === TODAY ? " today" : "");
       cell.dataset.date = date;
       cell.style.setProperty("--lanes", lanesShown);
