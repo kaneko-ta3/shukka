@@ -171,8 +171,17 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    2つを1つのクラスにまとめていたため、日曜で左の色線が復活していました */
 .c-item.cont-l{border-left:0; padding-left:7px;
   border-top-left-radius:0; border-bottom-left-radius:0;}
-.c-item.bleed-l{margin-left:-5px}
-.c-item.cont-r{margin-right:-6px; border-top-right-radius:0; border-bottom-right-radius:0;}
+.c-item.bleed-l{margin-left:calc(-1 * var(--cpx) - 1px)}
+.c-item.cont-r{margin-right:calc(-1 * var(--cpx) - 1px); border-top-right-radius:0; border-bottom-right-radius:0;}
+/* ★v114 はみ出しが切られて、隣のマスとつながっていませんでした（マスと中の枠が
+   はみ出しを切っていたため）。左右ははみ出せるように、上下は今まで通り切ります。
+   マスはそれぞれ1pxの枠を持つボタンなので、帯は余白＋自分の枠の上まで伸ばします。
+   左右のマスの帯が、2本の枠をそれぞれ1本ずつ覆って、1本につながります。
+   --cpx はマスの左右の余白です。余白を変えるときは一緒に変えます */
+.cell{--cpx:5px; overflow:visible; min-height:0; clip-path:inset(0);}
+.c-list{overflow:visible; clip-path:inset(0 -12px 0 -12px);}
+/* ★v114 過ぎた日で、伸ばしている途中のタスクだけが乗っている日の件数 */
+.c-count.wip{background:var(--surface-2); color:var(--muted);}
 .c-more{font-size:10.5px; color:var(--muted); padding-left:3px;}
 /* メモがあるタスクの点。案件名の手前（左）に置きます。
    右に置くと、日をまたぐ帯では隣のマスとの継ぎ目に重なるためです */
@@ -412,7 +421,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
   .c-more{font-size:9.5px}
   .c-num{font-size:13px}
   .c-count{font-size:9.5px; padding:1px 5px;}
-  .cell{padding:5px 4px; justify-content:flex-start;}
+  .cell{padding:5px 4px; justify-content:flex-start; --cpx:4px;}
 
   /* 月の切り替えを1行に収める */
   .nav{gap:4px}
@@ -450,7 +459,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v108";
+const BUILD = "v114";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -843,6 +852,7 @@ function renderMonth(){
   /* 1マスに出す件数。残りは「+○件」。
      PCはマスが伸びるので多めに、スマホは1画面に収めるため4件までです */
   const MAXI = (window.innerWidth <= 760) ? 4 : 10;
+  let prevPos = {};   // ★v114 前の日のマスで、タスクが何段目にあったか
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
@@ -868,8 +878,16 @@ function renderMonth(){
     let html = '<div class="c-head"><span class="c-num mono">'
              + (dt.getDate() === 1 ? (dt.getMonth()+1) + '/1' : dt.getDate()) + '</span>';
     if (list.length){
-      html += '<span class="c-count' + (undone ? '' : ' all-done') + '">'
-            + (undone ? undone + '件' : '済') + '</span>';
+      /* ★v114 過ぎた日は、伸ばしている途中のタスク（最終日がまだ先）を緑の丸に数えません。
+         その日が最終日なのに終わっていないもの（遅れ）だけを緑で数えます。
+         途中のものだけの日は、件数を灰色で出します */
+      const late = date < TODAY
+        ? list.filter(j => !j.done && add(j.start, j.days - 1) === date).length : -1;
+      let cc = '', ct = undone + '件';
+      if (!undone){ cc = ' all-done'; ct = '済'; }
+      else if (late === 0) cc = ' wip';
+      else if (late > 0) ct = late + '件';
+      html += '<span class="c-count' + cc + '">' + ct + '</span>';
     }
     html += '</div>';
     cell.innerHTML = html;
@@ -878,20 +896,33 @@ function renderMonth(){
     /* タスクを先に出して、ほかの業務は一番下に回します。
        これで出荷や製造が押し出されません */
     let shown = 0;
-    list.slice(0, MAXI).forEach(j => {
+    /* ★v114 週の頭で、前の日の段の控えを空にします */
+    if (i % 7 === 0) prevPos = {};
+    const nowPos = {};
+    const wsDate = add(gridStart, i - (i % 7)), weDate = add(wsDate, 6);
+    list.slice(0, MAXI).forEach((j, idx) => {
       /* またがるタスクの「続き」判定。
          週の折り返し（日曜の列・土曜の列）では切ります */
       const last   = add(j.start, j.days - 1);
       const isCont = (j.days > 1) && j.start < date;      // 続きの日か（曜日は関係ない）
       const bleedL = isCont && (i % 7 !== 0);             // 左へはみ出すのは週頭以外
       const contR  = (j.days > 1) && last > date && (i % 7 !== 6);
+      /* ★v114 またがるタスクの名前は、その週の1回だけ出します（今日をまたぐなら今日、
+         それ以外はその週で最初の日）。ほかの日は名前なしの帯にして、1本に見せます。
+         前の日と段がずれた日は、どれの続きか分からなくなるので、もう一度名前を出します */
+      nowPos[j.id] = idx;
+      const first   = j.start > wsDate ? j.start : wsDate;
+      const segEnd  = last < weDate ? last : weDate;
+      const nameDay = (TODAY > first && TODAY <= segEnd) ? TODAY : first;
+      const moved   = bleedL && prevPos[j.id] !== idx;
+      const showName = j.days <= 1 || date === nameDay || moved;
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : '')
                     + (isCont ? ' cont-l' : '') + (bleedL ? ' bleed-l' : '')
                     + (contR ? ' cont-r' : ''));
       /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
          代わりに背景色と左の線で見分けます */
-      if (j.memo) it.appendChild(el('span', 'memo-dot'));
-      it.appendChild(document.createTextNode(j.name));
+      if (showName && j.memo) it.appendChild(el('span', 'memo-dot'));
+      it.appendChild(document.createTextNode(showName ? j.name : ' '));
       it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name
                + (j.memo ? '\nメモ：' + j.memo : '');
       box.appendChild(it);
@@ -912,6 +943,7 @@ function renderMonth(){
       box.appendChild(m);
     }
     cell.appendChild(box);
+    prevPos = nowPos;
     cell.onclick = () => { openDate = date; render(); };
     grid.appendChild(cell);
   }

@@ -165,8 +165,14 @@ body.fold-log{--w-log:28px}
 }
 .load{font-size:11px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);
   white-space:nowrap; flex:none;}
-.load.lv2{background:var(--accent-soft); color:var(--accent); font-weight:500;}
-.load.lv3{background:var(--accent); color:var(--accent-ink); font-weight:600;}
+/* ★v114 製造（青）と出荷（黄）に分けた件数。灰色の地に色の数字 → 3件以上で薄い色の地 → 6件以上で濃い色の地 */
+.loads{display:flex; gap:3px; flex:none;}
+.load.k-m{color:var(--mfg)} .load.k-s{color:var(--ship)}
+.load.k-m.lv2{background:var(--mfg-soft); font-weight:600;}
+.load.k-s.lv2{background:var(--ship-soft); font-weight:600;}
+.load.k-m.lv3{background:var(--mfg); color:var(--mfg-ink); font-weight:700;}
+.load.k-s.lv3{background:var(--ship); color:var(--ship-ink); font-weight:700;}
+.load .lk{margin-right:2px; font-weight:700;}
 
 .week-bars{position:absolute; inset:0; pointer-events:none;}
 .bar{position:absolute; pointer-events:auto;
@@ -610,6 +616,9 @@ body.resizing{cursor:col-resize; user-select:none;}
   .day-head{gap:2px; overflow:hidden;}
   .dnum.wide{font-size:10.5px}
   .load{font-size:8.5px; padding:0 3px;}
+  /* ★v114 狭いので「造」「出」の字は外し、数字の色で見分けます */
+  .load .lk{display:none}
+  .loads{gap:2px}
   .day.today .dnum{padding:0 4px; min-width:1.3em;}
   .day.today .dnum.wide{padding:0 3px}
   .bar{top:calc(31px + var(--lane) * 18px); height:16px; font-size:9px;
@@ -762,7 +771,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v110";
+const BUILD = "v114";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1098,13 +1107,15 @@ function render(){
   renderCal(); renderPool("m"); renderPool("s"); renderDone(); renderSummary();
   if (openDay || statView) renderDayView(); }
 
+/* ★v114 製造と出荷を分けて数えます（前は合計でした） */
 function occupancy(){
-  const m = new Map();
+  const m = {m: new Map(), s: new Map()};
   tasks.forEach(t => {
     if (!onCal(t)) return;
+    const mp = t.kind === "s" ? m.s : m.m;
     for (let i = 0; i < t.days; i++){
       const d = add(t.start, i);
-      m.set(d, (m.get(d) || 0) + 1);
+      mp.set(d, (mp.get(d) || 0) + 1);
     }
   });
   return m;
@@ -1393,18 +1404,23 @@ function renderCal(){
     for (let i = 0; i < 7; i++){
       const date = add(wStart, i);
       const dt = p(date);
-      const n = occ.get(date) || 0;
+      const nM = occ.m.get(date) || 0, nS = occ.s.get(date) || 0;
       const cell = document.createElement("div");
       cell.className = "day" + (isOff(date) ? " off" : "")
         + (date < TODAY ? " past" : "") + (date === TODAY ? " today" : "");
       cell.dataset.date = date;
       cell.style.setProperty("--lanes", lanesShown);
-      const lv = n >= 6 ? " lv3" : (n >= 3 ? " lv2" : " lv1");
+      /* ★v114 「造3 出2」のように分けて出します。混み具合の色はそれぞれの数で決め、
+         3件以上で薄い色、6件以上で濃い色。過ぎた日は色を付けません（灰色）。
+         狭い画面では「造」「出」の字を外し、数字の色（製造＝青・出荷＝黄）で見分けます */
+      const lv = n => date < TODAY ? " lv1" : (n >= 6 ? " lv3" : (n >= 3 ? " lv2" : " lv1"));
+      const badge = (k, n) => n ? '<span class="load mono k-' + k + lv(n) + '"><span class="lk">'
+        + (k === "m" ? "造" : "出") + '</span>' + n + '</span>' : "";
       cell.innerHTML = '<div class="day-head"><span class="dnum mono'
         + (dt.getDate() === 1 ? ' wide' : '') + '">'
         + (dt.getDate() === 1 ? (dt.getMonth()+1) + "/1" : dt.getDate())
         + '</span>'
-        + (n ? '<span class="load mono' + lv + '">' + n + '<span class="u">件</span></span>' : "")
+        + (nM || nS ? '<span class="loads">' + badge("m", nM) + badge("s", nS) + '</span>' : "")
         + '</div>';
       if (hidden[i]){
         const mo = document.createElement("div");
@@ -1469,6 +1485,12 @@ function renderCal(){
         b.title += "\n\nメモ：" + t.memo;
       }
       if (t.kind === "s") b.querySelector(".grip").remove();
+      /* ★v114 今日をまたいでいる帯は、名前を今日の位置から出します。
+         前の週から続いている帯は、今まで通り週の左端から出ます */
+      const tc = diff(wStart, TODAY);
+      if (t.start < TODAY && tc > sg.col && tc < sg.col + sg.span){
+        b.style.paddingLeft = "calc(" + (COL_EDGE[tc] - COL_EDGE[sg.col]) + "% + 6px)";
+      }
       barsEl.appendChild(b);
     });
     week.appendChild(barsEl);
