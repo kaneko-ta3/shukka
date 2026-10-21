@@ -148,6 +148,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    ★v115 まだ作業中のまたぎタスクが乗っているだけの日も暗くします（件数の丸の灰色と合わせました）。
    またぎタスクはまだ動いている日（今日以降）のマスで見えるためです */
 .cell.done-past .c-num{opacity:.55}
+/* ★v117 過ぎた日の「済」と灰色の「N件」も、日付と同じ暗さにします（緑の丸＝遅れは暗くしません） */
+.cell.done-past .c-count.all-done, .cell.done-past .c-count.wip{opacity:.55}
 .cell.overdue .c-num{color:var(--warn)}
 .cell.overdue:nth-child(7n) .c-num{color:var(--warn)}
 .c-count{font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px;
@@ -472,7 +474,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v115";
+const BUILD = "v117";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
