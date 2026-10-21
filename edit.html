@@ -165,7 +165,7 @@ body.fold-log{--w-log:28px}
 }
 .load{font-size:11px; padding:0 4px; border-radius:3px; color:var(--muted); background:var(--surface-2);
   white-space:nowrap; flex:none;}
-/* ★v114 製造（青）と出荷（黄）に分けた件数。灰色の地に色の数字 → 3件以上で薄い色の地 → 6件以上で濃い色の地 */
+/* ★v114 製造（青）と出荷（黄）に分けた件数。★v116 今日以降は lv3（色の地）だけ、過ぎた日は lv1（灰色の地に色の数字） */
 .loads{display:flex; gap:3px; flex:none;}
 .load.k-m{color:var(--mfg)} .load.k-s{color:var(--ship)}
 .load.k-m.lv2{background:var(--mfg-soft); font-weight:600;}
@@ -773,7 +773,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v115";
+const BUILD = "v116";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1413,10 +1413,12 @@ function renderCal(){
         + (date < TODAY ? " past" : "") + (date === TODAY ? " today" : "");
       cell.dataset.date = date;
       cell.style.setProperty("--lanes", lanesShown);
-      /* ★v114 「造3 出2」のように分けて出します。混み具合の色はそれぞれの数で決め、
-         3件以上で薄い色、6件以上で濃い色。過ぎた日は色を付けません（灰色）。
+      /* ★v114 「造3 出2」のように分けて出します。
+         ★v116 件数で色の濃さを変えるのはやめ、1件以上なら いつも製造＝青・出荷＝黄の地にします
+         （3件・6件の区切りは、合計で数えていたころの数をそのまま使っていただけだったため）。
+         0件は出しません。過ぎた日は色を付けません（灰色）。
          狭い画面では「造」「出」の字を外し、数字の色（製造＝青・出荷＝黄）で見分けます */
-      const lv = n => date < TODAY ? " lv1" : (n >= 6 ? " lv3" : (n >= 3 ? " lv2" : " lv1"));
+      const lv = n => date < TODAY ? " lv1" : " lv3";
       const badge = (k, n) => n ? '<span class="load mono k-' + k + lv(n) + '"><span class="lk">'
         + (k === "m" ? "造" : "出") + '</span>' + n + '</span>' : "";
       cell.innerHTML = '<div class="day-head"><span class="dnum mono'
