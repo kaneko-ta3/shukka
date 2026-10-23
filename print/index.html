@@ -45,14 +45,14 @@ nav button[aria-selected="true"]{color:var(--accent-ink); background:var(--accen
   </nav>
   <div class="drop" id="drop">ここにファイルを落とすと、合うタブで開きます（別紙→印刷マン／送り状PDF→余白書き換え／発行済データ→追跡番号出力）</div>
   <!-- 版番号。push するたびに上げます（中の3つのページとは別に数えます） -->
-  <span class="ver">v4</span>
+  <span class="ver">v5</span>
 </header>
 <div id="msg" hidden></div>
 <div class="frames" id="frames"></div>
 
 <script>
 /* ===================================================================
-   ラベル印刷補助  v4
+   ラベル印刷補助  v5
 
    印刷マン（label/）・送り状 余白書き換え（hinmei/）・追跡番号出力（tracking/）を1つの入口にまとめる。
    ・中の3つは今のページをそのまま枠（iframe）で出す。開いたタブだけ読み込み、切り替えても中身は残る
@@ -157,25 +157,39 @@ function putShipper(sh) {
     addr: String(sh.address1 || '').trim(),
     bldg: String(sh.address2 || '').trim()
   };
+  const code = String(sh.code || '').trim();   // 今の ops は送ってこない。送ってくるようになったら使う
   if (!s.name || !s.addr) return false;
   let list;
   try { list = JSON.parse(localStorage.getItem(LS_SENDERS) || '[]') || []; } catch (e) { list = []; }
   /* 同じ名前・電話でも本社と倉庫のように住所違いがあるので、名前と電話だけでは同じとみなさない。
+     住所は書き方の違い（5丁目37-4 と 5-37-4、住所と建物名の分け方、全角半角、空白）を吸収して見比べる。
      前に ops から受け取った1件（src:'ops'）だけを ops に合わせて直し、ほかの依頼主には触らない */
-  const sp = v => String(v || '').replace(/\s+/g, '');
+  const addrKey = x => String((x.addr || '') + (x.bldg || '')).normalize('NFKC')
+    .replace(/\s+/g, '').replace(/[‐－―ー−]/g, '-')
+    .replace(/(\d+)丁目/g, '$1-').replace(/(\d+)番地?/g, '$1-').replace(/(\d+)号(?!館|棟|室|倉庫)/g, '$1').replace(/-+/g, '-');
   const same = x => x && x.name === s.name && digits(x.tel) === digits(s.tel) && digits(x.zip) === digits(s.zip) &&
-                    sp(x.addr) === sp(s.addr) && sp(x.bldg) === sp(s.bldg);
+                    addrKey(x) === addrKey(s);
   const fromOps = list.find(x => x && x.src === 'ops');
+  const manual = list.find(x => x && x !== fromOps && x.src !== 'ops' && (code ? x.code === code : same(x)));
+  if (fromOps && manual) {
+    /* 書き方の違いで別の依頼主として足してしまった分（v4 の初め）を片づける。手で入れた方（コード付き）を残す */
+    list = list.filter(x => x !== fromOps);
+    manual.src = 'ops';
+    try { if (JSON.parse(localStorage.getItem(LS_SENDER_SEL) || '""') === fromOps.id) localStorage.setItem(LS_SENDER_SEL, JSON.stringify(manual.id)); } catch (e) { /* 選び直してもらう */ }
+    localStorage.setItem(LS_SENDERS, JSON.stringify(list));
+    return true;
+  }
   if (fromOps) {
     if (same(fromOps)) return false;
-    Object.assign(fromOps, s);                // 依頼主コードは ops から来ないので、今のものを残す
-  } else if (list.some(same)) {
-    list.find(same).src = 'ops';              // 手で入れた同じ依頼主があれば、それを ops の分とする（中身は同じ）
+    Object.assign(fromOps, s);                // 依頼主コードは ops から来なければ、今のものを残す
+    if (code) fromOps.code = code;
+  } else if (manual) {
+    manual.src = 'ops';                       // 手で入れた同じ依頼主があれば、それを ops の分とする（中身は手で入れたまま）
     localStorage.setItem(LS_SENDERS, JSON.stringify(list));
     return false;
   } else {
     s.src = 'ops';
-    s.code = '';
+    s.code = code;
     s.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     list.push(s);
     try { if (!localStorage.getItem(LS_SENDER_SEL)) localStorage.setItem(LS_SENDER_SEL, JSON.stringify(s.id)); } catch (e) { /* 下で知らせる */ }
