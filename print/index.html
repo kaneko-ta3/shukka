@@ -45,14 +45,14 @@ nav button[aria-selected="true"]{color:var(--accent-ink); background:var(--accen
   </nav>
   <div class="drop" id="drop">ここにファイルを落とすと、合うタブで開きます（別紙→印刷マン／送り状PDF→余白書き換え／発行済データ→追跡番号出力）</div>
   <!-- 版番号。push するたびに上げます（中の3つのページとは別に数えます） -->
-  <span class="ver">v3</span>
+  <span class="ver">v4</span>
 </header>
 <div id="msg" hidden></div>
 <div class="frames" id="frames"></div>
 
 <script>
 /* ===================================================================
-   ラベル印刷補助  v3
+   ラベル印刷補助  v4
 
    印刷マン（label/）・送り状 余白書き換え（hinmei/）・追跡番号出力（tracking/）を1つの入口にまとめる。
    ・中の3つは今のページをそのまま枠（iframe）で出す。開いたタブだけ読み込み、切り替えても中身は残る
@@ -60,6 +60,9 @@ nav button[aria-selected="true"]{color:var(--accent-ink); background:var(--accen
        PDF → 余白書き換え ／ 見出しに「伝票番号」「お届け先名」がある表 → 追跡番号出力 ／ それ以外の表 → 印刷マン
    ・前に開いていたタブを覚える。URLの #label #hinmei #tracking でも開ける
    ・今の3つのURLはそのまま残す（ほかの人のブックマーク用）
+   ・ops（bishop-ops）の左メニューから開いたときは、ops の設定「送り状の依頼主」を受け取り、
+     印刷マンの依頼主に入れる（v4）。前に ops から受け取った1件だけを直し、無ければ足す。
+     本社と倉庫のように名前・電話が同じで住所違いの依頼主もあるので、手で入れた依頼主には触らない。今選んでいる依頼主も変えない
    =================================================================== */
 (function () {
 'use strict';
@@ -133,12 +136,75 @@ window.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTrans
 document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => show(b.dataset.tab)));
 window.addEventListener('hashchange', () => show(location.hash.slice(1)));
 
+/* ---- ops から依頼主を受け取る（v4） ----
+   ops は {type:'bishop-ops:shipper', version:1, shipper:{name, postal, address1, address2, phone}} を送ってくる。
+   ops のURLは公開リポに書かないので、送り元（origin）は SHA-256 の値で見比べる。開いた窓（opener）からの分だけ受け取る */
+const OPS_ORIGIN_SHA256 = '4a70d412f2994ee31ad4a4828f832a6564db66d7f6d795086f894028d58b70e5';
+const LS_SENDERS = 'label.senders.v1', LS_SENDER_SEL = 'label.sender.sel.v1';   // 印刷マン（label/app.js）と同じ置き場所
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const digits = v => String(v || '').replace(/[^0-9]/g, '');
+
+/* 印刷マンの依頼主に入れる。中身が変わったら true */
+function putShipper(sh) {
+  const s = {
+    name: String(sh.name || '').trim(),
+    tel: String(sh.phone || '').trim(),
+    zip: String(sh.postal || '').trim(),
+    addr: String(sh.address1 || '').trim(),
+    bldg: String(sh.address2 || '').trim()
+  };
+  if (!s.name || !s.addr) return false;
+  let list;
+  try { list = JSON.parse(localStorage.getItem(LS_SENDERS) || '[]') || []; } catch (e) { list = []; }
+  /* 同じ名前・電話でも本社と倉庫のように住所違いがあるので、名前と電話だけでは同じとみなさない。
+     前に ops から受け取った1件（src:'ops'）だけを ops に合わせて直し、ほかの依頼主には触らない */
+  const sp = v => String(v || '').replace(/\s+/g, '');
+  const same = x => x && x.name === s.name && digits(x.tel) === digits(s.tel) && digits(x.zip) === digits(s.zip) &&
+                    sp(x.addr) === sp(s.addr) && sp(x.bldg) === sp(s.bldg);
+  const fromOps = list.find(x => x && x.src === 'ops');
+  if (fromOps) {
+    if (same(fromOps)) return false;
+    Object.assign(fromOps, s);                // 依頼主コードは ops から来ないので、今のものを残す
+  } else if (list.some(same)) {
+    list.find(same).src = 'ops';              // 手で入れた同じ依頼主があれば、それを ops の分とする（中身は同じ）
+    localStorage.setItem(LS_SENDERS, JSON.stringify(list));
+    return false;
+  } else {
+    s.src = 'ops';
+    s.code = '';
+    s.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    list.push(s);
+    try { if (!localStorage.getItem(LS_SENDER_SEL)) localStorage.setItem(LS_SENDER_SEL, JSON.stringify(s.id)); } catch (e) { /* 下で知らせる */ }
+  }
+  localStorage.setItem(LS_SENDERS, JSON.stringify(list));
+  return true;
+}
+
+window.addEventListener('message', async e => {
+  const d = e.data;
+  if (!d || d.type !== 'bishop-ops:shipper' || d.version !== 1 || !d.shipper) return;
+  if (!window.opener || e.source !== window.opener) return;
+  if (await sha256(e.origin) !== OPS_ORIGIN_SHA256) return;
+  let changed;
+  try { changed = putShipper(d.shipper); }
+  catch (err) { msg('ops から依頼主を受け取れませんでした（ブラウザに保存できません）：' + (err.message || err)); return; }
+  if (!changed) return;
+  msg('ops から依頼主「' + d.shipper.name + '」を受け取り、印刷マンの依頼主に入れました');
+  if (frames.label) frames.label.contentWindow.location.reload();   // 開いている印刷マンに読み直させる
+});
+/* 受け取る用意ができたことを ops に知らせる（中身の無い合図なので、送り先は決めない） */
+if (window.opener) { try { window.opener.postMessage({type: 'bishop-ops:ready'}, '*'); } catch (e) { /* ops 以外から開いたとき */ } }
+
 let first = location.hash.slice(1);
 if (!PAGES[first]) { try { first = localStorage.getItem(LS_TAB) || 'label'; } catch (e) { first = 'label'; } }
 show(first);
 
 // 確かめる用（画面の動きには関係しない）
-window.PRINT = {show: show, handOver: handOver, tabFor: tabFor, frames: frames};
+window.PRINT = {show: show, handOver: handOver, tabFor: tabFor, frames: frames, putShipper: putShipper, sha256: sha256};
 })();
 </script>
 </body>
