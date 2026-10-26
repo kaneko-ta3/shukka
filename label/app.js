@@ -189,12 +189,12 @@ function normTel(v) {
   return d;
 }
 
-/* 住所マスタ（ネコポスと同じ表）。半角にした住所に、上から順に置き換えを掛けます。
+/* 住所マスタ（公開リポ public-data の addr_master.csv）。半角にした住所に、上から順に置き換えを掛けます。
    「ｹ丘→ケ丘」のように、半角のままだとB2の〒の自動判定で止まる町名を戻すためのものです */
 let ADDR_MASTER = [];
 async function loadAddrMaster() {
   try {
-    const r = await fetch('data/addr_master.csv', {cache: 'no-cache'});
+    const r = await fetch('https://kaneko-ta3.github.io/public-data/addr_master.csv', {cache: 'no-cache'});
     if (!r.ok) throw new Error(r.status);
     const grid = parseDelimited(await r.text(), ',');
     ADDR_MASTER = grid.slice(1).filter(x => x[0]).map(x => [x[0], x[1] || '']);
