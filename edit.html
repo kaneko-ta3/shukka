@@ -773,7 +773,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v116";
+const BUILD = "v119";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -833,7 +833,7 @@ function call(api, params){
     .then(function(j){
       if (j && j.error){
         /* 出荷指示の行が動いていた（サーバーが書き込まずに止めた）。最新を読み直します */
-        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false); }, 0);
+        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false, true); }, 0);
         throw new Error(j.error);
       }
       return j;
@@ -1043,12 +1043,14 @@ function showSnapshot(){
   }
 }
 
-function load(first){
+/* ★v119 fresh＝true のときは、サーバーの一時保存（最大5分）を使わずシートを読み直します。
+   「再読み込み」ボタンと、行が動いていたときだけ使います（自動更新は軽いまま） */
+function load(first, fresh){
   if (loading) return;
   loading = true;
   setState(document.body.classList.contains("stale")
     ? "前回の内容を表示中／最新を取得しています…" : "読み込み中…", "busy");
-  call("board")
+  call("board", fresh ? {fresh: 1} : undefined)
     .then(function(b){
       loading = false;
       document.body.classList.remove("stale");
@@ -2917,7 +2919,7 @@ dropEl().addEventListener("click", function(){ if (dropHold) dropHide(); });
 document.getElementById("prev").onclick = () => { anchor = add(anchor, -28); render(); };
 document.getElementById("next").onclick = () => { anchor = add(anchor, 28); render(); };
 document.getElementById("today-btn").onclick = () => { anchor = homeAnchor(); render(); };
-document.getElementById("reload").onclick = () => load(false);
+document.getElementById("reload").onclick = () => load(false, true);   // ★v119 押したときは読み直す
 document.getElementById("misc-btn").onclick = () => setMiscOn(!MISC_ON);
 
 /* 画面を回したり窓の幅を変えたとき、段数の上限が変わるので描き直します */

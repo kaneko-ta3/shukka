@@ -474,7 +474,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v117";
+const BUILD = "v119";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -545,7 +545,7 @@ function call(api, params){
     .then(function(j){
       if (j && j.error){
         /* 出荷指示の行が動いていた（サーバーが書き込まずに止めた）。最新を読み直します */
-        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false); }, 0);
+        if (/表の行が動いていました/.test(j.error)) setTimeout(function(){ load(false, true); }, 0);
         throw new Error(j.error);
       }
       return j;
@@ -670,12 +670,14 @@ function showSnapshot(){
   }
 }
 
-function load(silent){
+/* ★v119 fresh＝true のときは、サーバーの一時保存（最大5分）を使わずシートを読み直します。
+   「更新」ボタンと、行が動いていたときだけ使います */
+function load(silent, fresh){
   if (loading) return;              /* 読み込みが重なって表示が食い違うのを防ぐ */
   loading = true;
   if (!silent) setState(document.body.classList.contains("stale")
     ? "前回の内容／最新を取得中…" : "読み込み中…", "busy");
-  call("work", {ym: view ? ym(view) : null})
+  call("work", {ym: view ? ym(view) : null, fresh: fresh ? 1 : null})
     .then(function(b){
       loading = false;
       document.body.classList.remove("stale");
@@ -838,7 +840,7 @@ function renderMonth(){
   nav.querySelector("#prev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth()-1, 1); render(); load(true); };
   nav.querySelector("#next").onclick = () => { view = new Date(view.getFullYear(), view.getMonth()+1, 1); render(); load(true); };
   nav.querySelector("#tbtn").onclick = () => { view = p(TODAY); render(); load(true); };
-  nav.querySelector("#rel").onclick = () => load(false);
+  nav.querySelector("#rel").onclick = () => load(false, true);   // ★v119 押したときは読み直す
   const mb = nav.querySelector("#mbtn");
   mb.classList.toggle('on', MISC_ON);
   /* 押すとどうなるかを書きます。どちらも4文字なので幅は変わりません */
