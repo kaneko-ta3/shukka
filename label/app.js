@@ -1,13 +1,13 @@
 /* =============================================================
- *  印刷マン（複数宛先ラベル） — 別紙のExcelから、B2に上げる26列のCSVを作る
+ *  印刷マン(複数宛先ラベル) — 別紙のExcelから、B2に上げる26列のCSVを作る
  *
  *  別紙はこのブラウザの中で読むだけで、どこにも送りません。
- *  依頼主（倉庫の住所・電話）もこのブラウザにだけ保存します。
+ *  依頼主(倉庫の住所・電話)もこのブラウザにだけ保存します。
  *
  *  流れ
- *    1. 別紙を入れる（ドラッグ／ファイル選択／貼り付け）
- *    2. 見出しの行と、どの列が何かを選ぶ（見出しから自動で当てます）
- *    3. 一覧で確認・手直し（個口・指定日・〒のずれ）
+ *    1. 別紙を入れる(ドラッグ／ファイル選択／貼り付け)
+ *    2. 見出しの行と、どの列が何かを選ぶ(見出しから自動で当てます)
+ *    3. 一覧で確認・手直し(個口・指定日・〒のずれ)
  *    4. CSVをダウンロード
  * ============================================================= */
 
@@ -19,15 +19,15 @@ const CFG = {
   /* 対応表の項目。multi は複数の列をつなげられる項目 */
   ITEMS: [
     {key: 'store', label: '店名・宛先名', need: true, multi: true,
-     hint: '列を2つ選ぶか、下の会社名を入れると、どちらを「名前（お届け先名）」に入れるかを選べます。もう一方は「備考(住所4)」へ'},
+     hint: '列を2つ選ぶか、下の会社名を入れると、会社名と店名のどちらをお届け先名にするか選べます。もう一方は備考(住所4)'},
     {key: 'tel',   label: '電話', need: true, hint: '行ごとに電話が空のときは「0」で出し、保存のときに知らせます'},
     {key: 'zip',   label: '〒', need: true, hint: '住所の列に〒が入っているなら空でOK'},
     {key: 'addr',  label: '住所', need: true, multi: true, hint: '2〜3列に分かれていれば全部選ぶとつなげます'},
     {key: 'qty1',  label: '商品1の数量'},
     {key: 'qty2',  label: '商品2の数量'},
-    {key: 'boxes', label: '個口数', hint: '別紙に個口数そのものが書いてある場合だけ'},
-    {key: 'due',   label: '指定日'},
+    {key: 'boxes', label: '個口数', hint: '別紙に個口数そのものが書いてある場合だけ選びます', none: '― (数量÷入数で出す)'},
     {key: 'ship',  label: '出荷日'},
+    {key: 'due',   label: '指定日'},
     {key: 'time',  label: '時間指定'},
     {key: 'memo2', label: '備考2(記事欄)', multi: true}
   ],
@@ -48,8 +48,8 @@ const CFG = {
     memo2: ['備考', '記事']
   },
 
-  /* 出荷日が空の行は「指定日 −（東京からの輸送日数＋1）」にし、営業日でなければ前の営業日まで戻します。
-     輸送1日：関東・甲信越・北陸・東海・近畿（兵庫まで）・東北（青森まで）／それ以外は2日 */
+  /* 出荷日が空の行は「指定日 −(東京からの輸送日数＋1)」にし、営業日でなければ前の営業日まで戻します。
+     輸送1日：関東・甲信越・北陸・東海・近畿(兵庫まで)・東北(青森まで)／それ以外は2日 */
   TRANSIT_NEAR: 1,
   TRANSIT_FAR: 2,
   NEAR_PREF: ['東京都', '神奈川県', '埼玉県', '千葉県', '茨城県', '栃木県', '群馬県',
@@ -57,7 +57,7 @@ const CFG = {
               '富山県', '石川県', '福井県', '滋賀県', '京都府', '大阪府', '兵庫県',
               '奈良県', '和歌山県',
               '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
-  /* 祝日（振替休日・国民の休日を含む）。年が変わる前に次の年を足してください */
+  /* 祝日(振替休日・国民の休日を含む)。年が変わる前に次の年を足してください */
   HOLIDAYS: [
     '2026/01/01', '2026/01/12', '2026/02/11', '2026/02/23', '2026/03/20', '2026/04/29',
     '2026/05/03', '2026/05/04', '2026/05/05', '2026/05/06', '2026/07/20', '2026/08/11',
@@ -70,9 +70,9 @@ const CFG = {
   TIMES: [['', '指定なし'], ['0812', '午前中'], ['1416', '14〜16時'], ['1618', '16〜18時'],
           ['1820', '18〜20時'], ['1921', '19〜21時']],
 
-  /* B2の文字数。バイトで数えます（全角2・半角1） */
+  /* B2の文字数。バイトで数えます(全角2・半角1) */
   NAME_BYTES: 32,
-  CSV_MAX_ROWS: 1000,        // これを超えたらCSVを分けます（B2に1度に上げる件数）
+  CSV_MAX_ROWS: 1000,        // これを超えたらCSVを分けます(B2に1度に上げる件数)
   ADDR1_BYTES: 38,
 
   CSV_HEAD: ['備考(住所4)', 'お届け先電話', '備考2(記事欄)', '商品名1', '商品名2',
@@ -102,11 +102,11 @@ const S = {
   item1: {name: '', per: ''},
   item2: {name: '', per: ''},
   boxMode: 'each',          // 個口の計算。each＝商品ごとに割って切り上げてから足す／mix＝割ったまま足して最後に切り上げ
-  nameOrder: 'company',     // 名前に入れる方。company＝会社名（会社名が無ければ1つ目の列）／store＝店名（2つ目以降の列）。もう一方は備考(住所4)へ
+  nameOrder: 'company',     // 名前に入れる方。company＝会社名(会社名が無ければ1つ目の列)／store＝店名(2つ目以降の列)。もう一方は備考(住所4)へ
   csvOrder: 'item',         // CSVの並び。item＝品名・数量順／sheet＝別紙の順
   rows: [],                 // 組み立てた行
   edits: {},                // 元の行番号 -> {項目: 手で入れた値}
-  include: {},              // 元の行番号 -> true/false（手で発行する／外す）
+  include: {},              // 元の行番号 -> true/false(手で発行する／外す)
   sel: new Set(),           // 選択中の元の行番号
   lastClick: null,
   checks: {},               // `${〒}|${住所}` -> 照合結果
@@ -140,7 +140,7 @@ function cellText(v) {
 }
 function pad2(n) { return String(n).padStart(2, '0'); }
 
-/* 全角の英数記号とカタカナを半角にします（スプシのASCと同じ。今のラベル出しは名前と住所にこれを掛けています） */
+/* 全角の英数記号とカタカナを半角にします(スプシのASCと同じ。今のラベル出しは名前と住所にこれを掛けています) */
 const KANA_F = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンァィゥェォッャュョー・「」、。';
 const KANA_H = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝｧｨｩｪｫｯｬｭｮｰ･｢｣､｡';
 const DAKU_F = 'ガギグゲゴザジズゼゾダヂヅデドバビブベボ';
@@ -172,7 +172,7 @@ function bytes(s) {
   }
   return b;
 }
-/* 住所1と住所2の切れ目。今のスプシ（LEFTB）と同じ切り方にしています。
+/* 住所1と住所2の切れ目。今のスプシ(LEFTB)と同じ切り方にしています。
    英数字は1バイト、それ以外は半角カナも2バイトと数え、n バイト目にまたがる文字までを前に入れます */
 function leftB(s, n) {
   let b = 0, out = '';
@@ -184,7 +184,7 @@ function leftB(s, n) {
   return out;
 }
 
-/* 電話。数字だけにします（「03(5422)7609」→「0354227609」）。Excelで頭の0が落ちたものは戻します */
+/* 電話。数字だけにします(括弧やハイフンを外す)。Excelで頭の0が落ちたものは戻します */
 function normTel(v) {
   const d = String(v == null ? '' : v).normalize('NFKC').replace(/[^0-9]/g, '');
   if (!d) return '';
@@ -192,7 +192,7 @@ function normTel(v) {
   return d;
 }
 
-/* 住所マスタ（公開リポ public-data の addr_master.csv）。半角にした住所に、上から順に置き換えを掛けます。
+/* 住所マスタ(公開リポ public-data の addr_master.csv)。半角にした住所に、上から順に置き換えを掛けます。
    「ｹ丘→ケ丘」のように、半角のままだとB2の〒の自動判定で止まる町名を戻すためのものです */
 let ADDR_MASTER = [];
 async function loadAddrMaster() {
@@ -237,7 +237,7 @@ function parseDate(v) {
   if (m) {
     const now = new Date();
     let y = now.getFullYear();
-    /* 年が無いときは、今日から見て近い方の年にします（12月に1月の日付が来たら翌年） */
+    /* 年が無いときは、今日から見て近い方の年にします(12月に1月の日付が来たら翌年) */
     const cand = new Date(y, +m[1] - 1, +m[2]);
     if (cand - now < -1000 * 60 * 60 * 24 * 60) y += 1;
     return fmtYMD(y, +m[1], +m[2]);
@@ -326,7 +326,7 @@ function readPaste(text) {
 }
 
 /* Excelのシートを [行][列] にします。結合セルは結合範囲の全部に同じ値を入れます。
-   Excelで非表示にしている列と行は grid.hc / grid.hr に覚えておきます（列の記号はExcelと同じに保つため、消さずに隠します） */
+   Excelで非表示にしている列と行は grid.hc / grid.hr に覚えておきます(列の記号はExcelと同じに保つため、消さずに隠します) */
 function sheetToGrid(ws) {
   if (!ws || !ws['!ref']) return [];
   const rg = XLSX.utils.decode_range(ws['!ref']);
@@ -377,7 +377,7 @@ function trimGrid(grid) {
   });
 }
 
-/* 区切り文字のテキスト（Excelから貼り付けたもの＝タブ区切り）を読みます。"..." の中の改行もそのまま */
+/* 区切り文字のテキスト(Excelから貼り付けたもの＝タブ区切り)を読みます。"..." の中の改行もそのまま */
 function parseDelimited(text, sep) {
   const rows = []; let row = [], cur = '', q = false;
   text = text.replace(/^﻿/, '');
@@ -402,7 +402,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false;
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false; S.undoExcl = null;
   detectHeader();
   guessMap();
   rebuild();
@@ -436,7 +436,7 @@ function rowLooksData(row) {
     return /^(北海道|東京都|京都府|大阪府|.{2,3}県).+\d/.test(t);
   });
 }
-/* 値が1つしかない行（「〇〇納品先一覧」のようなタイトル）。見出しには含めません */
+/* 値が1つしかない行(「〇〇納品先一覧」のようなタイトル)。見出しには含めません */
 function rowIsTitle(row) {
   return new Set(vis(row).map(cellText).filter(Boolean)).size <= 1;
 }
@@ -445,7 +445,7 @@ function headerish(row) {
 }
 
 /* 先頭15行のうち、見出しらしい言葉がいちばん多い行を見出しにします。
-   上下の行も見出しらしければ（2段の見出し）、まとめて見出しとみなします */
+   上下の行も見出しらしければ(2段の見出し)、まとめて見出しとみなします */
 function detectHeader() {
   const g = S.grid;
   let best = -1, bestScore = 0;
@@ -499,7 +499,7 @@ function guessMap() {
       if (used.has(c) || S.hc.has(c)) continue;
       const h = headText(c);
       if (!h || !words.some(w => h.indexOf(w) >= 0)) continue;
-      /* 指定日・出荷日は、中身が日付でない列には当てません（見出しに「納品日」を含む店名の列に当たることがあるため） */
+      /* 指定日・出荷日は、中身が日付でない列には当てません(見出しに「納品日」を含む店名の列に当たることがあるため) */
       if ((k === 'due' || k === 'ship') && sampleText(c) && parseDate(sampleText(c)) === null) continue;
       /* 「お届け先住所」を住所に、「お届け先名」を宛先名に。電話の列の「TEL」も住所には当てません */
       S.map[k].push(c); used.add(c);
@@ -528,7 +528,7 @@ function isTotalRow(row) {
 
 /**
  * 別紙と対応表から、一覧の行を組み立てます。
- * 手で直した値（S.edits）は上書きせずに残します。
+ * 手で直した値(S.edits)は上書きせずに残します。
  */
 function rebuild() {
   const g = S.grid;
@@ -541,7 +541,7 @@ function rebuild() {
     const total = isTotalRow(raw);
     const hidden = S.hr.has(r);
     const filled = new Set();
-    /* 埋める元にも埋める先にも、Excelで非表示の行は使いません（画面で見えている上の値で埋めるため） */
+    /* 埋める元にも埋める先にも、Excelで非表示の行は使いません(画面で見えている上の値で埋めるため) */
     if (!total && !hidden) {
       S.fill.forEach(c => {
         const t = cellText(raw[c]);
@@ -554,7 +554,7 @@ function rebuild() {
 
     const auto = {};
     CFG.ITEMS.forEach(it => { auto[it.key] = pickRaw(raw, it.key); });
-    /* 〒と住所が1つのセルに入っている（〒141-0021 東京都…） */
+    /* 〒と住所が1つのセルに入っている(〒141-0021 東京都…) */
     const zm = auto.addr.normalize('NFKC').match(/^〒?\s*(\d{3}-?\d{4})\s*(.*)$/);
     if (zm) { if (!auto.zip) auto.zip = zm[1]; auto.addr = zm[2]; }
     const dueRaw = (S.map.due || []).map(c => raw[c]).find(v => cellText(v));
@@ -600,8 +600,8 @@ function included(row) {
   return (row.src in S.include) ? S.include[row.src] : defaultIncluded(row);
 }
 
-/* 名前（お届け先名）と備考(住所4)の自動の値。
-   a＝会社名（会社名が空なら1つ目の列）、b＝店名（会社名があれば選んだ列を全部、無ければ2つ目以降の列）。
+/* 名前(お届け先名)と備考(住所4)の自動の値。
+   a＝会社名(会社名が空なら1つ目の列)、b＝店名(会社名があれば選んだ列を全部、無ければ2つ目以降の列)。
    S.nameOrder が company なら 名前＝a・備考＝b、store なら 名前＝b・備考＝a。
    会社名が空で列が1つだけなら、名前＝その列、備考＝空 */
 function autoNameMemo(row) {
@@ -625,17 +625,17 @@ function computeRow(row) {
 
   const nameSrc = edited(row, 'name') ? String(val(row, 'name')) : nameAuto;
   const memoSrc = edited(row, 'memo') ? String(val(row, 'memo')) : memoAuto;
-  /* 名前は半角にして数えます（英数字と、カタカナ→半角カナ。ひらがな・漢字はそのまま） */
+  /* 名前は半角にして数えます(英数字と、カタカナ→半角カナ。ひらがな・漢字はそのまま) */
   const name = asc(nameSrc).trim();
-  if (!name) err.push('名前が空です');
-  else if (bytes(name) > CFG.NAME_BYTES) err.push('名前が長すぎます（半角にしても ' + bytes(name) + 'バイト。上限 ' + CFG.NAME_BYTES + 'バイト＝全角16文字）');
+  if (!name) err.push('お届け先名が空です');
+  else if (bytes(name) > CFG.NAME_BYTES) err.push('お届け先名が長すぎます(半角にしても ' + bytes(name) + 'バイト。上限 ' + CFG.NAME_BYTES + 'バイト＝全角16文字)');
 
   let tel = normTel(val(row, 'tel'));
   const telEmpty = !tel;
   if (telEmpty) { tel = '0'; warn.push('電話が空なので「0」で出します'); }
 
   const zipRaw = String(val(row, 'zip') || '');
-  const zip = normZip(zipRaw);                       // 別紙（または手直し）の〒。照合にはこちらを使います
+  const zip = normZip(zipRaw);                       // 別紙(または手直し)の〒。照合にはこちらを使います
   let zipOut = zip, zipFilled = '';                  // CSVに出す〒。住所から補ったときは zipFilled に元の〒
 
   const addrIn = String(val(row, 'addr') || '').replace(/\s+/g, ' ').trim();
@@ -651,33 +651,33 @@ function computeRow(row) {
       check = ck;
       if (ck.added) { addr = ck.addr; warn.push('「' + ck.added + '」を補いました'); }
       const okSig = S.edits[row.src] && S.edits[row.src].addrOk;
-      /* 相手が入れた〒は書き換えません（相手の〒で出して違っていたら相手のデータの問題だが、
-         こちらで変えて元が合っていたらこちらのミスになるため）。
+      /* 相手が入れた〒は書き換えません(相手の〒で出して違っていたら相手のデータの問題だが、
+         こちらで変えて元が合っていたらこちらのミスになるため)。
          住所から〒を入れるのは、〒が空で、住所から1つに決まるときだけです */
       const canFill = ck.status === 'nozip' && ck.byAddr.length === 1;
-      if (ck.status === 'ok') { if (ck.biz) warn.push('会社専用の〒です（' + ck.biz + '）'); }
+      if (ck.status === 'ok') { if (ck.biz) warn.push('会社専用の〒です(' + ck.biz + ')'); }
       else if (ck.status === 'nodata') warn.push(ck.msg);
       else if (okSig === zip + '|' + addrIn) warn.push('〒と住所の照合：このまま出すことにしました');
       else if (canFill) {
         zipOut = Addr.fmtZip(ck.byAddr[0].zip);
-        zipFilled = '（空）';
+        zipFilled = '(空)';
         warn.push('〒が空なので、住所から ' + zipOut + ' を入れました');
       }
-      /* データに無い〒も「〒の確認」として止めます（打ち間違いがほとんど）。直すかどうかは人が「住所どおり」を押して決めます */
+      /* データに無い〒も「〒の確認」として止めます(打ち間違いがほとんど)。直すかどうかは人が「住所どおり」を押して決めます */
       else err.push('check');
     }
   }
-  if (!zipOut && !(check && check.status === 'pending')) err.push(zipRaw ? '〒が7桁になりません（' + zipRaw + '）' : '〒が空です');
+  if (!zipOut && !(check && check.status === 'pending')) err.push(zipRaw ? '〒が7桁になりません(' + zipRaw + ')' : '〒が空です');
 
   /* 商品と数量 */
   const q1 = String(val(row, 'qty1') || '').trim();
   const q2 = String(val(row, 'qty2') || '').trim();
   const item = (it, q, label) => {
     const nm = itemName(it === S.item1 ? 'item1' : 'item2');
-    /* 数量の列を選んでいないとき、商品1は名前だけを出します。商品2は出しません（名前が残っていても） */
+    /* 数量の列を選んでいないとき、商品1は名前だけを出します。商品2は出しません(名前が残っていても) */
     if (!q) return label === '商品1' && nm && !(S.map.qty1 || []).length ? nm : '';
     const n = num(q);
-    if (isNaN(n)) { err.push(label + 'の数量が数字ではありません（' + q + '）'); return nm; }
+    if (isNaN(n)) { err.push(label + 'の数量が数字ではありません(' + q + ')'); return nm; }
     if (n === 0) return '';                          // 数量0の商品は出しません
     if (!nm) { err.push(label + 'の商品名を上の欄に入れてください'); return ''; }
     return nm + '(' + n + ')';
@@ -687,14 +687,14 @@ function computeRow(row) {
   /* 商品1が出ないときは、商品2を商品名1に詰めます */
   if (!item1 && item2) { item1 = item2; item2 = ''; }
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
-  if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0（または空）です。発行から外すか、数量を直してください');
-  /* 選んだ数量の列が、どれも0か空（空だけの行は除く）。この行は、はじめから除外にします（送らなくてよい行） */
+  if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
+  /* 選んだ数量の列が、どれも0か空(空だけの行は除く)。この行は、はじめから除外にします(送らなくてよい行) */
   const qCols = [['qty1', q1], ['qty2', q2]].filter(([k]) => (S.map[k] || []).length);
   row.zeroQty = qCols.length > 0 && qCols.some(([, q]) => q !== '') && qCols.every(([, q]) => q === '' || num(q) === 0);
 
   /* 個口数。手入力 > 別紙の個口数 > 数量÷入数 > 1
-       each：商品ごとに割って切り上げてから足す（別々の箱に詰める）
-       mix ：割ったまま足して、最後に切り上げ（同じ箱に混ぜて詰める） */
+       each：商品ごとに割って切り上げてから足す(別々の箱に詰める)
+       mix ：割ったまま足して、最後に切り上げ(同じ箱に混ぜて詰める) */
   let boxesAuto = 0;
   const bcol = String(row.auto.boxes || '').trim();
   if (bcol && !isNaN(num(bcol))) boxesAuto = Math.round(num(bcol));
@@ -719,22 +719,22 @@ function computeRow(row) {
 
   const dueV = val(row, 'due');
   const due = parseDate(dueV);
-  if (due === null) err.push('指定日が日付として読めません（' + cellText(dueV) + '）');
+  if (due === null) err.push('指定日が日付として読めません(' + cellText(dueV) + ')');
   const shipV = val(row, 'ship');
   let ship = parseDate(shipV), shipAuto = false;
-  if (ship === null) err.push('出荷日が日付として読めません（' + cellText(shipV) + '）');
+  if (ship === null) err.push('出荷日が日付として読めません(' + cellText(shipV) + ')');
   else if (!ship) { ship = autoShip(due, addr); shipAuto = !!ship; }
   if (ship === '' ) err.push('出荷日か指定日を入れてください');
   if (due && ship && ship > due) err.push('出荷日が指定日より後になっています');
 
   const timeV = val(row, 'time');
   const time = normTime(timeV);
-  if (time === null) err.push('時間指定が読めません（' + timeV + '）');
+  if (time === null) err.push('時間指定が読めません(' + timeV + ')');
 
   const memo2 = String(val(row, 'memo2') || '').trim();
 
-  /* 補った県・市（全角）にも同じ変換を掛けます */
-  /* ケ／ヶは郵便番号データの正式な書き方にそろえます（保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など） */
+  /* 補った県・市(全角)にも同じ変換を掛けます */
+  /* ケ／ヶは郵便番号データの正式な書き方にそろえます(保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など) */
   let addrA = Addr.canonKe(applyMaster(asc(addr.replace(/,/g, '，'))), check && check.towns);
   /* 「福岡市福岡市東区」「岩国市岩国市南岩国町」のように市区町村名が2回続いていたら1つにします */
   if (check && check.cities) {
@@ -753,7 +753,7 @@ function computeRow(row) {
 }
 
 
-/* =================== 住所の照合（非同期） =================== */
+/* =================== 住所の照合(非同期) =================== */
 
 let checkRunning = false, checkAgain = false;
 async function runChecks() {
@@ -833,7 +833,7 @@ async function importSenders(file) {
   try { text = new TextDecoder('utf-8', {fatal: true}).decode(buf); }
   catch (e) { text = new TextDecoder('shift_jis').decode(buf); }
   const grid = parseDelimited(text, /\t/.test(text.split(/\r?\n/)[0]) ? '\t' : ',');
-  if (grid.length < 2) throw new Error('中身がありません（1行目が見出し、2行目から）');
+  if (grid.length < 2) throw new Error('中身がありません(1行目が見出し、2行目から)');
   const head = grid[0].map(h => String(h).trim());
   /* 1つにまとめた設定ファイル。「種類」の列で依頼主と請求先を分けて読みます */
   const ti = head.indexOf('種類');
@@ -845,7 +845,7 @@ async function importSenders(file) {
     res.combined = true;
     return res;
   }
-  /* 前の形（依頼主だけ／請求先だけのファイル）もそのまま読めます */
+  /* 前の形(依頼主だけ／請求先だけのファイル)もそのまま読めます */
   if (head.some(h => h.indexOf('顧客コード') >= 0)) return {accounts: Issued.importAccounts(grid)};
   return importSenderGrid(grid);
 }
@@ -862,7 +862,7 @@ function importSenderGrid(grid) {
   grid.slice(1).forEach(r => {
     const s = {};
     SENDER_COLS.forEach(([k]) => { s[k] = idx[k] >= 0 ? String(r[idx[k]] || '').trim() : ''; });
-    if (!s.name || !s.addr) return;                  // 住所の無い行（請求先の行など）は依頼主にしません
+    if (!s.name || !s.addr) return;                  // 住所の無い行(請求先の行など)は依頼主にしません
     const old = S.senders.find(x => x.name === s.name && normTel(x.tel) === normTel(s.tel));
     if (old) { Object.assign(old, s); updated++; }
     else { s.id = newId(); S.senders.push(s); added++; }
@@ -891,7 +891,7 @@ function csvCell(v) {
 }
 function csvLine(a) { return a.map(csvCell).join(','); }
 
-/* CSVは商品名1（同じなら商品名2）の昇順に並べて出します。数字は数として比べます（(2) が (10) より前）。
+/* CSVは商品名1(同じなら商品名2)の昇順に並べて出します。数字は数として比べます((2) が (10) より前)。
    同じ商品名どうしは一覧の順のまま */
 const ITEM_ORDER = new Intl.Collator('ja', {numeric: true});
 function outRows() {
@@ -910,7 +910,7 @@ function outRows() {
             o.ship, o.due, o.time, s.code || '', kind,
             s.tel, s.name, normZip(s.zip), s.addr, s.bldg || '',
             kind === 6 ? i + 2 : '', '',
-            /* 受注ID。B2の取り込みでは25列目→検索キー1（タイトル「受注ID」あり）、26列目→検索キー4（タイトル無し）。
+            /* 受注ID。B2の取り込みでは25列目→検索キー1(タイトル「受注ID」あり)、26列目→検索キー4(タイトル無し)。
                検索キー4に値があるとタイトル無しでエラーになるので、26列目は空にします */
             0, ''];
   });
@@ -938,8 +938,8 @@ function downloadCsv() {
   const d = new Date();
   const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
 
-  /* 1000件を超えたら1000件ずつのファイルに分けます（選んだ並びに並べたあとで分ける）。
-     くくりキー（複数口の印＝ファイルの中の行番号）は、ファイルごとに振り直します */
+  /* 1000件を超えたら1000件ずつのファイルに分けます(選んだ並びに並べたあとで分ける)。
+     くくりキー(複数口の印＝ファイルの中の行番号)は、ファイルごとに振り直します */
   const parts = [];
   for (let i = 0; i < rows.length; i += CFG.CSV_MAX_ROWS) {
     const chunk = rows.slice(i, i + CFG.CSV_MAX_ROWS).map((r, j) => {
@@ -951,7 +951,7 @@ function downloadCsv() {
     parts.push({
       name: 'ラベル_' + stamp + (total > 1 ? '_' + (parts.length + 1) + 'of' + total : '') + '.csv',
       from: i + 1, to: i + chunk.length,
-      /* 今スプシから落としているCSVと同じ形（UTF-8、BOMなし、改行CRLF） */
+      /* 今スプシから落としているCSVと同じ形(UTF-8、BOMなし、改行CRLF) */
       text: [CFG.CSV_HEAD].concat(chunk).map(csvLine).join('\r\n') + '\r\n'
     });
   }
@@ -959,12 +959,12 @@ function downloadCsv() {
   parts.forEach((p, i) => setTimeout(() => download(p.name, p.text), i * 700));
   const box = $('#dlParts');
   if (parts.length > 1) {
-    box.innerHTML = '<div class="tiny">' + rows.length + '件を ' + parts.length + 'つのファイルに分けました（1ファイル最大' + CFG.CSV_MAX_ROWS + '件）。保存されていないファイルがあれば、ここから保存してください：</div>' +
-      '<div class="btns" style="margin-top:4px">' + parts.map((p, i) => '<button class="btn small" data-part="' + i + '">' + esc(p.name) + '（' + p.from + '〜' + p.to + '件目）</button>').join('') + '</div>';
+    box.innerHTML = '<div class="tiny">' + rows.length + '件を ' + parts.length + 'つのファイルに分けました(1ファイル最大' + CFG.CSV_MAX_ROWS + '件)。保存されていないファイルがあれば、ここから保存してください：</div>' +
+      '<div class="btns" style="margin-top:4px">' + parts.map((p, i) => '<button class="btn small" data-part="' + i + '">' + esc(p.name) + '(' + p.from + '〜' + p.to + '件目)</button>').join('') + '</div>';
     box.onclick = e => { const b = e.target.closest('[data-part]'); if (b) { const p = parts[Number(b.dataset.part)]; download(p.name, p.text); } };
   } else box.innerHTML = '';
 
-  toast('CSVを保存しました（' + rows.length + '件' + (parts.length > 1 ? '・' + parts.length + 'ファイル' : '') + '）');
+  toast('CSVを保存しました(' + rows.length + '件' + (parts.length > 1 ? '・' + parts.length + 'ファイル' : '') + ')');
 }
 
 
@@ -990,7 +990,7 @@ function renderSender() {
   const s = currentSender();
   const box = $('#senderBox');
   const opts = S.senders.map(x => '<option value="' + esc(x.id) + '"' + (x.id === S.senderId ? ' selected' : '') + '>' +
-    esc(x.name) + (x.code ? '（' + esc(x.code) + '）' : '') + '</option>').join('');
+    esc(x.name) + (x.code ? '(' + esc(x.code) + ')' : '') + '</option>').join('');
   if (!S.senders.length) {
     box.innerHTML =
       '<div class="notice warn">依頼主がまだ設定されていません。最初に1回だけ、依頼主設定のCSVを読み込んでください。</div>' +
@@ -999,7 +999,7 @@ function renderSender() {
   } else {
     const p = senderProblems(s);
     box.innerHTML =
-      '<div class="sender-row"><select id="senderSel">' + opts + '<option value="__new">＋ 新しく入力する（取引先が依頼主の場合など）</option></select>' +
+      '<div class="sender-row"><select id="senderSel">' + opts + '<option value="__new">＋ 新しく入力する(取引先が依頼主の場合など)</option></select>' +
       '<button class="btn small" id="senderEdit">直す</button>' +
       '<details class="more"><summary>設定ファイル</summary><div class="btns">' +
       '<label class="btn small">設定CSVを読み込む<input type="file" accept=".csv,.txt" id="senderFile" multiple hidden></label>' +
@@ -1039,13 +1039,13 @@ async function senderZipFromAddr() {
     const z = Addr.fmtZip(r.byAddr[0].zip);
     f.elements.zip.value = z;
     f.dataset.zipAuto = z;
-    note.textContent = '住所から入れました（' + r.byAddr[0].label + '）';
+    note.textContent = '住所から入れました(' + r.byAddr[0].label + ')';
     note.className = 'tiny warn-ink';
   } else if (r.byAddr && r.byAddr.length > 1) {
     note.textContent = '候補が複数あります。手で入れてください：' + r.byAddr.map(c => Addr.fmtZip(c.zip) + ' ' + c.label).join('　');
     note.className = 'tiny warn-ink';
   } else {
-    note.textContent = '住所から〒が分かりませんでした。手で入れてください' + (r.msg ? '（' + r.msg + '）' : '');
+    note.textContent = '住所から〒が分かりませんでした。手で入れてください' + (r.msg ? '(' + r.msg + ')' : '');
     note.className = 'tiny err-ink';
   }
 }
@@ -1073,8 +1073,8 @@ function renderSource() {
   const cols = visCols();
   const hiddenCols = [];
   for (let c = 0; c < ncols(); c++) if (S.hc.has(c)) hiddenCols.push(colLetter(c));
-  $('#hiddenInfo').textContent = (hiddenCols.length ? 'Excelで非表示の列（' + hiddenCols.join('・') + '）は出していません。' : '') +
-    (S.hr.size ? 'Excelで非表示の行が ' + S.hr.size + '行あります（一覧では除外）。' : '');
+  $('#hiddenInfo').textContent = (hiddenCols.length ? 'Excelで非表示の列(' + hiddenCols.join('・') + ')は出していません。' : '') +
+    (S.hr.size ? 'Excelで非表示の行が ' + S.hr.size + '行あります(一覧では除外)。' : '');
   const mapped = {};
   CFG.ITEMS.forEach(it => (S.map[it.key] || []).forEach(c => { (mapped[c] || (mapped[c] = [])).push(it.label); }));
   const showTo = Math.min(S.grid.length, 300);
@@ -1122,11 +1122,11 @@ function renderSource() {
 /* ---- 列の対応 ---- */
 function renderMap() {
   if (!S.grid.length) return;
-  /* 選べるのはExcelで見えている列だけ（すでに選ばれている非表示の列は残します） */
-  const opts = sel => '<option value="">―</option>' + visCols().concat(sel >= 0 && S.hc.has(sel) ? [sel] : []).map(c => {
+  /* 選べるのはExcelで見えている列だけ(すでに選ばれている非表示の列は残します) */
+  const opts = (sel, none) => '<option value="">' + esc(none || '―') + '</option>' + visCols().concat(sel >= 0 && S.hc.has(sel) ? [sel] : []).map(c => {
     const ht = headText(c), sm = sampleText(c);
     return '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + colLetter(c) + '：' +
-      esc((ht || '（見出しなし）').slice(0, 14)) + (sm ? '　例 ' + esc(sm.slice(0, 14)) : '') + '</option>';
+      esc((ht || '(見出しなし)').slice(0, 14)) + (sm ? '　例 ' + esc(sm.slice(0, 14)) : '') + '</option>';
   }).join('');
   /* 1項目1行。説明は項目名に重ねると出ます。使う機会の少ない列は「その他の列」に畳みます */
   const row = it => {
@@ -1140,9 +1140,9 @@ function renderMap() {
     const emptyReq = it.need && !cols.length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip));
     const slots = it.multi ? Math.min(3, cols.length + 1) : 1;
     let r = '<div class="mr"><div class="ml"' + (it.hint ? ' title="' + esc(it.hint) + '"' : '') + '>' + esc(it.label) +
-      (it.need ? '<span class="need">必須</span>' : '') + (it.hint ? '<span class="q">?</span>' : '') + '</div><div class="ms">';
+      (it.need ? '<span class="need">必須</span>' : '') + '</div><div class="ms">';
     for (let i = 0; i < slots; i++) {
-      r += '<select data-map="' + it.key + '" data-i="' + i + '"' + (i === 0 && emptyReq ? ' class="req-empty"' : '') + '>' + opts(cols[i] == null ? -1 : cols[i]) + '</select>';
+      r += '<select data-map="' + it.key + '" data-i="' + i + '"' + (i === 0 && emptyReq ? ' class="req-empty"' : '') + '>' + opts(cols[i] == null ? -1 : cols[i], it.none) + '</select>';
     }
     r += '</div></div>';
     if (it.key === 'qty1' || it.key === 'qty2') {
@@ -1152,47 +1152,48 @@ function renderMap() {
       const nameNeed = p === 'item1' || cols.length > 0;
       const nm = itemName(p);
       /* 商品名は見出しを付けず、数量の列の真下に入力欄だけを置きます */
-      r += '<div class="mr sub"><div></div><div class="ms">' +
+      r += '<div class="mr sub"><div class="ml tiny muted">└ 商品名' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms">' +
         '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '"' +
-          ' placeholder="商品名を入力' + (nameNeed ? '（必須）' : '') + '　例：非常用トイレ" title="ラベルには「' + esc(nm || '商品名') + '(10)」の形で出ます"' +
+          ' placeholder="例：非常用トイレ" title="ラベルには「' + esc(nm || '商品名') + '(10)」の形で出ます"' +
           (nameNeed && !nm ? ' class="req-empty"' : '') + '></div></div>';
       /* 入数。ここから個口数を出すことを、欄の横に書いておきます */
-      r += '<div class="mr sub per-row"><div class="ml tiny muted">└ 入数</div><div class="ms inline wrap">' +
+      r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
-        '<span class="plus">個/箱</span><span class="tiny muted">数量÷入数（切り上げ）で個口数を出します。空なら1口</span></div></div>';
+        '<span class="plus">個/箱</span></div></div>' +
+        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口</div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
         r += '<div class="mr sub"><div class="ml tiny muted">└ 個口の計算</div><div class="ms">' +
-          opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します（別々の箱に詰める）。例：30÷48→1、30÷24→2、合計3口') +
-          opt('mix', '割ったまま足して最後に切り上げ', '数量÷入数 を切り上げずに足して、最後に切り上げます（同じ箱に混ぜて詰める）。例：0.625＋1.25＝1.875→2口') +
+          opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します(別々の箱に詰める)。例：30÷48→1、30÷24→2、合計3口') +
+          opt('mix', '割ったまま足して最後に切り上げ', '数量÷入数 を切り上げずに足して、最後に切り上げます(同じ箱に混ぜて詰める)。例：0.625＋1.25＝1.875→2口') +
           '</div></div>';
-        r += '<div class="mr sub"><div></div><div class="ms inline"><button type="button" class="btn small" data-item2="close" title="商品2の数量の列を外して、たたみます">商品2を使わない（たたむ）</button></div></div>';
+        r += '<div class="mr sub"><div></div><div class="ms inline"><button type="button" class="btn small" data-item2="close" title="商品2の数量の列を外して、たたみます">商品2を使わない(たたむ)</button></div></div>';
       }
     }
     if (it.key === 'store') {
-      r += '<div class="mr sub"><div class="ml tiny muted" title="全行に同じ会社名を付けるとき。下で「名前」に入れる方を選べます">└ 会社名</div><div class="ms">' +
-        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="全行共通。例：株式会社△△（付けないなら空）"></div></div>';
+      r += '<div class="mr sub"><div class="ml tiny muted" title="全行に同じ会社名を付けるとき。下でお届け先名にする方を選べます">└ 会社名</div><div class="ms">' +
+        '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="全行共通。例：株式会社△△(付けないなら空)"></div></div>';
       /* 名前に入れる方。会社名を入れたときか、列を2つ以上選んだときだけ出します */
       if (canSwapName()) {
         const hasCo = !!S.company.trim();
         const opt = (v, label) => '<label class="boxmode"><input type="radio" name="nameOrder" value="' + v + '"' + (S.nameOrder === v ? ' checked' : '') + '> ' + label + '</label>';
-        r += '<div class="mr sub"><div class="ml tiny muted" title="選ばなかった方は「備考(住所4)」に入ります">└ 名前に入れる</div><div class="ms inline wrap">' +
+        r += '<div class="mr sub"><div class="ml tiny muted" title="選ばなかった方は備考(住所4)">└ お届け先名</div><div class="ms inline wrap">' +
           opt('company', hasCo ? '会社名' : '1つ目の列') + opt('store', hasCo ? '店名' : '2つ目の列') +
-          '<span class="tiny muted">もう一方は備考(住所4)へ</span></div></div>';
+          '<span class="tiny muted">もう一方は備考(住所4)</span></div></div>';
       }
     }
     return r;
   };
-  /* まとまりごとに少し間を空けます（宛先／商品と個口／日付と時間／記事） */
-  const GROUP_START = ['qty1', 'due', 'memo2'];
+  /* まとまりごとに少し間を空けます(宛先／商品と個口／日付と時間／記事) */
+  const GROUP_START = ['qty1', 'ship', 'memo2'];
   let h = CFG.ITEMS.map(it => (GROUP_START.includes(it.key) ? '<div class="moregap"></div>' : '') + row(it)).join('');
   $('#mapBox').innerHTML = h;
 }
 
 /* ---- 一覧 ---- */
-/* 表全体を描き直します（別紙を入れた・列を変えた・一括で入れた とき）。
-   1行だけ変わったときは updateRows で、その行だけ描き直します（172行で全体は0.2〜0.3秒かかるため） */
+/* 表全体を描き直します(別紙を入れた・列を変えた・一括で入れた とき)。
+   1行だけ変わったときは updateRows で、その行だけ描き直します(172行で全体は0.2〜0.3秒かかるため) */
 function renderRows() {
   if (!S.grid.length) return;
   const focus = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.cell;
@@ -1203,8 +1204,8 @@ function renderRows() {
   const showQ2 = item2Shown();
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
-    '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
-    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>指定日</th><th>出荷日</th><th>時間</th><th>記事</th>' +
+    '<th>お届け先名</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
+    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>出荷日</th><th>指定日</th><th>時間指定</th><th>記事</th>' +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
@@ -1242,7 +1243,7 @@ function updateRows(srcs) {
   renderPreview();
 }
 
-/* 選択の印（行の色とチェック）だけを塗り直します。表は描き直しません */
+/* 選択の印(行の色とチェック)だけを塗り直します。表は描き直しません */
 function paintSel(srcs) {
   srcs.forEach(src => {
     const tb = document.querySelector('#rowsTable tbody[data-row="' + src + '"]');
@@ -1266,12 +1267,18 @@ function renderSummary() {
   const sumQ = k => inc.reduce((a, r) => { const n = num(r.out[k]); return a + (isNaN(n) ? 0 : n); }, 0);
   const excl = S.rows.length - inc.length;
   const nBad = inc.filter(r => r.err.some(e => e !== 'check')).length;
+  /* 要修正をまとめて除外するボタン。除外すると1件も残らないときは押せなくします */
+  const exclBadBtn = (cls, label) => !nBad ? '' : nBad >= inc.length
+    ? '<button type="button" class="' + cls + '" disabled title="全部の行が要修正なので、まとめて除外すると1件も残りません。先に直してください">' + label + '</button>'
+    : '<button type="button" class="' + cls + '" data-excl-bad="1" title="要修正の行の発行のチェックをまとめて外します。すぐ横の「取り消す」で戻せます">' + label + '</button>';
+  /* 直前のまとめて除外を取り消すボタン */
+  const undoExclBtn = cls => S.undoExcl ? '<button type="button" class="' + cls + '" data-undo-excl="1" title="さっきまとめて除外した行を、発行に戻します">まとめて除外を取り消す (' + S.undoExcl.n + '行を戻す)</button>' : '';
   const sp = senderProblems(currentSender());
 
   const unknownRows = inc.filter(r => r.err.includes('check') && r.check && r.check.zipUnknown);
   const nUnknown = unknownRows.length;
   const nUnknownFix = unknownRows.filter(r => r.check.byAddr && r.check.byAddr.length === 1).length;
-  /* 件数のうち、問題の件数は押すとその行だけに絞り込めます（もう一度押すと全部に戻る） */
+  /* 件数のうち、問題の件数は押すとその行だけに絞り込めます(もう一度押すと全部に戻る) */
   const chip = (view, cls, label, n) => n ? '<button type="button" class="stat stat-btn ' + cls + (S.view === view ? ' on' : '') + '" data-view="' + view + '" title="押すとこの行だけを表に出します">' +
     label + ' ' + n + (view === 'excl' ? '行' : '件') + (S.view === view ? ' ✕' : '') + '</button>' : '';
   $('#summary').innerHTML =
@@ -1282,11 +1289,12 @@ function renderSummary() {
     chip('excl', 'muted', '除外', excl) +
     chip('chk', 'warn-ink', '〒の確認', nChk) +
     chip('unknown', 'warn-ink', 'うちデータに無い〒', nUnknown) +
-    (nUnknownFix ? '<button type="button" class="stat stat-btn warn-ink" data-fix-unknown="1" title="データに無い〒のうち、住所から〒が1つに決まる行を、まとめて住所から引いた〒にします">データに無い〒をまとめて住所どおりにする（' + nUnknownFix + '件）</button>' : '') +
+    (nUnknownFix ? '<button type="button" class="stat stat-btn warn-ink" data-fix-unknown="1" title="データに無い〒のうち、住所から〒が1つに決まる行を、まとめて住所から引いた〒にします">データに無い〒をまとめて住所どおりにする(' + nUnknownFix + '件)</button>' : '') +
     chip('filled', 'warn-ink', '〒を住所から入れた', inc.filter(r => r.out.zipFilled).length) +
     chip('bad', 'err-ink', '要修正', nBad) +
-    (nBad ? '<button type="button" class="stat stat-btn err-ink" data-excl-bad="1" title="要修正の行の「発行」のチェックをまとめて外します。除外の一覧から戻せます">要修正をまとめて除外</button>' : '') +
-    (S.view ? '<button type="button" class="stat stat-btn" data-view="">全部表示に戻す（' + visibleRows().length + '/' + S.rows.length + '行を表示中）</button>' : '') +
+    exclBadBtn('stat stat-btn err-ink', '要修正をまとめて除外') +
+    undoExclBtn('stat stat-btn') +
+    (S.view ? '<button type="button" class="stat stat-btn" data-view="">全部表示に戻す(' + visibleRows().length + '/' + S.rows.length + '行を表示中)</button>' : '') +
     (nPending ? '<span class="stat muted">照合中…</span>' : '');
 
   const block = [];
@@ -1297,13 +1305,13 @@ function renderSummary() {
   if (!itemName('item1')) block.push('商品1の商品名を入れてください');
   if ((S.map.qty2 || []).length && !itemName('item2')) block.push('商品2の商品名を入れてください');
   sp.forEach(p => block.push(p));
-  if (nErr) block.push('直すところが残っています（赤い行）');
+  if (nErr) block.push('直すところが残っています(赤い行)');
   if (nPending) block.push('住所の照合が終わっていません');
   const btn = $('#dlBtn');
   btn.disabled = block.length > 0;
   /* 要修正が残っているときは、ここからもまとめて除外できるようにします */
   $('#dlWhy').innerHTML = esc(block.join('　／　')) +
-    (nBad ? ' <button type="button" class="btn small" data-excl-bad="1">要修正の ' + nBad + '件を除外する</button>' : '');
+    ' ' + exclBadBtn('btn small', '要修正の ' + nBad + '件を除外する') + ' ' + undoExclBtn('btn small');
 
   /* 選択中の行への一括操作 */
   /* 幅は固定。選んでも右のボタンが動かないように、文字の長さを変えません */
@@ -1337,13 +1345,13 @@ function itemName(p) {
 function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
 function showQ2() { return item2Shown(); }
 
-/* 1行ぶんの HTML（本体の行と、問題・お知らせの行） */
+/* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
 function rowHtml(row) {
   const cols = 14 + (showQ2() ? 1 : 0);
   const cell = (row, key, shown, cls, extra) => {
     const ed = edited(row, key);
     const orig = row.auto[key];
-    const title = ed ? '元の値：' + (cellText(orig) || '（空）') : (row.filledKeys.has(key) ? '上の値で埋めました' : '');
+    const title = ed ? '元の値：' + (cellText(orig) || '(空)') : (row.filledKeys.has(key) ? '上の値で埋めました' : '');
     return '<td class="' + (cls || '') + (ed ? ' edited' : '') + (row.filledKeys.has(key) && !ed ? ' filled' : '') + '"' +
       (title ? ' title="' + esc(title) + '"' : '') + '><input data-cell="' + row.src + ':' + key + '" value="' + esc(shown) + '"' + (extra || '') + '></td>';
   };
@@ -1364,7 +1372,7 @@ function rowHtml(row) {
       cell(row, 'memo', memoShown, 'w-memo') +
       cell(row, 'tel', edited(row, 'tel') ? val(row, 'tel') : o.tel, 'w-tel') +
       (o.zipFilled && !edited(row, 'zip')
-        ? '<td class="w-zip filledzip" title="住所から入れました（元の〒：' + esc(o.zipFilled) + '）"><input data-cell="' + row.src + ':zip" value="' + esc(o.zip) + '"></td>'
+        ? '<td class="w-zip filledzip" title="住所から入れました(元の〒：' + esc(o.zipFilled) + ')"><input data-cell="' + row.src + ':zip" value="' + esc(o.zip) + '"></td>'
         : cell(row, 'zip', edited(row, 'zip') ? val(row, 'zip') : (o.zip || row.auto.zip), 'w-zip')) +
       cell(row, 'addr', edited(row, 'addr') ? val(row, 'addr') : row.auto.addr, 'c-addr') +
       cell(row, 'qty1', val(row, 'qty1'), 'w-num') +
@@ -1372,19 +1380,19 @@ function rowHtml(row) {
       '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
-      cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto ? '指定日から自動で出しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.ship ? o.ship.slice(5) + '(' + weekday(o.ship) + ')' : cellText(val(row, 'ship'))) + '"></td>' +
+      cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +
       '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
         CFG.TIMES.map(([v, l]) => '<option value="' + v + '"' + (o.time === v ? ' selected' : '') + '>' + l + '</option>').join('') +
-        (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '（読めません）</option>' : '') +
+        (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '(読めません)</option>' : '') +
         '</select></td>' +
       cell(row, 'memo2', val(row, 'memo2'), 'w-memo') +
       '</tr>';
 
     /* 問題とお知らせは、その行のすぐ下に出します */
     const msgs = [];
-    if (!inn) msgs.push('<span class="muted">除外' + (excludeWhy(row) && !(row.src in S.include) ? '（' + esc(excludeWhy(row)) + '）' : '') + '</span>');
+    if (!inn) msgs.push('<span class="muted">除外' + (excludeWhy(row) && !(row.src in S.include) ? '(' + esc(excludeWhy(row)) + ')' : '') + '</span>');
     else {
       row.err.filter(e => e !== 'check').forEach(e => msgs.push('<span class="err-ink">✕ ' + esc(e) + '</span>'));
       if (chk) msgs.push(checkUi(row));
@@ -1408,7 +1416,7 @@ function focusCell(id) {
 function checkUi(row) {
   const ck = row.check;
   const zip = row.out.zipIn;
-  /* 2つの場所を見比べて、頭から同じ部分の後ろ（食い違っているところ）を赤くします */
+  /* 2つの場所を見比べて、頭から同じ部分の後ろ(食い違っているところ)を赤くします */
   const zipLabel = ck.zipUnknown ? '' : (ck.byZip || '');     // データに無い〒のときは見比べる相手が無いので赤くしない
   const diffMark = (text, other) => {
     let i = 0;
@@ -1417,8 +1425,8 @@ function checkUi(row) {
   };
   const firstAddr = ck.byAddr.length ? ck.byAddr[0].label : '';
   let h = '<div class="ck"><div class="ck-title">' + (ck.zipUnknown
-      ? 'この〒（' + esc(zip) + '）は郵便番号データにありません。打ち間違いのことが多いので、住所から引いた〒を確かめてください'
-      : '〒と住所が合いません。どちらが正しいか選んでください') + (ck.msg ? '（' + esc(ck.msg) + '）' : '') + '</div>';
+      ? 'この〒(' + esc(zip) + ')は郵便番号データにありません。打ち間違いのことが多いので、住所から引いた〒を確かめてください'
+      : '〒と住所が合いません。どちらが正しいか選んでください') + (ck.msg ? '(' + esc(ck.msg) + ')' : '') + '</div>';
   h += '<div class="ck-opts">';
   ck.byAddr.forEach(c => {
     h += '<button class="btn small primary" data-fixzip="' + row.src + '" data-zip="' + c.zip + '">住所どおり：〒を ' + Addr.fmtZip(c.zip) + ' にする</button>' +
@@ -1426,7 +1434,7 @@ function checkUi(row) {
   });
   if (!ck.byAddr.length) h += '<span class="tiny muted">住所からは〒を引けませんでした。住所か〒を手で直してください</span>';
   h += '</div><div class="ck-opts">';
-  h += '<span class="tiny">今の〒 ' + esc(zip || '（なし）') + ' は：' + (zipLabel && firstAddr ? diffMark(zipLabel, firstAddr) : esc(ck.byZip || '―')) + '</span>';
+  h += '<span class="tiny">今の〒 ' + esc(zip || '(なし)') + ' は：' + (zipLabel && firstAddr ? diffMark(zipLabel, firstAddr) : esc(ck.byZip || '―')) + '</span>';
   if (zip) h += '<button class="btn small" data-keep="' + row.src + '">このまま出す</button>';
   h += '</div></div>';
   return h;
@@ -1569,6 +1577,7 @@ function bindEvents() {
       const src = Number(t.dataset.inc);
       const row = S.rows.find(r => r.src === src);
       if (t.checked === defaultIncluded(row)) delete S.include[src]; else S.include[src] = t.checked;
+      S.undoExcl = null;
       recomputeRow(row); return;
     }
     if (t.id === 'senderSel') {
@@ -1583,7 +1592,7 @@ function bindEvents() {
           try {
             const r = await importSenders(f);
             msg.push(r.combined ? '依頼主 ' + (r.added + r.updated) + '件・請求先 ' + r.accounts + '件'
-                     : r.accounts != null ? '請求先 ' + r.accounts + '件' : '依頼主（追加 ' + r.added + '・更新 ' + r.updated + '）');
+                     : r.accounts != null ? '請求先 ' + r.accounts + '件' : '依頼主(追加 ' + r.added + '・更新 ' + r.updated + ')');
           } catch (err) { msg.push(f.name + ' は読めませんでした：' + err.message); }
         }
         toast('読み込みました：' + msg.join(' ／ '));
@@ -1593,7 +1602,7 @@ function bindEvents() {
       return;
     }
   });
-  /* 表の中は Enter で下、Tab で右（Shift を押しながらで上・左）。行の右端の Tab は次の行の左端へ */
+  /* 表の中は Enter で下、Tab で右(Shift を押しながらで上・左)。行の右端の Tab は次の行の左端へ */
   document.addEventListener('keydown', e => {
     const t = e.target;
     if (!t.dataset || !t.dataset.cell) return;
@@ -1615,7 +1624,7 @@ function bindEvents() {
       if (ki < 0) { ki = keys.length - 1; si--; }
     }
     const next = (si >= 0 && si < srcs.length) ? srcs[si] + ':' + keys[ki] : '';
-    /* 値を変えていれば確定（表を描き直すので、描き直したあとに移り先へ入ります） */
+    /* 値を変えていれば確定(表を描き直すので、描き直したあとに移り先へ入ります) */
     S.pendingFocus = next;
     const changed = t.tagName === 'SELECT' ? false : t.value !== t.defaultValue;
     if (changed) commitCell(t);
@@ -1623,9 +1632,9 @@ function bindEvents() {
     if (!next) t.blur();
   });
 
-  /* 行の選択（Shiftで範囲） */
+  /* 行の選択(Shiftで範囲) */
   document.addEventListener('click', e => {
-    /* チェックの周り（マス全体）を押しても、チェックを押したことにします */
+    /* チェックの周り(マス全体)を押しても、チェックを押したことにします */
     const td = e.target.closest && e.target.closest('td.c-sel, td.c-inc');
     if (td && e.target === td) {
       const cb = td.querySelector('input[type=checkbox]');
@@ -1640,7 +1649,7 @@ function bindEvents() {
       paintSel(vis.map(r => r.src)); return;
     }
     if (t.closest && t.closest('[data-fix-unknown]')) {
-      /* データに無い〒のうち、住所から〒が1つに決まる行だけを、まとめて住所どおりにします（人が押したときだけ） */
+      /* データに無い〒のうち、住所から〒が1つに決まる行だけを、まとめて住所どおりにします(人が押したときだけ) */
       let n = 0;
       S.rows.forEach(r => {
         if (included(r) && r.err.includes('check') && r.check && r.check.zipUnknown && r.check.byAddr && r.check.byAddr.length === 1) {
@@ -1648,25 +1657,34 @@ function bindEvents() {
         }
       });
       if (S.view === 'unknown') S.view = '';
-      recompute(); toast('データに無い〒 ' + n + '件を、住所から引いた〒にしました（元の〒はセルに重ねると出ます）');
+      recompute(); toast('データに無い〒 ' + n + '件を、住所から引いた〒にしました(元の〒はセルに重ねると出ます)');
       return;
     }
     if (t.dataset && t.dataset.item2) {
-      /* 商品2を開く／たたむ。たたむときは商品2の数量の列も外します（隠れたまま数量が出ないように） */
+      /* 商品2を開く／たたむ。たたむときは商品2の数量の列も外します(隠れたまま数量が出ないように) */
       if (t.dataset.item2 === 'open') { S.item2Open = true; renderMap(); renderRows(); }
       else { S.item2Open = false; S.map.qty2 = []; rebuild(); }
       return;
     }
     if (t.closest && t.closest('[data-excl-bad]')) {
-      /* 要修正の行（〒の確認だけの行は除く）の「発行」のチェックをまとめて外します */
+      /* 要修正の行(〒の確認だけの行は除く)の「発行」のチェックをまとめて外します */
       let n = 0;
+      const prev = Object.assign({}, S.include);
       S.rows.forEach(r => {
         if (!included(r) || !r.err.some(x => x !== 'check')) return;
         if (defaultIncluded(r)) S.include[r.src] = false; else delete S.include[r.src];
         n++;
       });
       if (S.view === 'bad') S.view = '';
-      recompute(); toast('要修正の ' + n + '行を除外しました（「除外」を押すと一覧が出て、発行に戻せます）');
+      S.undoExcl = {prev, n};
+      recompute(); toast('要修正の ' + n + '行を除外しました。戻すときは「まとめて除外を取り消す」を押してください');
+      return;
+    }
+    if (t.closest && t.closest('[data-undo-excl]')) {
+      if (!S.undoExcl) return;
+      const n = S.undoExcl.n;
+      S.include = S.undoExcl.prev; S.undoExcl = null;
+      recompute(); toast(n + '行を発行に戻しました');
       return;
     }
     const vb = t.closest && t.closest('[data-view]');
@@ -1711,7 +1729,7 @@ function bindEvents() {
 
   /* 選択中の行への一括操作 */
   const bulk = (fn) => { if (!S.sel.size) { toast('先に行を選んでください'); return; } S.sel.forEach(fn); recompute(); };
-  /* 日付や時間を選んだ時点で、選択中の行に入れます（入れるボタンは無し） */
+  /* 日付や時間を選んだ時点で、選択中の行に入れます(入れるボタンは無し) */
   /* 入れたら欄を空に戻します。同じ日付を別の行にもう一度入れられるように */
   const bulkSet = (el, key, label, conv) => el.addEventListener('change', e => {
     const raw = e.target.value;
@@ -1724,7 +1742,7 @@ function bindEvents() {
     } else toast('先に行を選んでください');
     e.target.value = key === 'time' ? '__' : '';
   });
-  /* 日付の欄は、どこを押してもカレンダーを出します（右端のアイコンだけでなく） */
+  /* 日付の欄は、どこを押してもカレンダーを出します(右端のアイコンだけでなく) */
   ['#vDue', '#vShip'].forEach(id => $(id).addEventListener('click', e => {
     try { if (e.target.showPicker) e.target.showPicker(); } catch (err) { /* 出せないブラウザでは通常どおり */ }
   }));
@@ -1732,8 +1750,8 @@ function bindEvents() {
   bulkSet($('#vShip'), 'ship', '出荷日', v => v.replace(/-/g, '/'));
   bulkSet($('#vTime'), 'time', '時間', v => v);
   $('#bBoxAuto').addEventListener('click', () => bulk(src => { if (S.edits[src]) delete S.edits[src].boxes; }));
-  $('#bExcl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (!defaultIncluded(r)) delete S.include[src]; else S.include[src] = false; }));
-  $('#bIncl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (defaultIncluded(r)) delete S.include[src]; else S.include[src] = true; }));
+  $('#bExcl').addEventListener('click', () => bulk(src => { S.undoExcl = null; const r = S.rows.find(x => x.src === src); if (!defaultIncluded(r)) delete S.include[src]; else S.include[src] = false; }));
+  $('#bIncl').addEventListener('click', () => bulk(src => { S.undoExcl = null; const r = S.rows.find(x => x.src === src); if (defaultIncluded(r)) delete S.include[src]; else S.include[src] = true; }));
   $('#bClear').addEventListener('click', () => { S.sel.clear(); renderRows(); });
 
   $('#dlBtn').addEventListener('click', downloadCsv);
@@ -1750,7 +1768,7 @@ function bindEvents() {
     if (!s.name) miss.push('名称');
     if (!normTel(s.tel)) miss.push('電話');
     if (!s.addr) miss.push('住所');
-    if (!normZip(s.zip)) miss.push('〒（7桁）');
+    if (!normZip(s.zip)) miss.push('〒(7桁)');
     if (miss.length) { toast(miss.join('・') + ' を入れてください'); return; }
     s.zip = normZip(s.zip);
     const id = f.dataset.id;
@@ -1778,7 +1796,7 @@ function init() {
   if (lsGet(CFG.LS_CSV_ORDER, '') === 'sheet') S.csvOrder = 'sheet';
   document.querySelectorAll('input[name=csvOrder]').forEach(el => { el.checked = el.value === S.csvOrder; });
   /* 先頭の「選ぶ」は何も入れない印。時間を入れたらここに戻します */
-  $('#vTime').innerHTML = '<option value="__">（選ぶ）</option>' + CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
+  $('#vTime').innerHTML = '<option value="__">(選ぶ)</option>' + CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();
   renderAll();
   loadAddrMaster().then(() => { if (S.rows.length) { S.checks = {}; recompute(); } });
