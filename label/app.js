@@ -19,7 +19,7 @@ const CFG = {
   /* 対応表の項目。multi は複数の列をつなげられる項目 */
   ITEMS: [
     {key: 'store', label: '店名・宛先名', need: true, multi: true,
-     hint: '列を2つ選ぶと、1つ目が「お届け先名」、2つ目が「備考(住所4)」に入ります。会社名を入れたときは、選んだ列はすべて「備考(住所4)」へ'},
+     hint: '列を2つ選ぶか、下の会社名を入れると、どちらを「名前（お届け先名）」に入れるかを選べます。もう一方は「備考(住所4)」へ'},
     {key: 'tel',   label: '電話', need: true, hint: '行ごとに電話が空のときは「0」で出し、保存のときに知らせます'},
     {key: 'zip',   label: '〒', need: true, hint: '住所の列に〒が入っているなら空でOK'},
     {key: 'addr',  label: '住所', need: true, multi: true, hint: '2〜3列に分かれていれば全部選ぶとつなげます'},
@@ -83,7 +83,8 @@ const CFG = {
 
   LS_SENDERS: 'label.senders.v1',
   LS_SENDER_SEL: 'label.sender.sel.v1',
-  LS_ITEMS: 'label.items.v1'
+  LS_ITEMS: 'label.items.v1',
+  LS_CSV_ORDER: 'label.csvOrder.v1'
 };
 
 
@@ -101,6 +102,8 @@ const S = {
   item1: {name: '', per: ''},
   item2: {name: '', per: ''},
   boxMode: 'each',          // 個口の計算。each＝商品ごとに割って切り上げてから足す／mix＝割ったまま足して最後に切り上げ
+  nameOrder: 'company',     // 名前に入れる方。company＝会社名（会社名が無ければ1つ目の列）／store＝店名（2つ目以降の列）。もう一方は備考(住所4)へ
+  csvOrder: 'item',         // CSVの並び。item＝品名・数量順／sheet＝別紙の順
   rows: [],                 // 組み立てた行
   edits: {},                // 元の行番号 -> {項目: 手で入れた値}
   include: {},              // 元の行番号 -> true/false（手で発行する／外す）
@@ -399,7 +402,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = '';
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false;
   detectHeader();
   guessMap();
   rebuild();
@@ -496,6 +499,8 @@ function guessMap() {
       if (used.has(c) || S.hc.has(c)) continue;
       const h = headText(c);
       if (!h || !words.some(w => h.indexOf(w) >= 0)) continue;
+      /* 指定日・出荷日は、中身が日付でない列には当てません（見出しに「納品日」を含む店名の列に当たることがあるため） */
+      if ((k === 'due' || k === 'ship') && sampleText(c) && parseDate(sampleText(c)) === null) continue;
       /* 「お届け先住所」を住所に、「お届け先名」を宛先名に。電話の列の「TEL」も住所には当てません */
       S.map[k].push(c); used.add(c);
       if (!it.multi) break;
@@ -584,20 +589,33 @@ function edited(row, key) {
 function setEdit(src, key, v) {
   (S.edits[src] || (S.edits[src] = {}))[key] = v;
 }
+/* 手で発行・除外を変えていない行の扱い。合計の行などと、数量がどれも0の行は、はじめから除外にします */
+function defaultIncluded(row) {
+  return !row.autoExclude && !row.zeroQty;
+}
+function excludeWhy(row) {
+  return row.autoExclude || (row.zeroQty ? '数量がどれも0' : '');
+}
 function included(row) {
-  return (row.src in S.include) ? S.include[row.src] : !row.autoExclude;
+  return (row.src in S.include) ? S.include[row.src] : defaultIncluded(row);
 }
 
-/* 名前（お届け先名）と備考(住所4)の自動の値
-     会社名あり                → 名前＝会社名、備考＝選んだ列を全部つなげたもの
-     会社名なし・列を2つ以上   → 名前＝1つ目の列、備考＝2つ目以降の列
-     会社名なし・列が1つ       → 名前＝その列、備考＝空 */
+/* 名前（お届け先名）と備考(住所4)の自動の値。
+   a＝会社名（会社名が空なら1つ目の列）、b＝店名（会社名があれば選んだ列を全部、無ければ2つ目以降の列）。
+   S.nameOrder が company なら 名前＝a・備考＝b、store なら 名前＝b・備考＝a。
+   会社名が空で列が1つだけなら、名前＝その列、備考＝空 */
 function autoNameMemo(row) {
   const company = S.company.trim();
   const parts = (S.map.store || []).map(c => cellText(row.raw[c]));
-  if (company) return [company, parts.filter(Boolean).join(' ')];
-  if (parts.length >= 2) return [parts[0], parts.slice(1).filter(Boolean).join(' ')];
-  return [parts.filter(Boolean).join(' '), ''];
+  let a, b;
+  if (company) { a = company; b = parts.filter(Boolean).join(' '); }
+  else if (parts.length >= 2) { a = parts[0]; b = parts.slice(1).filter(Boolean).join(' '); }
+  else return [parts.filter(Boolean).join(' '), ''];
+  return S.nameOrder === 'store' ? [b, a] : [a, b];
+}
+/* 名前に入れる方を選べるのは、会社名を入れたときか、店名の列を2つ以上選んだとき */
+function canSwapName() {
+  return !!S.company.trim() || (S.map.store || []).length >= 2;
 }
 
 /* 1行ぶんの出力値と、問題の一覧を作ります */
@@ -670,6 +688,9 @@ function computeRow(row) {
   if (!item1 && item2) { item1 = item2; item2 = ''; }
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0（または空）です。発行から外すか、数量を直してください');
+  /* 選んだ数量の列が、どれも0か空（空だけの行は除く）。この行は、はじめから除外にします（送らなくてよい行） */
+  const qCols = [['qty1', q1], ['qty2', q2]].filter(([k]) => (S.map[k] || []).length);
+  row.zeroQty = qCols.length > 0 && qCols.some(([, q]) => q !== '') && qCols.every(([, q]) => q === '' || num(q) === 0);
 
   /* 個口数。手入力 > 別紙の個口数 > 数量÷入数 > 1
        each：商品ごとに割って切り上げてから足す（別々の箱に詰める）
@@ -875,9 +896,11 @@ function csvLine(a) { return a.map(csvCell).join(','); }
 const ITEM_ORDER = new Intl.Collator('ja', {numeric: true});
 function outRows() {
   const s = currentSender();
+  /* 「別紙の順」を選んだときは並べ替えません */
   const list = S.rows.filter(included)
     .map((row, i) => ({row, i}))
-    .sort((a, b) => ITEM_ORDER.compare(a.row.out.item1, b.row.out.item1) || ITEM_ORDER.compare(a.row.out.item2, b.row.out.item2) || a.i - b.i)
+    .sort((a, b) => S.csvOrder === 'sheet' ? a.i - b.i
+      : ITEM_ORDER.compare(a.row.out.item1, b.row.out.item1) || ITEM_ORDER.compare(a.row.out.item2, b.row.out.item2) || a.i - b.i)
     .map(x => x.row);
   return list.map((row, i) => {
     const o = row.out;
@@ -915,7 +938,7 @@ function downloadCsv() {
   const d = new Date();
   const stamp = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes());
 
-  /* 1000件を超えたら1000件ずつのファイルに分けます（商品名順に並べ替えたあとで分ける）。
+  /* 1000件を超えたら1000件ずつのファイルに分けます（選んだ並びに並べたあとで分ける）。
      くくりキー（複数口の印＝ファイルの中の行番号）は、ファイルごとに振り直します */
   const parts = [];
   for (let i = 0; i < rows.length; i += CFG.CSV_MAX_ROWS) {
@@ -1107,6 +1130,12 @@ function renderMap() {
   }).join('');
   /* 1項目1行。説明は項目名に重ねると出ます。使う機会の少ない列は「その他の列」に畳みます */
   const row = it => {
+    /* 商品2は使うときだけ開きます。たたんでいる間は「＋ 商品2を使う」のボタンだけ */
+    if (it.key === 'qty2' && !item2Shown()) {
+      return '<div class="mr"><div class="ml">商品2</div><div class="ms inline wrap">' +
+        '<button type="button" class="btn small" data-item2="open">＋ 商品2を使う</button>' +
+        '<span class="tiny muted">別紙に2つ目の商品の数量の列があるとき</span></div></div>';
+    }
     const cols = S.map[it.key] || [];
     const emptyReq = it.need && !cols.length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip));
     const slots = it.multi ? Math.min(3, cols.length + 1) : 1;
@@ -1121,16 +1150,16 @@ function renderMap() {
       const p = it.key === 'qty1' ? 'item1' : 'item2';
       /* 商品1の名前はいつも必須。商品2は数量の列を選んだときだけ必須 */
       const nameNeed = p === 'item1' || cols.length > 0;
-      /* 商品名は「入力」か「数量の列の見出し」を選べます */
-      const fromHead = o.src === 'head';
       const nm = itemName(p);
-      r += '<div class="mr sub"><div class="ml tiny muted" title="ラベルの商品名は「' + esc(nm || '商品名') + '(10)」の形で出ます">└ 商品名・入数' + (nameNeed ? '<span class="need">必須</span>' : '') + '</div><div class="ms inline">' +
-        '<select data-item="' + p + '" data-f="src" class="srcsel" title="商品名を入力するか、数量の列の見出しをそのまま使うか">' +
-          '<option value="input"' + (fromHead ? '' : ' selected') + '>入力</option><option value="head"' + (fromHead ? ' selected' : '') + '>見出し</option></select>' +
-        (fromHead
-          ? '<input type="text" readonly value="' + esc(nm) + '" placeholder="数量の列を選ぶと見出しが入ります" title="数量の列の見出しを使います"' + (nameNeed && !nm ? ' class="req-empty"' : ' class="fromhead"') + '>'
-          : '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '" placeholder="例：非常用トイレ"' + (nameNeed && !nm ? ' class="req-empty"' : '') + '>') +
-        '<span class="plus">÷</span><input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" placeholder="入数" class="w4" title="1箱に入る数。個口＝数量÷入数"><span class="plus">個/箱</span></div></div>';
+      /* 商品名は見出しを付けず、数量の列の真下に入力欄だけを置きます */
+      r += '<div class="mr sub"><div></div><div class="ms">' +
+        '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '"' +
+          ' placeholder="商品名を入力' + (nameNeed ? '（必須）' : '') + '　例：非常用トイレ" title="ラベルには「' + esc(nm || '商品名') + '(10)」の形で出ます"' +
+          (nameNeed && !nm ? ' class="req-empty"' : '') + '></div></div>';
+      /* 入数。ここから個口数を出すことを、欄の横に書いておきます */
+      r += '<div class="mr sub per-row"><div class="ml tiny muted">└ 入数</div><div class="ms inline wrap">' +
+        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
+        '<span class="plus">個/箱</span><span class="tiny muted">数量÷入数（切り上げ）で個口数を出します。空なら1口</span></div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
@@ -1138,11 +1167,20 @@ function renderMap() {
           opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します（別々の箱に詰める）。例：30÷48→1、30÷24→2、合計3口') +
           opt('mix', '割ったまま足して最後に切り上げ', '数量÷入数 を切り上げずに足して、最後に切り上げます（同じ箱に混ぜて詰める）。例：0.625＋1.25＝1.875→2口') +
           '</div></div>';
+        r += '<div class="mr sub"><div></div><div class="ms inline"><button type="button" class="btn small" data-item2="close" title="商品2の数量の列を外して、たたみます">商品2を使わない（たたむ）</button></div></div>';
       }
     }
     if (it.key === 'store') {
-      r += '<div class="mr sub"><div class="ml tiny muted" title="入れると「名前」に会社名、「備考(住所4)」に店名が入ります。空なら店名が「名前」に入ります">└ 会社名</div><div class="ms">' +
+      r += '<div class="mr sub"><div class="ml tiny muted" title="全行に同じ会社名を付けるとき。下で「名前」に入れる方を選べます">└ 会社名</div><div class="ms">' +
         '<input type="text" id="company" value="' + esc(S.company) + '" placeholder="全行共通。例：株式会社△△（付けないなら空）"></div></div>';
+      /* 名前に入れる方。会社名を入れたときか、列を2つ以上選んだときだけ出します */
+      if (canSwapName()) {
+        const hasCo = !!S.company.trim();
+        const opt = (v, label) => '<label class="boxmode"><input type="radio" name="nameOrder" value="' + v + '"' + (S.nameOrder === v ? ' checked' : '') + '> ' + label + '</label>';
+        r += '<div class="mr sub"><div class="ml tiny muted" title="選ばなかった方は「備考(住所4)」に入ります">└ 名前に入れる</div><div class="ms inline wrap">' +
+          opt('company', hasCo ? '会社名' : '1つ目の列') + opt('store', hasCo ? '店名' : '2つ目の列') +
+          '<span class="tiny muted">もう一方は備考(住所4)へ</span></div></div>';
+      }
     }
     return r;
   };
@@ -1162,7 +1200,7 @@ function renderRows() {
   const focusSel = focus && ae.selectionStart != null ? [ae.selectionStart, ae.selectionEnd] : null;
 
   renderSummary();
-  const showQ2 = (S.map.qty2 || []).length || itemName('item2');
+  const showQ2 = item2Shown();
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     '<th>名前</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
@@ -1227,6 +1265,7 @@ function renderSummary() {
   const boxes = inc.reduce((a, r) => a + (r.out.boxes || 0), 0);
   const sumQ = k => inc.reduce((a, r) => { const n = num(r.out[k]); return a + (isNaN(n) ? 0 : n); }, 0);
   const excl = S.rows.length - inc.length;
+  const nBad = inc.filter(r => r.err.some(e => e !== 'check')).length;
   const sp = senderProblems(currentSender());
 
   const unknownRows = inc.filter(r => r.err.includes('check') && r.check && r.check.zipUnknown);
@@ -1245,7 +1284,8 @@ function renderSummary() {
     chip('unknown', 'warn-ink', 'うちデータに無い〒', nUnknown) +
     (nUnknownFix ? '<button type="button" class="stat stat-btn warn-ink" data-fix-unknown="1" title="データに無い〒のうち、住所から〒が1つに決まる行を、まとめて住所から引いた〒にします">データに無い〒をまとめて住所どおりにする（' + nUnknownFix + '件）</button>' : '') +
     chip('filled', 'warn-ink', '〒を住所から入れた', inc.filter(r => r.out.zipFilled).length) +
-    chip('bad', 'err-ink', '要修正', inc.filter(r => r.err.some(e => e !== 'check')).length) +
+    chip('bad', 'err-ink', '要修正', nBad) +
+    (nBad ? '<button type="button" class="stat stat-btn err-ink" data-excl-bad="1" title="要修正の行の「発行」のチェックをまとめて外します。除外の一覧から戻せます">要修正をまとめて除外</button>' : '') +
     (S.view ? '<button type="button" class="stat stat-btn" data-view="">全部表示に戻す（' + visibleRows().length + '/' + S.rows.length + '行を表示中）</button>' : '') +
     (nPending ? '<span class="stat muted">照合中…</span>' : '');
 
@@ -1261,7 +1301,9 @@ function renderSummary() {
   if (nPending) block.push('住所の照合が終わっていません');
   const btn = $('#dlBtn');
   btn.disabled = block.length > 0;
-  $('#dlWhy').textContent = block.join('　／　');
+  /* 要修正が残っているときは、ここからもまとめて除外できるようにします */
+  $('#dlWhy').innerHTML = esc(block.join('　／　')) +
+    (nBad ? ' <button type="button" class="btn small" data-excl-bad="1">要修正の ' + nBad + '件を除外する</button>' : '');
 
   /* 選択中の行への一括操作 */
   /* 幅は固定。選んでも右のボタンが動かないように、文字の長さを変えません */
@@ -1286,17 +1328,14 @@ function inView(row) {
 }
 function visibleRows() { return S.rows.filter(inView); }
 
-/* 商品名。src が 'head' なら数量の列の見出しを、そうでなければ入力した名前を使います */
+/* 商品名。入力した名前を使います */
 function itemName(p) {
-  const it = S[p];
-  if (it.src === 'head') {
-    const c = (S.map[p === 'item1' ? 'qty1' : 'qty2'] || [])[0];
-    return c == null ? '' : headText(c).trim();
-  }
-  return String(it.name || '').trim();
+  return String(S[p].name || '').trim();
 }
 
-function showQ2() { return (S.map.qty2 || []).length || itemName('item2'); }
+/* 商品2を開いているか。数量の列を選んであれば開いたままにします */
+function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
+function showQ2() { return item2Shown(); }
 
 /* 1行ぶんの HTML（本体の行と、問題・お知らせの行） */
 function rowHtml(row) {
@@ -1345,7 +1384,7 @@ function rowHtml(row) {
 
     /* 問題とお知らせは、その行のすぐ下に出します */
     const msgs = [];
-    if (!inn) msgs.push('<span class="muted">除外' + (row.autoExclude && !(row.src in S.include) ? '（' + esc(row.autoExclude) + '）' : '') + '</span>');
+    if (!inn) msgs.push('<span class="muted">除外' + (excludeWhy(row) && !(row.src in S.include) ? '（' + esc(excludeWhy(row)) + '）' : '') + '</span>');
     else {
       row.err.filter(e => e !== 'check').forEach(e => msgs.push('<span class="err-ink">✕ ' + esc(e) + '</span>'));
       if (chk) msgs.push(checkUi(row));
@@ -1505,20 +1544,31 @@ function bindEvents() {
     }
     if (t.dataset.item) {
       S[t.dataset.item][t.dataset.f] = t.value;
-      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode});
+      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode, nameOrder: S.nameOrder});
       renderMap(); recompute(); return;
     }
     if (t.name === 'boxMode') {
       S.boxMode = t.value === 'mix' ? 'mix' : 'each';
-      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode});
+      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode, nameOrder: S.nameOrder});
       recompute(); return;
     }
-    if (t.id === 'company') { S.company = t.value; recompute(); return; }
+    if (t.name === 'nameOrder') {
+      S.nameOrder = t.value === 'store' ? 'store' : 'company';
+      lsSet(CFG.LS_ITEMS, {item1: S.item1, item2: S.item2, boxMode: S.boxMode, nameOrder: S.nameOrder});
+      recompute(); return;
+    }
+    if (t.name === 'csvOrder') {
+      S.csvOrder = t.value === 'sheet' ? 'sheet' : 'item';
+      lsSet(CFG.LS_CSV_ORDER, S.csvOrder);
+      renderPreview(); return;
+    }
+    /* 会社名を入れた・消したときは「名前に入れる」の出し入れがあるので、対応表も描き直します */
+    if (t.id === 'company') { S.company = t.value; renderMap(); recompute(); return; }
     if (t.dataset.cell) { commitCell(t); return; }
     if (t.dataset.inc != null) {
       const src = Number(t.dataset.inc);
       const row = S.rows.find(r => r.src === src);
-      if (t.checked === !row.autoExclude) delete S.include[src]; else S.include[src] = t.checked;
+      if (t.checked === defaultIncluded(row)) delete S.include[src]; else S.include[src] = t.checked;
       recomputeRow(row); return;
     }
     if (t.id === 'senderSel') {
@@ -1601,6 +1651,24 @@ function bindEvents() {
       recompute(); toast('データに無い〒 ' + n + '件を、住所から引いた〒にしました（元の〒はセルに重ねると出ます）');
       return;
     }
+    if (t.dataset && t.dataset.item2) {
+      /* 商品2を開く／たたむ。たたむときは商品2の数量の列も外します（隠れたまま数量が出ないように） */
+      if (t.dataset.item2 === 'open') { S.item2Open = true; renderMap(); renderRows(); }
+      else { S.item2Open = false; S.map.qty2 = []; rebuild(); }
+      return;
+    }
+    if (t.closest && t.closest('[data-excl-bad]')) {
+      /* 要修正の行（〒の確認だけの行は除く）の「発行」のチェックをまとめて外します */
+      let n = 0;
+      S.rows.forEach(r => {
+        if (!included(r) || !r.err.some(x => x !== 'check')) return;
+        if (defaultIncluded(r)) S.include[r.src] = false; else delete S.include[r.src];
+        n++;
+      });
+      if (S.view === 'bad') S.view = '';
+      recompute(); toast('要修正の ' + n + '行を除外しました（「除外」を押すと一覧が出て、発行に戻せます）');
+      return;
+    }
     const vb = t.closest && t.closest('[data-view]');
     if (vb) { S.view = S.view === vb.dataset.view ? '' : vb.dataset.view; renderRows(); return; }
     if (t.dataset && t.dataset.sel != null) {
@@ -1664,8 +1732,8 @@ function bindEvents() {
   bulkSet($('#vShip'), 'ship', '出荷日', v => v.replace(/-/g, '/'));
   bulkSet($('#vTime'), 'time', '時間', v => v);
   $('#bBoxAuto').addEventListener('click', () => bulk(src => { if (S.edits[src]) delete S.edits[src].boxes; }));
-  $('#bExcl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (r.autoExclude) delete S.include[src]; else S.include[src] = false; }));
-  $('#bIncl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (!r.autoExclude) delete S.include[src]; else S.include[src] = true; }));
+  $('#bExcl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (!defaultIncluded(r)) delete S.include[src]; else S.include[src] = false; }));
+  $('#bIncl').addEventListener('click', () => bulk(src => { const r = S.rows.find(x => x.src === src); if (defaultIncluded(r)) delete S.include[src]; else S.include[src] = true; }));
   $('#bClear').addEventListener('click', () => { S.sel.clear(); renderRows(); });
 
   $('#dlBtn').addEventListener('click', downloadCsv);
@@ -1705,7 +1773,10 @@ function init() {
   if (it) {
     S.item1 = Object.assign(S.item1, it.item1 || {}); S.item2 = Object.assign(S.item2, it.item2 || {});
     if (it.boxMode === 'mix') S.boxMode = 'mix';
+    if (it.nameOrder === 'store') S.nameOrder = 'store';
   }
+  if (lsGet(CFG.LS_CSV_ORDER, '') === 'sheet') S.csvOrder = 'sheet';
+  document.querySelectorAll('input[name=csvOrder]').forEach(el => { el.checked = el.value === S.csvOrder; });
   /* 先頭の「選ぶ」は何も入れない印。時間を入れたらここに戻します */
   $('#vTime').innerHTML = '<option value="__">（選ぶ）</option>' + CFG.TIMES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
   bindEvents();

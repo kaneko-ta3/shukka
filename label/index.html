@@ -130,8 +130,12 @@ details.morecols[open] > summary{color:var(--ink);}
 /* ラジオは幅いっぱいにしない（丸と文字がくっつくように） */
 .mr input[type=radio]{width:auto; flex:none; margin:0;}
 label.boxmode{justify-content:flex-start;}
-.mr .ms.inline select.srcsel{width:auto; flex:none;}
-.mr input.fromhead{color:var(--muted);}
+/* 横に並べて、入りきらなければ折り返す（入数の説明・名前に入れる方） */
+.mr .ms.inline.wrap{flex-wrap:wrap; column-gap:10px; row-gap:2px;}
+/* 入数の行は説明が2行目に回るので、項目名を入力欄の高さにそろえます */
+.mr.per-row{align-items:start;}
+.mr.per-row .ml{padding-top:5px;}
+.dl .order{display:inline-flex; gap:10px; align-items:center; font-size:13px;}
 #bulk{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:var(--surface-2); border-radius:6px; margin:6px 0 10px;}
 #bulk.dim .btn, #bulk.dim input, #bulk.dim select{opacity:.55;}
 #bulk .selcount{display:inline-block; width:6.5em; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap;}
@@ -155,8 +159,9 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 .c-sel, .c-inc{width:28px; text-align:center;}
 .c-rn{width:48px; color:var(--muted); white-space:nowrap;}
 .c-addr{min-width:300px;}
-.w-name{min-width:200px;} .w-memo{min-width:150px;} .w-tel{width:120px;} .w-zip{width:88px;}
-.w-num{width:62px;} .w-date{width:96px;} .w-time{width:100px;}
+/* 狭い画面でも電話・〒・日付・時間が切れないよう、下限の幅を決めます（入りきらなければ表を横に送る） */
+.w-name{min-width:200px;} .w-memo{min-width:150px;} .w-tel{min-width:118px;} .w-zip{min-width:86px;}
+.w-num{min-width:56px;} .w-date{min-width:96px;} .w-time{min-width:104px;}
 .undo{background:none; border:none; color:var(--edit); cursor:pointer; padding:0 2px; font-size:13px;}
 .ck{margin-top:2px; padding:6px 8px; border:1px solid var(--warn); border-radius:6px; background:var(--warn-soft);}
 /* 〒と住所の食い違っているところ */
@@ -179,7 +184,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます（出荷ボードとは別に数えます） -->
-  <span class="ver">v38</span>
+  <span class="ver">v39</span>
 </header>
 
 <main>
@@ -248,6 +253,10 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <section id="step4">
     <h2><span class="n">4</span>CSVを保存</h2>
     <div class="dl">
+      <span class="order">並び
+        <label class="boxmode" title="商品名1の順。同じ商品は数量の少ない順（(2) が (10) より前）"><input type="radio" name="csvOrder" value="item" checked> 品名・数量順</label>
+        <label class="boxmode" title="別紙の行の順のまま"><input type="radio" name="csvOrder" value="sheet"> 別紙の順</label>
+      </span>
       <button class="btn primary" id="dlBtn" disabled>CSVをダウンロード</button>
       <span id="dlWhy" class="tiny err-ink"></span>
     </div>
@@ -282,8 +291,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=38"></script>
-<script src="app.js?v=38"></script>
-<script src="issued.js?v=38"></script>
+<script src="addr.js?v=39"></script>
+<script src="app.js?v=39"></script>
+<script src="issued.js?v=39"></script>
 </body>
 </html>
