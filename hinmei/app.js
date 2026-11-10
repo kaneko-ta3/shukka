@@ -16,7 +16,8 @@
 /* ---------------- 決まり（Python版と同じ値） ---------------- */
 const MARGIN = 8;                        // 枠の内側の余白(pt)
 // 品名の文字の大きさはこのどれかに固定する。大＝Python版と同じ。中・小は上限を下げるだけ
-const SIZE_SET = {L: [47, 42, 36, 30], M: [36, 30], S: [30]};
+// メモ＝目立たせず、こちらのメモ代わりに書くとき(仕分けコードの数字より小さい)
+const SIZE_SET = {L: [47, 42, 36, 30], M: [36, 30], S: [30], X: [20]};
 const MIN_SIZE = 30;                     // 下限。送り状の上の仕分けコードの数字(27.8pt)より少し大きい
 const MAX_LINES = 3;                     // 30ptを守れるのは3行まで
 const LH = 1.22, BL = 0.88;              // 行の高さ、ベースラインの位置（文字の大きさに対する比）
@@ -29,6 +30,7 @@ const FRAGILE = {w: 5.7 * CM, sw: 4.2 * CM, sh: 3.2 * CM, steps: [30, 26, 22, 18
 const HARI_TODOKE = [330, 28, 540, 110];
 const HIN_FIELD = [340, 162, 520, 184];
 const KIJI_FIELD = [340, 186, 520, 216];   // 貼付票の記事欄
+const BOXNO_FIELD = [521, 185, 575, 212];  // 貼付票の「何箱目 / 箱の数」(例 2 / 7)
 const ADDR_LINE = /[都道府県市区町村郡]|様|御中|\d{2,4}-\d{2,4}-\d{3,4}|\d{3}-\d{4}/;
 const ITEM = /^(.+?)\s*[(（]\s*(\d+)\s*[)）]$/;
 
@@ -250,7 +252,7 @@ function nameRect(zone, fragile) {
   const z = fragile ? fragileSplit(zone).left : zone;
   return S.kind === 'band' ? [z[0], z[1], z[2], z[3] - BAND.h] : z;
 }
-const minFor = fragile => (fragile ? FRAGILE.min : MIN_SIZE);
+const minFor = fragile => (fragile ? FRAGILE.min : Math.min(MIN_SIZE, ...(SIZE_SET[S.size] || [MIN_SIZE])));
 
 
 /* ================================================================
@@ -396,6 +398,22 @@ function readKiji(pg) {
     .filter(s => ['記', '事', '記事', '記 事'].indexOf(s) < 0 && !/^[\d\s]+$/.test(s));
 }
 
+/** 貼付票の「何箱目 / 箱の数」。読めなければ null */
+function readBoxNo(pg) {
+  // 「2 / 7」の「/」は線で描かれていて文字に無いので、「2 7」のように数字が2つ並んでいれば読む
+  const m = linesIn(pg.items, BOXNO_FIELD).join(' ').normalize('NFKC').match(/^(\d+)\s*\/?\s*(\d+)$/);
+  return m ? {n: +m[1], of: +m[2]} : null;
+}
+
+/** 記事欄の内訳。印刷マンで箱を分けた届け先は、記事欄の頭に「20,15」が入る。無ければ null */
+function readUchi(g) {
+  for (const t of S.src.pages[g.pages[0]].kiji) {
+    const m = t.normalize('NFKC').match(/^(\d+(?:\s*[,、]\s*\d+)+)(?!\d)/);
+    if (m) return m[1].split(/\s*[,、]\s*/).map(Number);
+  }
+  return null;
+}
+
 const normMark = s => String(s).normalize('NFKC').replace(/[\s　]/g, '');
 
 /** 送り状（1通）の番号。複数口の子は「親伝票 送り状番号」の番号、それ以外は自分の送り状番号
@@ -511,6 +529,7 @@ async function openPdf(bytes, name) {
       pg.own = readOwnNo(pg);
       pg.hin = readHin(pg);
       pg.kiji = readKiji(pg);
+      pg.box = readBoxNo(pg);
     });
     if (noZone.length) {
       throw new Error(noZone.join('・') + '枚目に、左下のヤマトのロゴ（色付きの枠）が見つかりません。' +
@@ -1090,21 +1109,43 @@ async function autofill(masterOverride) {
       if (rd.mismatch) notes.push(rd.mismatch + '枚目の品名欄が1枚目と違います。手で確かめてください');
       if (rd.junk.length) notes.push('品名欄に「商品名(数)」の形でない行があります：' + rd.junk.join(' / '));
       if (!rd.items.length) notes.push('品名欄から商品が読めませんでした');
-      g.rows = rd.items.map(it => ({
-        name: it.name,
-        per: ans.found[it.name] !== undefined ? String(ans.found[it.name]) : '',
-        total: String(it.total), count: '', keep: false,
-        fragile: (ans.fragile || []).indexOf(it.name) >= 0     // 入数マスタで「割れ物」にチェックがある商品
-      }));
-      rd.items.forEach(it => {
-        if (ans.missing.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタにありません。入数を手で入れてください');
-        else if (ans.bad.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタの入数が数字ではありません');
-      });
+      // 記事欄に内訳(「20,15」)がある届け先は、何箱目かの順に「商品名(20)」「商品名(15)」を1枚ずつ入れる
+      const ux = readUchi(g);
+      let byUchi = false;
+      if (ux && rd.items.length === 1) {
+        const it = rd.items[0], sum = ux.reduce((a, b) => a + b, 0);
+        if (ux.length !== g.pages.length) notes.push('記事欄の内訳は ' + ux.length + '箱、送り状は ' + g.pages.length + '枚です。表を手で直してください');
+        else if (sum !== it.total) notes.push('記事欄の内訳の合計(' + sum + ')が、品名欄の数(' + it.total + ')と合いません。表を手で直してください');
+        else if (g.pages.some(p => !s.pages[p].box)) notes.push('何箱目かが読めない送り状があります。表を手で直してください');
+        else {
+          g.pages.sort((a, b) => s.pages[a].box.n - s.pages[b].box.n);
+          const fr = (ans.fragile || []).indexOf(it.name) >= 0;
+          g.rows = [];
+          ux.forEach(n => {
+            const last = g.rows[g.rows.length - 1], nm = it.name + '(' + n + ')';
+            if (last && last.name === nm) last.count = String(+last.count + 1);
+            else g.rows.push({name: nm, per: '', total: '', count: '1', keep: false, fragile: fr});
+          });
+          byUchi = true;
+        }
+      }
+      if (!byUchi) {
+        g.rows = rd.items.map(it => ({
+          name: it.name,
+          per: ans.found[it.name] !== undefined ? String(ans.found[it.name]) : '',
+          total: String(it.total), count: '', keep: false,
+          fragile: (ans.fragile || []).indexOf(it.name) >= 0     // 入数マスタで「割れ物」にチェックがある商品
+        }));
+        rd.items.forEach(it => {
+          if (ans.missing.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタにありません。入数を手で入れてください');
+          else if (ans.bad.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタの入数が数字ではありません');
+        });
+      }
       if (!g.rows.length) g.rows = [blankRow()];
       g.rows.push(blankRow());
       const got = g.rows.map(rowInfo).reduce((n, x) => n + (x.count || 0), 0);
       const allKnown = rd.items.length && rd.items.every(it => ans.found[it.name] !== undefined);
-      if (!notes.length && allKnown && got !== g.pages.length) {
+      if (!byUchi && !notes.length && allKnown && got !== g.pages.length) {
         notes.push('計算は ' + got + '枚、送り状は ' + g.pages.length + '枚です。入数どおりに詰めていない箱があれば、表を直してください');
       }
       g.status = notes;
