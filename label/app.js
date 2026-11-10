@@ -79,7 +79,7 @@ const CFG = {
              '名前', 'お届け先〒', '住所1', '-', '住所2', '-', '個口数',
              '出荷日', '指定日', '時間指定', '依頼主コード', 'ラベル種別',
              '依頼主電話', '依頼主名', '依頼主〒', '依頼主住所', '依頼主建物マンション名',
-             'くくりキー', '-', '受注ID', '受注ID'],
+             'くくりキー', '-', '-', '-'],
 
   LS_SENDERS: 'label.senders.v1',
   LS_SENDER_SEL: 'label.sender.sel.v1',
@@ -402,7 +402,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false; S.undoExcl = null;
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false; S.undoExcl = null; S.selAuto = true;
   detectHeader();
   guessMap();
   rebuild();
@@ -572,6 +572,7 @@ function rebuild() {
     rows.push({src: r, raw, auto, filledKeys, autoExclude: why});
   }
   S.rows = rows;
+  if (S.selAuto) S.sel = new Set(rows.map(r => r.src));
   S.fillFirstEmpty = fillFirstEmpty;
   rows.forEach(computeRow);
   renderAll();
@@ -589,12 +590,13 @@ function edited(row, key) {
 function setEdit(src, key, v) {
   (S.edits[src] || (S.edits[src] = {}))[key] = v;
 }
-/* 手で発行・除外を変えていない行の扱い。合計の行などと、数量がどれも0の行は、はじめから除外にします */
+/* 手で発行・除外を変えていない行の扱い。合計の行などは、はじめから除外にします。
+   数量がどれも0の行は除外にせず要修正にします(人が確かめてから除外する) */
 function defaultIncluded(row) {
-  return !row.autoExclude && !row.zeroQty;
+  return !row.autoExclude;
 }
 function excludeWhy(row) {
-  return row.autoExclude || (row.zeroQty ? '数量がどれも0' : '');
+  return row.autoExclude || '';
 }
 function included(row) {
   return (row.src in S.include) ? S.include[row.src] : defaultIncluded(row);
@@ -688,9 +690,6 @@ function computeRow(row) {
   if (!item1 && item2) { item1 = item2; item2 = ''; }
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
-  /* 選んだ数量の列が、どれも0か空(空だけの行は除く)。この行は、はじめから除外にします(送らなくてよい行) */
-  const qCols = [['qty1', q1], ['qty2', q2]].filter(([k]) => (S.map[k] || []).length);
-  row.zeroQty = qCols.length > 0 && qCols.some(([, q]) => q !== '') && qCols.every(([, q]) => q === '' || num(q) === 0);
 
   /* 個口数。手入力 > 別紙の個口数 > 数量÷入数 > 1
        each：商品ごとに割って切り上げてから足す(別々の箱に詰める)
@@ -910,9 +909,9 @@ function outRows() {
             o.ship, o.due, o.time, s.code || '', kind,
             s.tel, s.name, normZip(s.zip), s.addr, s.bldg || '',
             kind === 6 ? i + 2 : '', '',
-            /* 受注ID。B2の取り込みでは25列目→検索キー1(タイトル「受注ID」あり)、26列目→検索キー4(タイトル無し)。
-               検索キー4に値があるとタイトル無しでエラーになるので、26列目は空にします */
-            0, ''];
+            /* 25・26列目は使っていないので空にします。B2(MOSHIMO)では25列目→検索キータイトル4、26列目→検索キー4 に
+               つながっていて、25列目に値があると「検索キー4が入力されていません」で止まります */
+            '', ''];
   });
 }
 
@@ -1642,6 +1641,7 @@ function bindEvents() {
       return;
     }
     const t = e.target;
+    if (t.id === 'selAll' || (t.dataset && t.dataset.sel != null)) S.selAuto = false;
     if (t.id === 'selAll') {
       /* 絞り込み中は、表に出ている行だけを選びます */
       const vis = visibleRows();
@@ -1752,7 +1752,7 @@ function bindEvents() {
   $('#bBoxAuto').addEventListener('click', () => bulk(src => { if (S.edits[src]) delete S.edits[src].boxes; }));
   $('#bExcl').addEventListener('click', () => bulk(src => { S.undoExcl = null; const r = S.rows.find(x => x.src === src); if (!defaultIncluded(r)) delete S.include[src]; else S.include[src] = false; }));
   $('#bIncl').addEventListener('click', () => bulk(src => { S.undoExcl = null; const r = S.rows.find(x => x.src === src); if (defaultIncluded(r)) delete S.include[src]; else S.include[src] = true; }));
-  $('#bClear').addEventListener('click', () => { S.sel.clear(); renderRows(); });
+  $('#bClear').addEventListener('click', () => { S.selAuto = false; S.sel.clear(); renderRows(); });
 
   $('#dlBtn').addEventListener('click', downloadCsv);
 
