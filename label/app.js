@@ -632,11 +632,11 @@ function fitName(parts) {
     if (ps[i + 1].indexOf(ps[i]) === 0) { dropped.push(ps[i]); ps.splice(i, 1); }
     else i++;
   }
-  const said = dropped.length ? '前の列の「' + dropped.join('」「') + '」を省いた' : '';
+  const said = dropped.length ? '重複していた「' + dropped.join('」「') + '」を省略' : '';
   let nm = ps.join(' ');
-  if (dropped.length && bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + said};
+  if (dropped.length && bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + said + 'しました'};
   nm = ps.reduce((a, p) => a ? a + (/\d$/.test(a) && /^\d/.test(p) ? ' ' : '') + p : p, '');
-  if (bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + (said ? said + 'うえ、' : '') + '列の間の空白を詰めた'};
+  if (bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + (said ? said + 'し、' : '') + '列の間の空白を詰めました'};
   return null;
 }
 /* 名前に入れる方を選べるのは、会社名を入れたときか、店名の列を2つ以上選んだとき */
@@ -1398,7 +1398,7 @@ function rowHtml(row) {
       '<td class="c-inc"><input type="checkbox" data-inc="' + row.src + '"' + (inn ? ' checked' : '') + '></td>' +
       /* 縮めたお届け先名は、出す形をそのまま黄色で見せます(元の値はセルに重ねると出ます) */
       (o.nameFit && !edited(row, 'name')
-        ? '<td class="w-name autofix" title="入らないので縮めた(元：' + esc(nameAuto) + ')"><input data-cell="' + row.src + ':name" value="' + esc(o.name) + '"></td>'
+        ? '<td class="w-name autofix" title="入らないので縮めました(元：' + esc(nameAuto) + ')"><input data-cell="' + row.src + ':name" value="' + esc(o.name) + '"></td>'
         : cell(row, 'name', nameShown, 'w-name')) +
       cell(row, 'memo', memoShown, 'w-memo') +
       cell(row, 'tel', edited(row, 'tel') ? val(row, 'tel') : o.tel, 'w-tel') +
