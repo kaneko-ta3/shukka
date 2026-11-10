@@ -75,11 +75,12 @@ const CFG = {
   CSV_MAX_ROWS: 1000,        // これを超えたらCSVを分けます(B2に1度に上げる件数)
   ADDR1_BYTES: 38,
 
-  CSV_HEAD: ['備考(住所4)', 'お届け先電話', '備考2(記事欄)', '商品名1', '商品名2',
+  /* 記事欄はX列(24列目)。3列目はもしも・ビショ通販のB2でSKUの列なので空にします(11/10 本人) */
+  CSV_HEAD: ['備考(住所4)', 'お届け先電話', '-', '商品名1', '商品名2',
              '名前', 'お届け先〒', '住所1', '-', '住所2', '-', '個口数',
              '出荷日', '指定日', '時間指定', '依頼主コード', 'ラベル種別',
              '依頼主電話', '依頼主名', '依頼主〒', '依頼主住所', '依頼主建物マンション名',
-             'くくりキー', '-', '-', '-'],
+             'くくりキー', '備考2(記事欄)', '-', '-'],
 
   LS_SENDERS: 'label.senders.v1',
   LS_SENDER_SEL: 'label.sender.sel.v1',
@@ -904,11 +905,11 @@ function outRows() {
   return list.map((row, i) => {
     const o = row.out;
     const kind = o.boxes > 1 ? 6 : 0;               // 宅急便。複数口は6
-    return [o.memo, o.tel, o.memo2, o.item1, o.item2,
+    return [o.memo, o.tel, '', o.item1, o.item2,
             o.name, o.zip, o.addr1, '', o.addr2, '', o.boxes,
             o.ship, o.due, o.time, s.code || '', kind,
             s.tel, s.name, normZip(s.zip), s.addr, s.bldg || '',
-            kind === 6 ? i + 2 : '', '',
+            kind === 6 ? i + 2 : '', o.memo2,
             /* 25・26列目は使っていないので空にします。B2(MOSHIMO)では25列目→検索キータイトル4、26列目→検索キー4 に
                つながっていて、25列目に値があると「検索キー4が入力されていません」で止まります */
             '', ''];
