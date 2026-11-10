@@ -608,13 +608,36 @@ function included(row) {
    S.nameOrder が company なら 名前＝a・備考＝b、store なら 名前＝b・備考＝a。
    会社名が空で列が1つだけなら、名前＝その列、備考＝空 */
 function autoNameMemo(row) {
+  const p = autoNameParts(row);
+  return [p.name.join(' '), p.memo.join(' ')];
+}
+/* お届け先名と備考(住所4)を、つなぐ前の列ごとのかたまりで返します(お届け先名を縮めるときに列の境目を見るため) */
+function autoNameParts(row) {
   const company = S.company.trim();
   const parts = (S.map.store || []).map(c => cellText(row.raw[c]));
   let a, b;
-  if (company) { a = company; b = parts.filter(Boolean).join(' '); }
-  else if (parts.length >= 2) { a = parts[0]; b = parts.slice(1).filter(Boolean).join(' '); }
-  else return [parts.filter(Boolean).join(' '), ''];
-  return S.nameOrder === 'store' ? [b, a] : [a, b];
+  if (company) { a = [company]; b = parts.filter(Boolean); }
+  else if (parts.length >= 2) { a = [parts[0]].filter(Boolean); b = parts.slice(1).filter(Boolean); }
+  else return {name: parts.filter(Boolean), memo: []};
+  return S.nameOrder === 'store' ? {name: b, memo: a} : {name: a, memo: b};
+}
+/* お届け先名が入らないときだけ縮めます。入る形が見つからなければ null(要修正のまま)。
+   1. 列の境目で、前の列の中身がまるごと次の列の頭と同じなら、前の列を省く(1つのセルの中は見ない)
+   2. 列の間の空白を詰める。ただし空白の両側が数字のときは詰めない */
+function fitName(parts) {
+  let ps = parts.map(p => asc(p).replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (ps.length < 2) return null;
+  const dropped = [];
+  for (let i = 0; i < ps.length - 1;) {
+    if (ps[i + 1].indexOf(ps[i]) === 0) { dropped.push(ps[i]); ps.splice(i, 1); }
+    else i++;
+  }
+  const said = dropped.length ? '前の列の「' + dropped.join('」「') + '」を省いた' : '';
+  let nm = ps.join(' ');
+  if (dropped.length && bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + said};
+  nm = ps.reduce((a, p) => a ? a + (/\d$/.test(a) && /^\d/.test(p) ? ' ' : '') + p : p, '');
+  if (bytes(nm) <= CFG.NAME_BYTES) return {name: nm, msg: 'お届け先名が入らないので、' + (said ? said + 'うえ、' : '') + '列の間の空白を詰めた'};
+  return null;
 }
 /* 名前に入れる方を選べるのは、会社名を入れたときか、店名の列を2つ以上選んだとき */
 function canSwapName() {
@@ -629,7 +652,12 @@ function computeRow(row) {
   const nameSrc = edited(row, 'name') ? String(val(row, 'name')) : nameAuto;
   const memoSrc = edited(row, 'memo') ? String(val(row, 'memo')) : memoAuto;
   /* 名前は半角にして数えます(英数字と、カタカナ→半角カナ。ひらがな・漢字はそのまま) */
-  const name = asc(nameSrc).trim();
+  let name = asc(nameSrc).trim(), nameFit = false;
+  /* 入らないときだけ縮めます(手で直したお届け先名は触りません) */
+  if (!edited(row, 'name') && bytes(name) > CFG.NAME_BYTES) {
+    const fit = fitName(autoNameParts(row).name);
+    if (fit) { name = fit.name; nameFit = true; warn.push(fit.msg); }
+  }
   if (!name) err.push('お届け先名が空です');
   else if (bytes(name) > CFG.NAME_BYTES) err.push('お届け先名が長すぎます(半角にしても ' + bytes(name) + 'バイト。上限 ' + CFG.NAME_BYTES + 'バイト＝全角16文字)');
 
@@ -747,7 +775,7 @@ function computeRow(row) {
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
-  row.out = {name, memo: memoSrc.trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
+  row.out = {name, nameFit, memo: memoSrc.trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
              boxes, boxesAuto, due: due || '', ship: ship || '', shipAuto, time: time || '', memo2, q1, q2};
   row.err = err; row.warn = warn; row.check = check;
 }
@@ -1368,7 +1396,10 @@ function rowHtml(row) {
       '<td class="c-sel"><input type="checkbox" data-sel="' + row.src + '"' + (S.sel.has(row.src) ? ' checked' : '') + '></td>' +
       '<td class="c-rn">' + (row.src + 1) + (hasEdits ? '<button class="undo" data-undo="' + row.src + '" title="この行の手直しを全部戻す">↺</button>' : '') + '</td>' +
       '<td class="c-inc"><input type="checkbox" data-inc="' + row.src + '"' + (inn ? ' checked' : '') + '></td>' +
-      cell(row, 'name', nameShown, 'w-name') +
+      /* 縮めたお届け先名は、出す形をそのまま黄色で見せます(元の値はセルに重ねると出ます) */
+      (o.nameFit && !edited(row, 'name')
+        ? '<td class="w-name autofix" title="入らないので縮めた(元：' + esc(nameAuto) + ')"><input data-cell="' + row.src + ':name" value="' + esc(o.name) + '"></td>'
+        : cell(row, 'name', nameShown, 'w-name')) +
       cell(row, 'memo', memoShown, 'w-memo') +
       cell(row, 'tel', edited(row, 'tel') ? val(row, 'tel') : o.tel, 'w-tel') +
       (o.zipFilled && !edited(row, 'zip')

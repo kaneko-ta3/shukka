@@ -144,7 +144,7 @@ table.rows td{border-bottom:1px solid var(--line); padding:2px 3px; vertical-ali
 table.rows td input:not([type=checkbox]), table.rows td select{width:100%; background:transparent; border:1px solid transparent; padding:3px 4px; border-radius:4px;}
 table.rows td input:not([type=checkbox]):hover, table.rows td select:hover{border-color:var(--line);}
 table.rows td.edited input, table.rows td.edited select{background:var(--edit-soft); border-color:var(--edit);}
-table.rows td.filledzip input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
+table.rows td.filledzip input, table.rows td.autofix input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
 table.rows td.filled input{font-style:italic; color:var(--muted);}
 table.rows td.auto input{color:var(--muted);}
 table.rows tr.excl td{opacity:.45;}
@@ -182,7 +182,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v43</span>
+  <span class="ver">v44</span>
 </header>
 
 <main>
@@ -289,8 +289,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=43"></script>
-<script src="app.js?v=43"></script>
-<script src="issued.js?v=43"></script>
+<script src="addr.js?v=44"></script>
+<script src="app.js?v=44"></script>
+<script src="issued.js?v=44"></script>
 </body>
 </html>
