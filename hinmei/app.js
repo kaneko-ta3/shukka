@@ -813,16 +813,15 @@ function fitIn(text, zone, fragile) {
     return true;
   };
   if (place(f0)) return f0;
-  /* 入らなければ、大きい字を1段ずつ小さくして入る形を探す (11/11 本人「文字サイズがでかいからじゃ」)。
-     「非常用 / トイレ(15)」47pt では入らず、「非常用トイレ / (15)」42pt なら入る、のような場合 */
-  const steps = fragile ? FRAGILE.steps : (SIZE_SET[S.size] || SIZE_SET.L);
-  for (const s of steps) {
-    if (s >= f0.size) continue;
-    const f = layout(main, nr, steps.filter(x => x <= s));
-    if (f.size < minFor(fragile)) break;
-    if (place(f)) return f;
+  /* 入らなければ、同じ大きさのまま「商品名 / (数量)」の折り方で試す (1行の「非常用トイレ(15)」では右が空かないため)。
+     大きい字を1枚だけ小さくはしない (11/11 本人「文字サイズ一部だけ変えるのキモい」)。
+     計を入れた束は、自動入力で文字の大きさを全部「小」にする (autofill) */
+  const qm = main.indexOf('\n') < 0 && main.match(/^(.+?)\s*([(（].*[)）])$/);
+  if (qm) {
+    const f = fitMain(qm[1] + '\n' + qm[2], nr, fragile);
+    if (f.size >= f0.size && place(f)) return f;
   }
-  return f0;   // 下限まで小さくしても入らない長い名前は、計を書かない (B2の品名欄に合計が刷られている)
+  return f0;   // 入らないときは計を書かない (B2の品名欄に合計が刷られている)
 }
 function fitMain(text, rect, fragile) {
   if (!fragile) return layout(text, rect);
@@ -1278,6 +1277,13 @@ async function autofill(masterOverride) {
       }
     });
     autoResult(s.groups);
+    /* 【計】を入れた束は、文字の大きさを全部「小」にそろえる。大・中だと計が右に入らない送り状だけ
+       字が小さくなるか計が消えるため (11/11 本人「全部メモか全部小でいいでしょこの場合は」)。メモ・小を選んでいればそのまま */
+    if ((S.size === 'L' || S.size === 'M') && s.groups.some(g => g.rows.some(r => /【計\d+】/.test(r.name)))) {
+      $('input[name="size"][value="S"]').click();
+      const el = $('#autoMsg');
+      el.insertAdjacentHTML('beforeend', '<div>箱ごとの数に【計】を入れたので、文字の大きさを全部「小」にしました。</div>');
+    }
     invalidateOut();
   } catch (e) {
     setMsg('#autoMsg', e.message || String(e), 'err');
