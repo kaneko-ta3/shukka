@@ -153,7 +153,7 @@ table.rows{font-size:13px; width:100%;}
   #step3 > .s3help{margin:0 0 8px; justify-self:start;}
 }
 table.rows th.sortable{cursor:pointer; user-select:none;} table.rows th.sortable:hover{color:var(--accent, inherit);}
-table.rows td.multi input{color:var(--red-ink); font-weight:700;}
+table.rows td.multi input{color:var(--red-ink); font-weight:900;}   /* 個口2以上。字の大きさは変えない(v58〜v59 本人) */
 table.rows th{background:var(--surface-2); position:sticky; top:0; z-index:2; font-weight:700; text-align:left; padding:5px 4px; border-bottom:1px solid var(--line-strong); white-space:nowrap;}
 table.rows td{border-bottom:1px solid var(--line); padding:2px 3px; vertical-align:top;}
 table.rows th + th, table.rows td + td{border-left:1px solid var(--line);}
@@ -205,7 +205,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v58</span>
+  <span class="ver">v59</span>
 </header>
 
 <main>
@@ -316,8 +316,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=58"></script>
-<script src="app.js?v=58"></script>
-<script src="issued.js?v=58"></script>
+<script src="addr.js?v=59"></script>
+<script src="app.js?v=59"></script>
+<script src="issued.js?v=59"></script>
 </body>
 </html>
