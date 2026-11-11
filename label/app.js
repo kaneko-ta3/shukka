@@ -734,14 +734,14 @@ function computeRow(row) {
   let uchi = [], memo2Rest = memo2In;
   const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)(?!\d)\s*(.*)$/);
   if (um) {
-    if (item2Shown()) err.push('記事の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
+    if (item2Shown()) err.push('記事欄の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
     else if (uchiOn()) {
       const parts = um[1].split(/\s*[,、+]\s*/).map(Number);
-      if (parts.some(p => p <= 0)) err.push('記事の頭の箱ごとの数に0があります(' + um[1] + ')');
+      if (parts.some(p => p <= 0)) err.push('記事欄の頭の箱ごとの数に0があります(' + um[1] + ')');
       else {
         uchi = parts; memo2Rest = um[2];
         const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
-        if (!isNaN(n) && sum !== n) err.push('記事の頭の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
+        if (!isNaN(n) && sum !== n) err.push('記事欄の頭の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
       }
     }
   }
@@ -791,7 +791,7 @@ function computeRow(row) {
 
   /* 記事欄。箱を分けた行は、頭の数を「15+10」の形にそろえて出します */
   const memo2 = uchi.length >= 2 ? uchi.join('+') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
-  if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
+  if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事欄が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
   /* ケ／ヶは郵便番号データの正式な書き方にそろえます(保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など) */
@@ -1266,8 +1266,8 @@ function renderRows() {
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     sortTh('name', 'お届け先名') + sortTh('memo', '備考(住所4)') + sortTh('tel', '電話') + sortTh('zip', '〒') + sortTh('addr', '住所', 'c-addr') +
     sortTh('q1', '数量1') + (showQ2 ? sortTh('q2', '数量2') : '') + sortTh('boxes', '個口') +
-    sortTh('ship', '出荷日', '', '', '空欄なら今日の日付') + sortTh('due', '指定日') + sortTh('time', '時間指定') +
-    (uchiOn() ? sortTh('memo2', '記事', '', '1つの届け先に箱を分けて送るときは、記事の頭に「15+10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15+10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます', '箱を分けるなら頭に 15+10') : sortTh('memo2', '記事')) +
+    sortTh('ship', '出荷日', '', '', '空欄なら今日') + sortTh('due', '指定日') + sortTh('time', '時間指定') +
+    (uchiOn() ? sortTh('memo2', '記事欄(ラベルに記載されるメモ)', '', '記事欄の頭に「15+10」のように箱ごとの数を入れると、2口になります。2枚とも記事欄に「15+10」と刷られ、どの箱が何個かは余白書き換えで1枚ずつ書きます', '箱を分けるなら頭に 15+10') : sortTh('memo2', '記事欄(ラベルに記載されるメモ)')) +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
