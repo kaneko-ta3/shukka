@@ -726,11 +726,11 @@ function computeRow(row) {
   let uchi = [];
   if (uchiOn() && edited(row, 'uchi')) {
     const parts = String(val(row, 'uchi') || '').normalize('NFKC').split(/[,、・\s]+/).filter(Boolean);
-    if (!parts.length || parts.some(p => !/^\d+$/.test(p) || +p <= 0)) err.push('内訳は「20,15」のように、箱ごとの数をカンマで区切って入れてください');
+    if (!parts.length || parts.some(p => !/^\d+$/.test(p) || +p <= 0)) err.push('箱ごとの数は「15,10」のように、カンマで区切って入れてください');
     else {
       uchi = parts.map(Number);
       const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
-      if (!isNaN(n) && sum !== n) err.push('内訳の合計(' + sum + ')が数量(' + n + ')と合いません');
+      if (!isNaN(n) && sum !== n) err.push('箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
     }
   }
 
@@ -1206,7 +1206,7 @@ function renderMap() {
       r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
         '<span class="plus">個/箱</span></div></div>' +
-        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の内訳を「20,15」のように分けた行は、分けた数 (2口) になります</div></div>';
+        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の「箱ごとの数」を「15,10」のように分けた行は、分けた数 (2口) になります</div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
@@ -1251,7 +1251,7 @@ function renderRows() {
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     '<th>お届け先名</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
-    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th>' + (uchiOn() ? '<th title="箱を分ける届け先だけ「20,15」のように入れます">内訳</th>' : '') + '<th>出荷日</th><th>指定日</th><th>時間指定</th><th>記事</th>' +
+    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th>' + (uchiOn() ? '<th class="w-uchi" title="ふだんは数量のまま(1箱)。箱を分ける届け先だけ「15,10」のように入れると、個口数と記事欄に入ります">箱ごとの数<div class="tiny muted" style="font-weight:400">分けるなら 15,10</div></th>' : '') + '<th>出荷日</th><th>指定日</th><th>時間指定</th><th>記事</th>' +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
@@ -1431,7 +1431,7 @@ function rowHtml(row) {
       '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
-      (uchiOn() ? cell(row, 'uchi', edited(row, 'uchi') ? val(row, 'uchi') : String(val(row, 'qty1') || '').trim(), 'w-uchi') : '') +
+      (uchiOn() ? cell(row, 'uchi', edited(row, 'uchi') ? val(row, 'uchi') : String(val(row, 'qty1') || '').trim(), 'w-uchi' + (edited(row, 'uchi') ? '' : ' auto')) : '') +
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto ? '指定日から自動で出しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.ship ? o.ship.slice(5) + '(' + weekday(o.ship) + ')' : cellText(val(row, 'ship'))) + '"></td>' +
       cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +

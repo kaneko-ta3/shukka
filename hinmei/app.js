@@ -1114,8 +1114,8 @@ async function autofill(masterOverride) {
       let byUchi = false;
       if (ux && rd.items.length === 1) {
         const it = rd.items[0], sum = ux.reduce((a, b) => a + b, 0);
-        if (ux.length !== g.pages.length) notes.push('記事欄の内訳は ' + ux.length + '箱、送り状は ' + g.pages.length + '枚です。表を手で直してください');
-        else if (sum !== it.total) notes.push('記事欄の内訳の合計(' + sum + ')が、品名欄の数(' + it.total + ')と合いません。表を手で直してください');
+        if (ux.length !== g.pages.length) notes.push('記事欄の箱ごとの数は ' + ux.length + '箱、送り状は ' + g.pages.length + '枚です。表を手で直してください');
+        else if (sum !== it.total) notes.push('記事欄の箱ごとの数の合計(' + sum + ')が、品名欄の数(' + it.total + ')と合いません。表を手で直してください');
         else if (g.pages.some(p => !s.pages[p].box)) notes.push('何箱目かが読めない送り状があります。表を手で直してください');
         else {
           g.pages.sort((a, b) => s.pages[a].box.n - s.pages[b].box.n);

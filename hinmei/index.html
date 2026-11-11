@@ -125,7 +125,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v21</span>
+  <span class="ver">v22</span>
 </header>
 
 <main>
@@ -166,7 +166,7 @@ details.sk summary{cursor:pointer;}
     <h2><span class="n">3</span>品名と枚数</h2>
     <div class="btns">
       <button class="btn" id="autoBtn">アテンション自動判別</button>
-      <span class="tiny muted">品名欄の「商品名(総数)」と入数マスタから、下の表を埋めます。記事欄に「20,15」のような内訳があれば、箱ごとに入れます</span>
+      <span class="tiny muted">品名欄の「商品名(総数)」と入数マスタから、下の表を埋めます。記事欄に「15,10」のような箱ごとの数 (印刷マンで箱を分けた届け先) があれば、1箱ずつ入れます</span>
       <span class="sizes">文字の大きさ
         <label><input type="radio" name="size" value="L" checked>大</label>
         <label><input type="radio" name="size" value="M">中</label>
@@ -214,7 +214,7 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=21"></script>
-<script src="app.js?v=21"></script>
+<script src="config.js?v=22"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>
