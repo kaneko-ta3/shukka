@@ -27,7 +27,7 @@ const CFG = {
     {key: 'qty2',  label: '商品2の数量'},
     {key: 'due',   label: '指定日'},
     {key: 'time',  label: '時間指定'},
-    {key: 'memo2', label: '備考2(記事欄)', multi: true}
+    {key: 'memo2', label: '記事(ラベルに出るメモ)', multi: true}
   ],
 
   /* 見出しの自動判定。上の項目から順に、1つの列は1つの項目にだけ当てます */
@@ -734,14 +734,14 @@ function computeRow(row) {
   let uchi = [], memo2Rest = memo2In;
   const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)(?!\d)\s*(.*)$/);
   if (um) {
-    if (item2Shown()) err.push('記事欄の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
+    if (item2Shown()) err.push('記事の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
     else if (uchiOn()) {
       const parts = um[1].split(/\s*[,、+]\s*/).map(Number);
-      if (parts.some(p => p <= 0)) err.push('記事欄の頭の箱ごとの数に0があります(' + um[1] + ')');
+      if (parts.some(p => p <= 0)) err.push('記事の頭の箱ごとの数に0があります(' + um[1] + ')');
       else {
         uchi = parts; memo2Rest = um[2];
         const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
-        if (!isNaN(n) && sum !== n) err.push('記事欄の頭の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
+        if (!isNaN(n) && sum !== n) err.push('記事の頭の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
       }
     }
   }
@@ -791,7 +791,7 @@ function computeRow(row) {
 
   /* 記事欄。箱を分けた行は、頭の数を「15+10」の形にそろえて出します */
   const memo2 = uchi.length >= 2 ? uchi.join('+') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
-  if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事欄が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
+  if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
   /* ケ／ヶは郵便番号データの正式な書き方にそろえます(保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など) */
@@ -1267,7 +1267,7 @@ function renderRows() {
     sortTh('name', 'お届け先名') + sortTh('memo', '備考(住所4)') + sortTh('tel', '電話') + sortTh('zip', '〒') + sortTh('addr', '住所', 'c-addr') +
     sortTh('q1', '数量1') + (showQ2 ? sortTh('q2', '数量2') : '') + sortTh('boxes', '個口') +
     sortTh('ship', '出荷日', '', '', '空欄なら今日') + sortTh('due', '指定日') + sortTh('time', '時間指定') +
-    (uchiOn() ? sortTh('memo2', '記事欄(ラベルに記載されるメモ)', '', '記事欄の頭に「15+10」のように箱ごとの数を入れると、2口になります。2枚とも記事欄に「15+10」と刷られ、どの箱が何個かは余白書き換えで1枚ずつ書きます', '箱を分けるなら頭に 15+10') : sortTh('memo2', '記事欄(ラベルに記載されるメモ)')) +
+    (uchiOn() ? sortTh('memo2', '記事(ラベルに出るメモ)', '', '記事の頭に「15+10」のように箱ごとの数を入れると、2口になります。2枚とも送り状の記事欄に「15+10」と刷られ、どの箱が何個かは余白書き換えで1枚ずつ書きます', '箱を分けるなら頭に 15+10') : sortTh('memo2', '記事(ラベルに出るメモ)')) +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
@@ -1438,13 +1438,16 @@ function uchiOn() { return (S.map.qty1 || []).length > 0 && !item2Shown(); }
 /* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
 function rowHtml(row) {
   const cols = 14 + (showQ2() ? 1 : 0);
-  const cell = (row, key, shown, cls, extra) => {
+  const cell = (row, key, shown, cls, extra, after) => {
     const ed = edited(row, key);
     const orig = row.auto[key];
     const title = ed ? '元の値：' + (cellText(orig) || '(空)') : (row.filledKeys.has(key) ? '上の値で埋めました' : '');
     return '<td class="' + (cls || '') + (ed ? ' edited' : '') + (row.filledKeys.has(key) && !ed ? ' filled' : '') + '"' +
-      (title ? ' title="' + esc(title) + '"' : '') + '><input data-cell="' + row.src + ':' + key + '" value="' + esc(shown) + '"' + (extra || '') + '></td>';
+      (title ? ' title="' + esc(title) + '"' : '') + '><input data-cell="' + row.src + ':' + key + '" value="' + esc(shown) + '"' + (extra || '') + '>' + (after || '') + '</td>';
   };
+  /* 日付のセルのカレンダー。見えない日付の欄を重ねておき、セルを押したらそのカレンダーを出します */
+  const cal = (row, key, ymd) => '<input type="date" class="cal" tabindex="-1" aria-hidden="true" data-cal="' + row.src + ':' + key + '" value="' + (ymd ? ymd.replace(/\//g, '-') : '') + '">';
+  const md = ymd => ymd ? ymd.slice(5) + '(' + weekday(ymd) + ')' : '';
     const inn = included(row);
     const o = row.out;
     const bad = inn && row.err.some(e => e !== 'check');
@@ -1474,8 +1477,9 @@ function rowHtml(row) {
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
-        '<input data-cell="' + row.src + ':ship" value="' + esc(o.ship ? o.ship.slice(5) + '(' + weekday(o.ship) + ')' : cellText(val(row, 'ship'))) + '"></td>' +
-      cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +
+        '<input data-cell="' + row.src + ':ship" value="' + esc(o.shipAuto ? '' : (o.ship ? md(o.ship) : cellText(val(row, 'ship')))) + '"' +
+          (o.shipAuto ? ' placeholder="' + esc(md(o.ship)) + '"' : '') + '>' + cal(row, 'ship', o.ship) + '</td>' +
+      cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date', '', cal(row, 'due', o.due)) +
       '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
         CFG.TIMES.map(([v, l]) => '<option value="' + v + '"' + (o.time === v ? ' selected' : '') + '>' + l + '</option>').join('') +
         (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '(読めません)</option>' : '') +
@@ -1557,7 +1561,7 @@ function commitCell(el) {
 
   /* 表示用に「10/01(水)」の形にしているので、同じなら触っていないとみなします */
   if (key === 'due' || key === 'ship') {
-    const shown = row.out[key] ? row.out[key].slice(5) + '(' + weekday(row.out[key]) + ')' : cellText(val(row, key));
+    const shown = key === 'ship' && row.out.shipAuto ? '' : row.out[key] ? row.out[key].slice(5) + '(' + weekday(row.out[key]) + ')' : cellText(val(row, key));
     if (trimmed === shown) return;
     v = trimmed.replace(/\(.\)$/, '');
     if (v && /^\d{1,2}\/\d{1,2}$/.test(v)) v = parseDate(v) || v;
@@ -1665,6 +1669,12 @@ function bindEvents() {
     }
     /* 会社名を入れた・消したときは「名前に入れる」の出し入れがあるので、対応表も描き直します */
     if (t.id === 'company') { S.company = t.value; renderMap(); recompute(); return; }
+    if (t.dataset.cal) {
+      const [src, key] = t.dataset.cal.split(':');
+      const row = S.rows.find(r => String(r.src) === src);
+      if (row && t.value) { setEdit(row.src, key, t.value.replace(/-/g, '/')); recomputeRow(row); }
+      return;
+    }
     if (t.dataset.cell) { commitCell(t); return; }
     if (t.dataset.inc != null) {
       const src = Number(t.dataset.inc);
@@ -1780,6 +1790,10 @@ function bindEvents() {
       S.include = S.undoExcl.prev; S.undoExcl = null;
       recompute(); toast(n + '行を発行に戻しました');
       return;
+    }
+    if (t.dataset && /:(ship|due)$/.test(t.dataset.cell || '')) {
+      const c = t.parentElement.querySelector('input.cal');
+      try { if (c && c.showPicker) c.showPicker(); } catch (err) { /* 出せないブラウザでは手で入れる */ }
     }
     const sh = t.closest && t.closest('th[data-sort]');
     if (sh) {

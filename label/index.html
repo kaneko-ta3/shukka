@@ -163,6 +163,10 @@ table.rows td.edited input, table.rows td.edited select{background:var(--edit-so
 table.rows td.filledzip input, table.rows td.autofix input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
 table.rows td.filled input{font-style:italic; color:var(--muted);}
 table.rows td.auto input{color:var(--faint);}
+table.rows td input::placeholder{color:var(--faint); opacity:1;}
+/* 日付のセルに重ねる見えないカレンダー(押したセルの位置に出すため) */
+table.rows td.w-date{position:relative;}
+table.rows td input.cal{position:absolute; left:0; bottom:0; width:100%; height:100%; opacity:0; pointer-events:none; border:0; padding:0;}
 table.rows tr.excl td{opacity:.45;}
 table.rows tr.bad > td:first-child{box-shadow:inset 3px 0 var(--danger);}
 table.rows tr.chk > td:first-child{box-shadow:inset 3px 0 var(--warn);}
@@ -199,7 +203,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v51</span>
+  <span class="ver">v52</span>
 </header>
 
 <main>
@@ -253,7 +257,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
       <div>見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
       <div>出荷日が空欄なら、今日の日付か可能な日付が自動で入力されます。</div>
       <div>個口が2以上は赤字。</div>
-      <div>記事欄の頭に「15+10」等入力すると、2口になります(箱ごとの数は余白書き換えで書きます)。</div>
+      <div>記事の頭に「15+10」等入力すると、2口になります(箱ごとの数は余白書き換えで書きます)。</div>
     </div>
     <div class="bar" id="summary"></div>
     <div id="bulk">
@@ -314,8 +318,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=51"></script>
-<script src="app.js?v=51"></script>
-<script src="issued.js?v=51"></script>
+<script src="addr.js?v=52"></script>
+<script src="app.js?v=52"></script>
+<script src="issued.js?v=52"></script>
 </body>
 </html>
