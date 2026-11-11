@@ -25,15 +25,14 @@ const CFG = {
     {key: 'addr',  label: '住所', need: true, multi: true, hint: '2〜3列に分かれていれば全部選ぶとつなげます'},
     {key: 'qty1',  label: '商品1の数量'},
     {key: 'qty2',  label: '商品2の数量'},
-    {key: 'boxes', label: '個口数', hint: '別紙に個口数そのものが書いてある場合だけ選びます', none: '― (数量÷入数で出す)'},
-    {key: 'ship',  label: '出荷日'},
     {key: 'due',   label: '指定日'},
     {key: 'time',  label: '時間指定'},
     {key: 'memo2', label: '備考2(記事欄)', multi: true}
   ],
 
   /* 見出しの自動判定。上の項目から順に、1つの列は1つの項目にだけ当てます */
-  GUESS_ORDER: ['zip', 'tel', 'addr', 'boxes', 'due', 'ship', 'time', 'qty1', 'store', 'memo2'],
+  /* 個口数・出荷日は別紙から読みません(v50、11/11 本人)。個口は 数量÷入数 か③で手で、出荷日は今日か③で */
+  GUESS_ORDER: ['zip', 'tel', 'addr', 'due', 'time', 'qty1', 'store', 'memo2'],
   GUESS: {
     zip:   ['〒', '郵便'],
     tel:   ['電話', 'TEL', 'Tel', 'tel', '携帯'],
@@ -747,7 +746,7 @@ function computeRow(row) {
     }
   }
 
-  /* 個口数。手入力 > 記事の頭の箱ごとの数(2つ以上に分けたとき) > 別紙の個口数 > 数量÷入数 > 1
+  /* 個口数。手入力 > 記事の頭の箱ごとの数(2つ以上に分けたとき) > 数量÷入数 > 1 (別紙の個口数の列は v50 から読まない)
        each：商品ごとに割って切り上げてから足す(別々の箱に詰める)
        mix ：割ったまま足して、最後に切り上げ(同じ箱に混ぜて詰める) */
   let boxesAuto = 0;
@@ -1195,7 +1194,7 @@ function renderMap() {
     if (it.key === 'qty2' && !item2Shown()) {
       return '<div class="mr"><div class="ml">商品2</div><div class="ms inline wrap">' +
         '<button type="button" class="btn small" data-item2="open">＋ 商品2を使う</button>' +
-        '<span class="tiny muted">別紙に2つ目の商品の数量の列があるとき</span></div></div>';
+        '<span class="tiny muted">2つ目の商品の数量の列があるとき</span></div></div>';
     }
     const cols = S.map[it.key] || [];
     const emptyReq = it.need && !cols.length && !(it.key === 'zip' && S.rows.some(r => r.auto.zip));
@@ -1219,9 +1218,9 @@ function renderMap() {
           (nameNeed && !nm ? ' class="req-empty"' : '') + '></div></div>';
       /* 入数。ここから個口数を出すことを、欄の横に書いておきます */
       r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
-        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
-        '<span class="plus">個/箱</span></div></div>' +
-        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の記事の頭に「15+10」のように入れた行は、分けた数 (2口) になります</div></div>';
+        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1梱包に入る数">' +
+        '<span class="plus">個/1梱包</span></div></div>' +
+        '<div class="mr sub"><div></div><div class="tiny muted">個口数＝数量÷入数 (切り上げ)。空なら1口</div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
@@ -1247,7 +1246,7 @@ function renderMap() {
     return r;
   };
   /* まとまりごとに少し間を空けます(宛先／商品と個口／日付と時間／記事) */
-  const GROUP_START = ['qty1', 'ship', 'memo2'];
+  const GROUP_START = ['qty1', 'due', 'memo2'];
   let h = CFG.ITEMS.map(it => (GROUP_START.includes(it.key) ? '<div class="moregap"></div>' : '') + row(it)).join('');
   $('#mapBox').innerHTML = h;
 }

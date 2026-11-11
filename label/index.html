@@ -139,6 +139,16 @@ label.boxmode{justify-content:flex-start;}
 #bulk input[type=date]{cursor:pointer;}
 #bulk .sep{width:1px; height:22px; background:var(--line); margin:0 4px;}
 table.rows{font-size:13px; width:100%;}
+/* ③は 見出し・数の札 を左、使い方を右に並べます(数の札の行は上に貼りつくので、セクションの子のまま置きます) */
+#step3:not([hidden]){display:grid; grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto 1fr; column-gap:28px; align-items:start;}
+#step3 > *{grid-column:1 / -1;}
+#step3 > h2{grid-column:1; grid-row:1;}
+#step3 > #summary{grid-column:1; grid-row:2;}
+#step3 > .s3help{grid-column:2; grid-row:1 / span 2; line-height:1.6; margin-bottom:8px;}
+@media (max-width: 1100px){
+  #step3:not([hidden]){display:block;}
+  #step3 > .s3help{margin:0 0 8px;}
+}
 table.rows th.sortable{cursor:pointer; user-select:none;} table.rows th.sortable:hover{color:var(--accent, inherit);}
 table.rows td.multi input{color:var(--danger); font-weight:700;}
 table.rows th{background:var(--surface-2); position:sticky; top:0; z-index:2; font-weight:700; text-align:left; padding:5px 4px; border-bottom:1px solid var(--line-strong); white-space:nowrap;}
@@ -184,7 +194,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v49</span>
+  <span class="ver">v50</span>
 </header>
 
 <main>
@@ -231,6 +241,15 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
   <section id="step3" hidden>
     <h2><span class="n">3</span>確認・手直し</h2>
+    <div class="s3help tiny muted">
+      <div>行は左端の □ で選びます(Shiftを押しながらで範囲)。</div>
+      <div>セルはそのまま書き換えられます(Enterで下、Tabで右。Shiftを押しながらで上・左)。</div>
+      <div>手で直したセルは青くなり、元の値はセルに重ねると出ます。</div>
+      <div>見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
+      <div>出荷日が空なら今日の日付(灰色)、指定日が7日後以上なら指定日から逆算します。</div>
+      <div>個口が2以上の行は赤で出します。</div>
+      <div>箱を分ける届け先は、記事の頭に「15+10」と入れます(2口になり、箱ごとの数は余白書き換えで書きます)。</div>
+    </div>
     <div class="bar" id="summary"></div>
     <div id="bulk">
       <span id="selInfo" class="selcount"></span>
@@ -246,7 +265,6 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
       <button class="btn small" id="bIncl">発行</button>
       <button class="btn small" id="bClear">選択を外す</button>
     </div>
-    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます(Shiftを押しながらで範囲)。セルはそのまま書き換えられます(Enterで下、Tabで右へ。Shiftを押しながらで上・左)。手で直したセルは青くなり、元の値はセルに重ねると出ます。見出しをクリックすると並べ替えます(1回目は昇順、2回目は降順、3回目で元の順。CSVの順は変わりません)。出荷日が空の行は今日の日付にします(灰色。今日だと指定日が7日後以上になる行は、指定日から逆算します)。個口が2以上の行は赤で出します。1つの届け先に箱を分けて送るときは、記事の頭に「15+10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15+10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます。</p>
     <div class="scroll" id="rowsTable" style="max-height:70vh"></div>
   </section>
 
@@ -291,8 +309,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=49"></script>
-<script src="app.js?v=49"></script>
-<script src="issued.js?v=49"></script>
+<script src="addr.js?v=50"></script>
+<script src="app.js?v=50"></script>
+<script src="issued.js?v=50"></script>
 </body>
 </html>
