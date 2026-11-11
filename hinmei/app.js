@@ -407,9 +407,15 @@ function readBoxNo(pg) {
 
 /** 記事欄の内訳。印刷マンで箱を分けた届け先は、記事欄の頭に「20,15」が入る。無ければ null */
 function readUchi(g) {
+  /* 「15+10」「20*4+5」(20*4 は20個の箱が4つ。v24、印刷マン v60 と同じ読み方)。かけるは * ＊ × x X、区切りは + , 、 */
+  const re = /^(\d+(?:\s*\*\s*\d+)?(?:\s*[,、+]\s*\d+(?:\s*\*\s*\d+)?)*)(?![\d*])/;
   for (const t of S.src.pages[g.pages[0]].kiji) {
-    const m = t.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)(?!\d)/);
-    if (m) return m[1].split(/\s*[,、+]\s*/).map(Number);
+    const m = t.normalize('NFKC').replace(/[×xX]/g, '*').match(re);
+    if (!m) continue;
+    const terms = m[1].split(/\s*[,、+]\s*/).map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
+    const n = terms.reduce((k, [, b]) => k + b, 0);
+    if (n < 2 || n > 99) continue;
+    return terms.flatMap(([a, b]) => Array(b).fill(a));
   }
   return null;
 }

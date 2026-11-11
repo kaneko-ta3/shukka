@@ -189,6 +189,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 .ck-title{color:var(--warn); font-weight:700; margin-bottom:4px;}
 .ck-opts{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;}
 .dl{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+#uchiNote{margin-top:10px; padding:6px 12px; border:1px solid var(--line); border-radius:6px; width:fit-content; line-height:1.8; color:var(--muted);}
+#uchiNote a.btn{text-decoration:none; margin-left:6px;}
 .dl .btn{font-size:16px; padding:10px 22px;}
 .dl .btn.small{font-size:12px; padding:3px 10px;}   /* 保存できない理由の横の小さいボタンは大きくしない */
 #toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent); color:var(--accent-ink); padding:10px 18px; border-radius:8px; font-weight:700; z-index:50; box-shadow:0 6px 18px rgba(0,0,0,.5);}
@@ -205,7 +207,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v59</span>
+  <span class="ver">v60</span>
 </header>
 
 <main>
@@ -255,7 +257,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
     <div class="s3help tiny muted">
       <div>見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
       <div>個口が2以上は赤字。</div>
-      <div>記事に「15+10+10」のように箱ごとの数だけを入れると、送り状が自動的に複数個口になります。</div>
+      <div>記事に「15+10」「20*4+5」のように箱ごとの数を入れると、送り状が自動的に複数個口になります。</div>
     </div>
     <div class="bar" id="summary"></div>
     <div id="bulk">
@@ -286,6 +288,11 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
       <span id="dlWhy" class="tiny err-ink"></span>
     </div>
     <div id="dlParts" style="margin-top:8px"></div>
+    <!-- 箱を分けた届け先があるときだけ。なぜ余白書き換えへ移るかと、何ができるかだけを2行で(v60、11/11 本人「手順じゃなくて」) -->
+    <div id="uchiNote" class="tiny" hidden>
+      <div>箱を分けた届け先が<b id="uchiCount"></b>件あります。送り状だけでは、どの箱に何個入っているか分かりません。</div>
+      <div>余白書き換えで、B2で発行した送り状の左下の余白に、箱ごとの数量を書き出せます。 <a class="btn small" href="../hinmei/?from=label" target="_blank" rel="noopener">余白書き換えを開く</a></div>
+    </div>
     <details class="more" style="margin-top:10px"><summary>CSVの中身(先頭5件)</summary>
       <div class="scroll" id="csvPreview" style="margin-top:6px"></div>
     </details>
@@ -316,8 +323,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=59"></script>
-<script src="app.js?v=59"></script>
-<script src="issued.js?v=59"></script>
+<script src="addr.js?v=60"></script>
+<script src="app.js?v=60"></script>
+<script src="issued.js?v=60"></script>
 </body>
 </html>

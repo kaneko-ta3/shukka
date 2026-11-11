@@ -76,6 +76,7 @@ const CFG = {
   CSV_MAX_ROWS: 1000,        // これを超えたらCSVを分けます(B2に1度に上げる件数)
   ADDR1_BYTES: 38,
   KIJI_BYTES: 44,           // 記事欄(全角22文字)
+  MAX_BOXES: 99,            // B2の個口数の上限(記事の「20*4」で箱を分けるときに見ます)
 
   /* 記事欄はX列(24列目)。3列目はもしも・ビショ通販のB2でSKUの列なので空にします(11/10 本人) */
   CSV_HEAD: ['備考(住所4)', 'お届け先電話', '不使用列', '商品名1', '商品名2',
@@ -727,19 +728,20 @@ function computeRow(row) {
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
 
-  /* 箱ごとの数。記事の頭に「15+10」のように入れた行は、箱を分けます(個口数＝分けた数)。
-     「15,10」「15、10」でも読み、CSVでは「15+10」にそろえます(CSVはカンマ区切りなので、11/11 本人)。
+  /* 箱ごとの数。記事がまるごと「15+10」「20*4+5」のような箱ごとの数の行は、箱を分けます(個口数＝分けた数)。
+     「20*4」は20個の箱が4つ(v60、11/11 本人)。「15,10」「15、10」、「×」「x」でも読み、
+     CSVでは「15+10」「20*4+5」にそろえます(CSVはカンマ区切りなので、11/11 本人)。
      余白書き換えが記事欄のこれを読んで、1箱ずつ数を書きます。商品1だけのときに使います */
   const memo2In = String(val(row, 'memo2') || '').trim();
-  let uchi = [], memo2Rest = memo2In;
-  const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)$/);   // 記事がまるごと「15+10」のときだけ(v55)
+  let uchi = [], uchiText = '';
+  const um = parseUchi(memo2In);   // 記事がまるごと箱ごとの数のときだけ(v55)
   if (um) {
-    if (item2Shown()) err.push('記事の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
+    if (item2Shown()) err.push('記事の「' + um.text + '」で箱を分けられるのは、商品が1つのときだけです');
     else if (uchiOn()) {
-      const parts = um[1].split(/\s*[,、+]\s*/).map(Number);
-      if (parts.some(p => p <= 0)) err.push('記事の箱ごとの数に0があります(' + um[1] + ')');
+      if (um.zero) err.push('記事の箱ごとの数に0があります(' + um.text + ')');
+      else if (um.n > CFG.MAX_BOXES) err.push('記事の箱の数(' + um.n + ')が多すぎます。B2の個口数は' + CFG.MAX_BOXES + 'までです');
       else {
-        uchi = parts; memo2Rest = '';
+        uchi = um.boxes(); uchiText = um.text;
         const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
         if (!isNaN(n) && sum !== n) err.push('記事の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
       }
@@ -789,8 +791,8 @@ function computeRow(row) {
   const time = normTime(timeV);
   if (time === null) err.push('時間指定が読めません(' + timeV + ')');
 
-  /* 記事欄。箱を分けた行は、頭の数を「15+10」の形にそろえて出します */
-  const memo2 = uchi.length >= 2 ? uchi.join('+') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
+  /* 記事欄。箱を分けた行は「15+10」「20*4+5」の形にそろえて出します */
+  const memo2 = uchi.length >= 2 ? uchiText : memo2In;
   if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
@@ -1371,6 +1373,9 @@ function renderSummary() {
   if (nPending) block.push('住所の照合が終わっていません');
   const btn = $('#dlBtn');
   btn.disabled = block.length > 0;
+  /* 箱を分けた届け先があれば、④に余白書き換えの案内を出します */
+  const nUchi = inc.filter(r => r.out.uchi && r.out.uchi.length >= 2).length;
+  $('#uchiNote').hidden = !nUchi; $('#uchiCount').textContent = nUchi;
   /* 要修正が残っているときは、ここからもまとめて除外できるようにします */
   $('#dlWhy').innerHTML = esc(block.join('　／　')) +
     ' ' + exclBadBtn('btn small', '要修正の ' + nBad + '件を除外する') + ' ' + undoExclBtn('btn small');
@@ -1432,7 +1437,21 @@ function itemName(p) {
 /* 商品2を開いているか。数量の列を選んであれば開いたままにします */
 function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
 function showQ2() { return item2Shown(); }
-/* 記事の頭の「15+10」で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
+/* 記事がまるごと箱ごとの数(「15+10」「20*4+5」)なら {text, n, zero, boxes()} を返します。箱が2つ未満なら null。
+   「20*4」は20個の箱が4つ。区切りは + , 、、かけるは * ＊ × x X を同じに読み、text は「20*4+5」の形にそろえます */
+function parseUchi(s) {
+  const t = String(s || '').normalize('NFKC').replace(/[×xX]/g, '*').trim();
+  if (!/^\d+(?:\s*\*\s*\d+)?(?:\s*[,、+]\s*\d+(?:\s*\*\s*\d+)?)*$/.test(t)) return null;
+  const terms = t.split(/\s*[,、+]\s*/).map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
+  const n = terms.reduce((m, [, b]) => m + b, 0);
+  if (n < 2 && !terms.some(([a, b]) => a === 0 || b === 0)) return null;
+  return {
+    text: terms.map(([a, b], i) => a + (t.split(/\s*[,、+]\s*/)[i].includes('*') ? '*' + b : '')).join('+'),
+    n, zero: terms.some(([a, b]) => a === 0 || b === 0),
+    boxes: () => terms.flatMap(([a, b]) => Array(b).fill(a)),
+  };
+}
+/* 記事の箱ごとの数で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
 function uchiOn() { return (S.map.qty1 || []).length > 0 && !item2Shown(); }
 
 /* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
