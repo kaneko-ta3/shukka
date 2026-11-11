@@ -406,14 +406,15 @@ function readBoxNo(pg) {
   return m ? {n: +m[1], of: +m[2]} : null;
 }
 
-/** 記事欄の内訳。印刷マンで箱を分けた届け先は、記事欄の頭に「20,15」が入る。無ければ null */
+/** 記事欄の箱ごとの数。印刷マンで箱を分けた届け先は、記事欄に「15+10」「20*4+5」が入る。無ければ null */
 function readUchi(g) {
-  /* 「15+10」「20*4+5」(20*4 は20個の箱が4つ。v24、印刷マン v60 と同じ読み方)。かけるは * ＊ × x X、区切りは + , 、 */
-  const re = /^(\d+(?:\s*\*\s*\d+)?(?:\s*[,、+]\s*\d+(?:\s*\*\s*\d+)?)*)(?![\d*])/;
+  /* 「15+10」「20*4+5」(20*4 は20個の箱が4つ)。記事欄の1行がまるごと数字と + * だけのときに読む (全角も同じ)。
+     「25×2」「25,25」は内箱などのメモなので読まない (v31、印刷マン v63 と同じ読み方。11/11 本人「+と*と数字のみなら計算に」) */
+  const re = /^(\d+(?:\s*\*\s*\d+)?(?:\s*\+\s*\d+(?:\s*\*\s*\d+)?)*)$/;
   for (const t of S.src.pages[g.pages[0]].kiji) {
-    const m = t.normalize('NFKC').replace(/[×xX]/g, '*').match(re);
+    const m = t.normalize('NFKC').trim().match(re);
     if (!m) continue;
-    const terms = m[1].split(/\s*[,、+]\s*/).map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
+    const terms = m[1].split(/\s*\+\s*/).map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
     const n = terms.reduce((k, [, b]) => k + b, 0);
     if (n < 2 || n > 99) continue;
     return terms.flatMap(([a, b]) => Array(b).fill(a));

@@ -729,8 +729,8 @@ function computeRow(row) {
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
 
   /* 箱ごとの数。記事がまるごと「15+10」「20*4+5」のような箱ごとの数の行は、箱を分けます(個口数＝分けた数)。
-     「20*4」は20個の箱が4つ(v60、11/11 本人)。「15,10」「15、10」、「×」「x」でも読み、
-     CSVでは「15+10」「20*4+5」にそろえます(CSVはカンマ区切りなので、11/11 本人)。
+     「20*4」は20個の箱が4つ(v60、11/11 本人)。数字と + * だけで、+ か * が1つ以上あるときに読みます
+     (v63、本人「数字and (+ or *) で」。「25×2」「25,25」はメモ)。全角の ＋ ＊ は半角にそろえてCSVに出します。
      余白書き換えが記事欄のこれを読んで、1箱ずつ数を書きます。商品1だけのときに使います */
   const memo2In = String(val(row, 'memo2') || '').trim();
   let uchi = [], uchiText = '';
@@ -1438,15 +1438,17 @@ function itemName(p) {
 function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
 function showQ2() { return item2Shown(); }
 /* 記事がまるごと箱ごとの数(「15+10」「20*4+5」)なら {text, n, zero, boxes()} を返します。箱が2つ未満なら null。
-   「20*4」は20個の箱が4つ。区切りは + , 、、かけるは * ＊ × x X を同じに読み、text は「20*4+5」の形にそろえます */
+   「20*4」は20個の箱が4つ。数字と + * だけのときに読む (全角の ＋ ＊ と数字も同じ)。
+   「25×2」「25,25」「25、25」は内箱などのメモとしてそのまま刷り、箱は分けない (v63、11/11 本人「+と*と数字のみなら計算に」) */
 function parseUchi(s) {
-  const t = String(s || '').normalize('NFKC').replace(/[×xX]/g, '*').trim();
-  if (!/^\d+(?:\s*\*\s*\d+)?(?:\s*[,、+]\s*\d+(?:\s*\*\s*\d+)?)*$/.test(t)) return null;
-  const terms = t.split(/\s*[,、+]\s*/).map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
+  const t = String(s || '').normalize('NFKC').trim();
+  if (!/^\d+(?:\s*\*\s*\d+)?(?:\s*\+\s*\d+(?:\s*\*\s*\d+)?)*$/.test(t)) return null;
+  const parts = t.split(/\s*\+\s*/);
+  const terms = parts.map(x => x.split(/\s*\*\s*/).map(Number)).map(([a, b]) => [a, b == null ? 1 : b]);
   const n = terms.reduce((m, [, b]) => m + b, 0);
   if (n < 2 && !terms.some(([a, b]) => a === 0 || b === 0)) return null;
   return {
-    text: terms.map(([a, b], i) => a + (t.split(/\s*[,、+]\s*/)[i].includes('*') ? '*' + b : '')).join('+'),
+    text: terms.map(([a, b], i) => a + (parts[i].includes('*') ? '*' + b : '')).join('+'),
     n, zero: terms.some(([a, b]) => a === 0 || b === 0),
     boxes: () => terms.flatMap(([a, b]) => Array(b).fill(a)),
   };
