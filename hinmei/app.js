@@ -241,9 +241,10 @@ function fitProblem(lines, fragile) {
 function splitBoxes(name, per, total) {
   if (per <= 0 || total <= 0) return [];
   const full = Math.floor(total / per), rem = total % per;
+  const memo = full + (rem ? 1 : 0) > 1 ? '【計' + total + '】' : '';   // 2箱以上なら合計を小さく添える (v30)
   const out = [];
-  if (rem) out.push([name + '(' + rem + ')', 1]);
-  if (full) out.push([name + '(' + per + ')', full]);
+  if (rem) out.push([name + '(' + rem + ')' + memo, 1]);
+  if (full) out.push([name + '(' + per + ')' + memo, full]);
   return out;
 }
 
@@ -777,9 +778,33 @@ function rowInfo(r) {
   return text ? {kind: TEXT, text: text, count: +c, fragile: !!r.fragile} : {kind: BLANK, count: +c, fragile: !!r.fragile};
 }
 
-/** 品名の折り方と大きさ。割れ物のときは右を空けた残りに、小さい段階まで使って入れる */
+/** 品名の折り方と大きさ。返す f.rect は大きい字を置く枠、f.memo は小さく添える文 (無ければ null)、
+    f.lastX は最後の行の左端 (まん中のままなら null)。
+    品名の最後の「【計35】」は大きくせず、メモの大きさ (20pt。大きい字の6割を超えない) で最後の行の右に添える
+    (v30、11/11 本人「メモでいいんだよね」「わざわざでっかく出す意味はない」)。
+    大きい字の大きさは計の無いときと同じにする。最後の行がまん中のままで右に入らなければ、その行だけ左へ寄せる。
+    寄せても入らない (長い名前で最後の行が長い) ときは計を書かない (B2の品名欄に合計が刷られている) */
+const MEMO_SIZE = 20, MEMO_GAP = 6;
 function fitIn(text, zone, fragile) {
-  const rect = nameRect(zone, fragile);
+  const nr = nameRect(zone, fragile);
+  const mm = String(text).match(/^([\s\S]*?)\s*(【[^【】]*】)\s*$/);
+  const f = fitMain(mm && mm[1].trim() ? mm[1] : text, nr, fragile);
+  f.rect = nr; f.memo = null; f.lastX = null;
+  if (!mm || !mm[1].trim()) return f;
+  const memo = mm[2], ms = Math.min(MEMO_SIZE, Math.floor(f.size * 0.6)), mw = width(memo, ms);
+  const last = f.lines[f.lines.length - 1], lw = width(last, f.size);
+  const memoX = nr[2] - MARGIN - mw;
+  let lx = nr[0] + (nr[2] - nr[0] - lw) / 2;
+  if (lx + lw + MEMO_GAP > memoX) {
+    lx = memoX - MEMO_GAP - lw;
+    if (lx < nr[0] + MARGIN) return f;
+    f.lastX = lx;
+  }
+  const base = lineBases(f, nr);
+  f.memo = {text: memo, size: ms, x: memoX, base: base[base.length - 1]};
+  return f;
+}
+function fitMain(text, rect, fragile) {
   if (!fragile) return layout(text, rect);
   // 割れ物は幅が狭いので、大きさより「商品名／(数量)」の形を優先する（商品名の途中で折らない）
   const m = text.indexOf('\n') < 0 && text.match(/^(.+?)\s*([(（].*[)）])$/);
@@ -998,10 +1023,17 @@ function drawSketch(cv, zone, e) {
     text(FRAGILE.label, fz, FRAGILE.labelSize, (fz[1] + fz[3]) / 2 + FRAGILE.labelSize * 0.38, ctx.strokeStyle);
   }
   if (e.mode === TEXT) {
-    const nr = nameRect(zone, fr);
-    const f = fitIn(e.text, zone, fr);
+    const f = fitIn(e.text, zone, fr), nr = f.rect;
     const base = lineBases(f, nr);
-    f.lines.forEach((ln, i) => text(ln, nr, f.size, base[i], '#000'));
+    f.lines.forEach((ln, i) => {
+      if (i === f.lines.length - 1 && f.lastX != null) { ctx.font = f.size + 'px HinmeiBIZ'; ctx.fillStyle = '#000'; ctx.fillText(ln, f.lastX, base[i]); }
+      else text(ln, nr, f.size, base[i], '#000');
+    });
+    if (f.memo) {
+      ctx.font = f.memo.size + 'px HinmeiBIZ';
+      ctx.fillStyle = '#000';
+      ctx.fillText(f.memo.text, f.memo.x, f.memo.base);
+    }
     if (f.size < minFor(fr)) problem = fitProblem(f.lines, fr);
   }
   return problem;
@@ -1171,7 +1203,7 @@ async function autofill(masterOverride) {
           const fr = (ans.fragile || []).indexOf(it.name) >= 0;
           g.rows = [];
           ux.forEach(n => {
-            const last = g.rows[g.rows.length - 1], nm = it.name + '(' + n + ')';
+            const last = g.rows[g.rows.length - 1], nm = it.name + '(' + n + ')【計' + it.total + '】';   // 計は小さく添える (v30)
             if (last && last.name === nm) last.count = String(+last.count + 1);
             else g.rows.push({name: nm, per: '', total: '', count: '1', keep: false, fragile: fr});
           });
@@ -1334,10 +1366,13 @@ async function buildPdf(plan) {
       center(FRAGILE.label, fz, FRAGILE.labelSize, (fz[1] + fz[3]) / 2 + FRAGILE.labelSize * 0.38, GRAY);
     }
     if (p.mode === TEXT) {                                // 品名（Python版 stamp と同じ置き方）
-      const nr = nameRect(zone, fr);
-      const f = fitIn(p.text, zone, fr);
+      const f = fitIn(p.text, zone, fr), nr = f.rect;
       const base = lineBases(f, nr);
-      f.lines.forEach((ln, k) => center(ln, nr, f.size, base[k], BLACK));
+      f.lines.forEach((ln, k) => {
+        if (k === f.lines.length - 1 && f.lastX != null) text(ln, f.lastX, base[k], f.size, BLACK);   // 計の分だけ左へ寄せた行
+        else center(ln, nr, f.size, base[k], BLACK);
+      });
+      if (f.memo) text(f.memo.text, f.memo.x, f.memo.base, f.memo.size, BLACK);   // 【計35】は小さく右下
     }
   });
   // ページを並べ直す（中身はそのまま、順番だけ）。送り状番号順か、数量順（v25）
