@@ -676,12 +676,13 @@ function setMsg(sel, text, cls) {
 /* 自動入力のあとのお知らせ。全部で何件、何件埋まったか、直す届け先はどれかを出し、名前を押すとその表へ飛ぶ (v26) */
 function autoResult(groups) {
   const bad = groups.map((g, gi) => ({g, gi})).filter(x => x.g.status && x.g.status.length);
+  const done = groups.filter(g => g.rows.some(r => rowInfo(r).kind !== 'empty' && rowInfo(r).kind !== 'err')).length;
   const el = $('#autoMsg');
   if (!bad.length) { setMsg('#autoMsg', groups.length + '件すべて埋めました。見本を確かめて「PDFを作る」へ進んでください', 'ok'); return; }
   el.className = 'notice warn';
   el.hidden = false;
-  el.innerHTML = '<div>' + groups.length + '件中 ' + (groups.length - bad.length) + '件を埋めました。残りの ' + bad.length +
-    '件は、黄色の枠に書いた理由を見て、表を手で直してください。</div>' +
+  el.innerHTML = '<div>' + (done === groups.length ? groups.length + '件すべて埋めました。' : groups.length + '件中 ' + done + '件を埋めました。') +
+    '黄色の ' + bad.length + '件は、枠に書いた理由を見て、確かめるか表を直してください。</div>' +
     '<div class="jump">' + bad.map(x => '<button type="button" class="btn small" data-jump="' + x.gi + '">' +
       esc(x.g.name || '(届け先名なし)') + '</button>').join('') + '</div>';
 }
@@ -1182,6 +1183,16 @@ async function autofill(masterOverride) {
         const it = rd.items[0];
         g.rows = [{name: it.name + '(' + it.total + ')', per: '', total: '', count: '1', keep: false,
                    fragile: (ans.fragile || []).indexOf(it.name) >= 0}];
+        byUchi = true;
+      }
+      // 送り状が2枚以上で、記事欄に箱ごとの数が無く、入数マスタにも無い商品1つの届け先は、
+      // 全部の送り状に「商品名(計35)」と総数を入れて黄色で知らせる。箱ごとの数はペンで書くか表で直す (v28、11/11 本人「案3」)
+      if (!byUchi && !ux && g.pages.length > 1 && rd.items.length === 1 && !rd.mismatch &&
+          ans.found[rd.items[0].name] === undefined && (ans.bad || []).indexOf(rd.items[0].name) < 0) {
+        const it = rd.items[0], nm = it.name + '(計' + it.total + ')';
+        g.rows = [{name: nm, per: '', total: '', count: String(g.pages.length), keep: false,
+                   fragile: (ans.fragile || []).indexOf(it.name) >= 0}];
+        notes.push('記事欄に箱ごとの数が無いので、' + g.pages.length + '枚全部に「' + nm + '」と入れました。箱ごとの数はペンで書くか、表で直してください');
         byUchi = true;
       }
       if (!byUchi) {
