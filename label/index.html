@@ -148,6 +148,7 @@ table.rows{font-size:13px; width:100%;}
 #step3 > #bulk{grid-column:1; grid-row:3;}
 #step3 > .s3help{grid-column:2; grid-row:1 / span 3; line-height:1.6; margin-bottom:8px; justify-self:start; width:fit-content;
   border:1px solid var(--line); border-radius:6px; padding:6px 12px;}  /* 枠で囲み、一括の欄の右に左寄せ (v55) */
+#step3 > .s3help .indent1{visibility:hidden;}   /* 見えない「・」で、頭の「・」の後ろにそろえて一字下げ (v64 本人) */
 @media (max-width: 1500px){
   #step3:not([hidden]){display:block;}
   #step3 > .s3help{margin:0 0 8px; justify-self:start;}
@@ -207,7 +208,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v63</span>
+  <span class="ver">v64</span>
 </header>
 
 <main>
@@ -255,9 +256,10 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <section id="step3" hidden>
     <h2><span class="n">3</span>確認・手直し</h2>
     <div class="s3help tiny muted">
-      <div>見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
-      <div>個口が2以上は赤字。</div>
-      <div>記事に「15+10」「20*4+5」のように箱ごとの数を入れると、送り状が自動的に複数個口になります。</div>
+      <div>・見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
+      <div>・個口が2以上は赤字。</div>
+      <div>・記事に「15+10」「20*4+5」のように箱ごとの数を入れると、送り状が自動的に複数個口になります。</div>
+      <div><span class="indent1">・</span>(+か*での計算のみ個口数に反映されます。)</div>
     </div>
     <div class="bar" id="summary"></div>
     <div id="bulk">
@@ -322,8 +324,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=63"></script>
-<script src="app.js?v=63"></script>
-<script src="issued.js?v=63"></script>
+<script src="addr.js?v=64"></script>
+<script src="app.js?v=64"></script>
+<script src="issued.js?v=64"></script>
 </body>
 </html>
