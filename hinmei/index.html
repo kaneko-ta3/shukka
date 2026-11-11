@@ -56,6 +56,7 @@ h2 .n{display:inline-grid; place-items:center; width:22px; height:22px; border-r
 .kinds{display:flex; gap:10px; flex-wrap:wrap;}
 label.kind{display:flex; flex-direction:column; gap:2px; min-width:180px; padding:10px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer;}
 label.kind input{margin:0 0 4px;}
+.pgsort{display:inline-flex; gap:12px; align-items:center;} .pgsort label{display:inline-flex; gap:4px; align-items:center; cursor:pointer;}
 label.kind:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
 
 .marks{margin-top:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); display:flex; flex-direction:column; gap:8px;}
@@ -125,7 +126,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v24</span>
+  <span class="ver">v25</span>
 </header>
 
 <main>
@@ -199,6 +200,10 @@ details.sk summary{cursor:pointer;}
   <section id="secMake" hidden>
     <h2><span class="n">4</span>PDFを作る</h2>
     <div class="btns">
+      <span class="pgsort">並び順
+        <label title="B2が発行した順。複数口は親の送り状のすぐ後ろに子が並びます"><input type="radio" name="pageSort" value="slip" checked> 送り状番号順</label>
+        <label title="左下に書いた品名と数量の順。同じ中身はほかの届け先とも並びます((5) が (20) より前)"><input type="radio" name="pageSort" value="qty"> 数量順</label>
+      </span>
       <button class="btn primary big" id="makeBtn">PDFを作る</button>
     </div>
     <div id="makeMsg" class="notice" hidden></div>
@@ -216,8 +221,22 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=24"></script>
-<script src="app.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="app.js?v=25"></script>
 <script>if (new URLSearchParams(location.search).get('from') === 'label') document.getElementById('fromLabel').hidden = false;</script>
+<script>
+/* 並び順 (v25)。選んだ方はブラウザに残します */
+(() => {
+  const KEY = 'hinmei.pageSort.v1';
+  let v = 'slip';
+  try { if (localStorage.getItem(KEY) === 'qty') v = 'qty'; } catch (e) {}
+  const st = window.HINMEI.state;
+  st.pageSort = v;
+  document.querySelectorAll('input[name=pageSort]').forEach(el => {
+    el.checked = el.value === v;
+    el.addEventListener('change', () => { st.pageSort = el.value; try { localStorage.setItem(KEY, el.value); } catch (e) {} });
+  });
+})();
+</script>
 </body>
 </html>

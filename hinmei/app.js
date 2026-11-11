@@ -466,6 +466,23 @@ function pageOrder(pages) {
     (keys[a][1] < keys[b][1] ? -1 : keys[a][1] > keys[b][1] ? 1 : 0) || a - b);
 }
 
+/** 数量順（v25、11/11 本人「デフォ順と数量順で選べるように」）。左下に書いた品名と数量で並べる。
+    「非常用トイレ(20)」はほかの届け先の(20)と並ぶ。数字は数として比べる（(5) が (20) より前）。
+    同じ中身どうしは送り状番号順。品名を書かないページ（そのまま・注意書きだけ・何も書かない）は品名欄の文字で並べる */
+const QTY_ORDER = new Intl.Collator('ja', {numeric: true});
+function qtyOrder(pages, plan) {
+  const key = i => {
+    const p = plan[i];
+    if (p && p.mode === TEXT && p.text) return String(p.text).replace(/\s+/g, '');
+    const h = pages[i].hin;
+    return h && h.items ? h.items.map(it => it.name + '(' + it.total + ')').join('・') : '';
+  };
+  const base = pageOrder(pages), rank = [];
+  base.forEach((v, k) => { rank[v] = k; });
+  const keys = pages.map((p, i) => key(i));
+  return base.slice().sort((a, b) => QTY_ORDER.compare(keys[a], keys[b]) || rank[a] - rank[b]);
+}
+
 /** 届け先と送り状（親番号）ごとにページをまとめる。同じ届け先でも別の送り状なら別の表にする
     （品名欄の総数は送り状ごとなので）。届け先が読めないページは直前と同じ届け先 */
 function groupPages(pages) {
@@ -1291,8 +1308,8 @@ async function buildPdf(plan) {
       f.lines.forEach((ln, k) => center(ln, nr, f.size, base[k], BLACK));
     }
   });
-  // ページを送り状番号の小さい順に並べ直す（中身はそのまま、順番だけ）
-  const order = pageOrder(s.pages);
+  // ページを並べ直す（中身はそのまま、順番だけ）。送り状番号順か、数量順（v25）
+  const order = S.pageSort === 'qty' ? qtyOrder(s.pages, plan) : pageOrder(s.pages);
   S.lastOrder = order;
   if (order.some((v, i) => v !== i)) {
     for (let i = pages.length - 1; i >= 0; i--) doc.removePage(i);
@@ -1331,7 +1348,7 @@ async function make() {
     $('#result').hidden = false;
     const order = S.lastOrder || plan.map((p, i) => i);
     const moved = order.some((v, i) => v !== i);
-    setMsg('#makeMsg', 'できました。' + (moved ? '元のPDFは並びが割れていたので、送り状番号の小さい順（発行済データの順）に並べ直しました。'
+    setMsg('#makeMsg', 'できました。' + (S.pageSort === 'qty' ? '数量順に並べました。' : moved ? '元のPDFは並びが割れていたので、送り状番号の小さい順（発行済データの順）に並べ直しました。'
                                          : S.kind === 'none' ? '元のPDFはもともと送り状番号の順でした（中身も順番も元のままです）。' : '') +
                        'ダウンロードが始まらないときは下のボタンから', 'ok');
     a.click();
