@@ -1218,17 +1218,17 @@ function renderMap() {
         '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '"' +
           ' placeholder="例：非常用トイレ" title="ラベルには「' + esc(nm || '商品名') + '(10)」の形で出ます"' +
           (nameNeed && !nm ? ' class="req-empty"' : '') + '></div></div>';
-      /* 入数。ここから個口数を出すことを、欄の横に書いておきます */
-      r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
-        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1梱包に入る数">' +
+      /* 1梱包に入る数 (v62 で「入数」から改名、11/11 本人)。ここから個口数を出すことを、欄の横に書いておきます */
+      r += '<div class="mr sub"><div class="ml tiny muted">└ 1梱包に入る数</div><div class="ms inline">' +
+        '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="個口数＝数量÷1梱包に入る数 (切り上げ)">' +
         '<span class="plus">個/1梱包</span></div></div>' +
-        '<div class="mr sub"><div></div><div class="tiny muted">個口数＝数量÷入数 (切り上げ)。空なら1口</div></div>';
+        '<div class="mr sub"><div></div><div class="ms"><span class="plus">(個口数計算に使います。空欄は全て1個口)</span></div></div>';   // カッコからは次の行 (本人「カッコ以降は改行してもいいよ」)
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
         r += '<div class="mr sub"><div class="ml tiny muted">└ 個口の計算</div><div class="ms">' +
-          opt('each', '割って切り上げてから足す', '商品ごとに 数量÷入数 を切り上げて足します(別々の箱に詰める)。例：30÷48→1、30÷24→2、合計3口') +
-          opt('mix', '割ったまま足して最後に切り上げ', '数量÷入数 を切り上げずに足して、最後に切り上げます(同じ箱に混ぜて詰める)。例：0.625＋1.25＝1.875→2口') +
+          opt('each', '割って切り上げてから足す', '商品ごとに 数量÷1梱包に入る数 を切り上げて足します(別々の箱に詰める)。例：30÷48→1、30÷24→2、合計3口') +
+          opt('mix', '割ったまま足して最後に切り上げ', '数量÷1梱包に入る数 を切り上げずに足して、最後に切り上げます(同じ箱に混ぜて詰める)。例：0.625＋1.25＝1.875→2口') +
           '</div></div>';
         r += '<div class="mr sub"><div></div><div class="ms inline"><button type="button" class="btn small" data-item2="close" title="商品2の数量の列を外して、たたみます">商品2を使わない(たたむ)</button></div></div>';
       }
