@@ -158,7 +158,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 .c-addr{min-width:300px;}
 /* 狭い画面でも電話・〒・日付・時間が切れないよう、下限の幅を決めます(入りきらなければ表を横に送る) */
 .w-name{min-width:200px;} .w-memo{min-width:150px;} .w-tel{min-width:118px;} .w-zip{min-width:86px;}
-.w-num{min-width:56px;} .w-uchi{min-width:96px;} .w-date{min-width:96px;} .w-time{min-width:104px;}
+.w-num{min-width:56px;} .w-date{min-width:96px;} .w-time{min-width:104px;}
 .undo{background:none; border:none; color:var(--edit); cursor:pointer; padding:0 2px; font-size:13px;}
 .ck{margin-top:2px; padding:6px 8px; border:1px solid var(--warn); border-radius:6px; background:var(--warn-soft);}
 /* 〒と住所の食い違っているところ */
@@ -182,7 +182,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v47</span>
+  <span class="ver">v48</span>
 </header>
 
 <main>
@@ -244,7 +244,7 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
       <button class="btn small" id="bIncl">発行</button>
       <button class="btn small" id="bClear">選択を外す</button>
     </div>
-    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます(Shiftを押しながらで範囲)。セルはそのまま書き換えられます(Enterで下、Tabで右へ。Shiftを押しながらで上・左)。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します(灰色)。1つの届け先に箱を分けて送るときは、「箱ごとの数」を「15,10」のように入れると、個口数と記事欄に入ります。</p>
+    <p class="tiny muted" style="margin:0 0 8px">行は左端の □ で選びます(Shiftを押しながらで範囲)。セルはそのまま書き換えられます(Enterで下、Tabで右へ。Shiftを押しながらで上・左)。手で直したセルは青くなり、元の値はセルに重ねると出ます。出荷日が空の行は、指定日から自動で出します(灰色)。1つの届け先に箱を分けて送るときは、記事の頭に「15,10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15,10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます。</p>
     <div class="scroll" id="rowsTable" style="max-height:70vh"></div>
   </section>
 
@@ -289,8 +289,8 @@ table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=47"></script>
-<script src="app.js?v=47"></script>
-<script src="issued.js?v=47"></script>
+<script src="addr.js?v=48"></script>
+<script src="app.js?v=48"></script>
+<script src="issued.js?v=48"></script>
 </body>
 </html>

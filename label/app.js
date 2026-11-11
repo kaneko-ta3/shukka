@@ -721,20 +721,25 @@ function computeRow(row) {
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
 
-  /* 内訳。はじめは数量そのまま(1箱)。箱を分ける届け先だけ「20,15」のように手で入れます。
-     商品1だけのとき(商品2を開いていないとき)に使います */
-  let uchi = [];
-  if (uchiOn() && edited(row, 'uchi')) {
-    const parts = String(val(row, 'uchi') || '').normalize('NFKC').split(/[,、・\s]+/).filter(Boolean);
-    if (!parts.length || parts.some(p => !/^\d+$/.test(p) || +p <= 0)) err.push('箱ごとの数は「15,10」のように、カンマで区切って入れてください');
-    else {
-      uchi = parts.map(Number);
-      const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
-      if (!isNaN(n) && sum !== n) err.push('箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
+  /* 箱ごとの数。記事の頭に「15,10」のように入れた行は、箱を分けます(個口数＝分けた数)。
+     余白書き換えが記事欄のこれを読んで、1箱ずつ数を書きます。商品1だけのときに使います */
+  const memo2In = String(val(row, 'memo2') || '').trim();
+  let uchi = [], memo2Rest = memo2In;
+  const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、]\s*\d+)+)(?!\d)\s*(.*)$/);
+  if (um) {
+    if (item2Shown()) err.push('記事の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
+    else if (uchiOn()) {
+      const parts = um[1].split(/\s*[,、]\s*/).map(Number);
+      if (parts.some(p => p <= 0)) err.push('記事の頭の箱ごとの数に0があります(' + um[1] + ')');
+      else {
+        uchi = parts; memo2Rest = um[2];
+        const sum = uchi.reduce((a, b) => a + b, 0), n = num(q1);
+        if (!isNaN(n) && sum !== n) err.push('記事の頭の箱ごとの数の合計(' + sum + ')が数量(' + n + ')と合いません');
+      }
     }
   }
 
-  /* 個口数。手入力 > 内訳の箱の数(2つ以上に分けたとき) > 別紙の個口数 > 数量÷入数 > 1
+  /* 個口数。手入力 > 記事の頭の箱ごとの数(2つ以上に分けたとき) > 別紙の個口数 > 数量÷入数 > 1
        each：商品ごとに割って切り上げてから足す(別々の箱に詰める)
        mix ：割ったまま足して、最後に切り上げ(同じ箱に混ぜて詰める) */
   let boxesAuto = 0;
@@ -774,9 +779,8 @@ function computeRow(row) {
   const time = normTime(timeV);
   if (time === null) err.push('時間指定が読めません(' + timeV + ')');
 
-  /* 記事欄。箱を分けた行は、内訳(「20,15」)を頭に入れます。余白書き換えがこれを読んで、箱ごとに数を書きます */
-  const memo2In = String(val(row, 'memo2') || '').trim();
-  const memo2 = uchi.length >= 2 ? uchi.join(',') + (memo2In ? ' ' + memo2In : '') : memo2In;
+  /* 記事欄。箱を分けた行は、頭の数を「15,10」の形にそろえて出します */
+  const memo2 = uchi.length >= 2 ? uchi.join(',') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
   if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
@@ -1206,7 +1210,7 @@ function renderMap() {
       r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
         '<span class="plus">個/箱</span></div></div>' +
-        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の「箱ごとの数」を「15,10」のように分けた行は、分けた数 (2口) になります</div></div>';
+        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の記事の頭に「15,10」のように入れた行は、分けた数 (2口) になります</div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
@@ -1251,7 +1255,7 @@ function renderRows() {
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
     '<th>お届け先名</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
-    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th>' + (uchiOn() ? '<th class="w-uchi" title="ふだんは数量のまま(1箱)。箱を分ける届け先だけ「15,10」のように入れると、個口数と記事欄に入ります">箱ごとの数<div class="tiny muted" style="font-weight:400">分けるなら 15,10</div></th>' : '') + '<th>出荷日</th><th>指定日</th><th>時間指定</th><th>記事</th>' +
+    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>出荷日</th><th>指定日</th><th>時間指定</th>' + (uchiOn() ? '<th title="1つの届け先に箱を分けて送るときは、記事の頭に「15,10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15,10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます">記事<div class="tiny muted" style="font-weight:400">箱を分けるなら頭に 15,10</div></th>' : '<th>記事</th>') + '' +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
@@ -1390,12 +1394,12 @@ function itemName(p) {
 /* 商品2を開いているか。数量の列を選んであれば開いたままにします */
 function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
 function showQ2() { return item2Shown(); }
-/* 内訳の列を出すか。商品1の数量の列を選んでいて、商品2を開いていないとき */
+/* 記事の頭の「15,10」で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
 function uchiOn() { return (S.map.qty1 || []).length > 0 && !item2Shown(); }
 
 /* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
 function rowHtml(row) {
-  const cols = 14 + (showQ2() ? 1 : 0) + (uchiOn() ? 1 : 0);
+  const cols = 14 + (showQ2() ? 1 : 0);
   const cell = (row, key, shown, cls, extra) => {
     const ed = edited(row, key);
     const orig = row.auto[key];
@@ -1431,7 +1435,6 @@ function rowHtml(row) {
       '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
-      (uchiOn() ? cell(row, 'uchi', edited(row, 'uchi') ? val(row, 'uchi') : String(val(row, 'qty1') || '').trim(), 'w-uchi' + (edited(row, 'uchi') ? '' : ' auto')) : '') +
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto ? '指定日から自動で出しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.ship ? o.ship.slice(5) + '(' + weekday(o.ship) + ')' : cellText(val(row, 'ship'))) + '"></td>' +
       cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +
@@ -1528,7 +1531,6 @@ function commitCell(el) {
   const autoV = key === 'name' ? autoNameMemo(row)[0]
               : key === 'memo' ? autoNameMemo(row)[1]
               : key === 'tel' ? normTel(row.auto.tel)
-              : key === 'uchi' ? String(val(row, 'qty1') || '').trim()
               : cellText(row.auto[key]);
   if (!edited(row, key) && trimmed === String(autoV)) return;
   if (trimmed === String(autoV)) delete S.edits[row.src][key];
