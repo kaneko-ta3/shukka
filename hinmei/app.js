@@ -722,7 +722,7 @@ function renderGroups() {
       '<th class="c-keep" rowspan="2">そのまま</th>' +
       '<th class="c-keep" rowspan="2" title="右に割れ物シールの場所を空けます">割れ物</th>' +
       '<th class="c-opt opt-l" colspan="2">入数で割るとき（任意）</th>' +
-      '<th class="c-det" rowspan="2">内訳</th><th class="c-del" rowspan="2"></th></tr><tr>' +
+      '<th class="c-det" rowspan="2">箱ごとの数</th><th class="c-del" rowspan="2"></th></tr><tr>' +
       '<th class="c-num opt-l">1箱の入数</th><th class="c-num">総数</th>' +
       '</tr></thead><tbody></tbody></table>' +
       '<div class="gf"><button class="btn small" data-act="add">＋ 入力欄を追加</button>' +
