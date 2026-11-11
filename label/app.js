@@ -48,8 +48,10 @@ const CFG = {
     memo2: ['備考', '記事']
   },
 
-  /* 出荷日が空の行は「指定日 −(東京からの輸送日数＋1)」にし、営業日でなければ前の営業日まで戻します。
+  /* 出荷日が空の行は今日の日付。今日だと指定日が7日後以上になる行はB2で弾かれるので(11/11 本人)、
+     「指定日 −(東京からの輸送日数＋1)」に寄せ、営業日でなければ前の営業日まで戻します。
      輸送1日：関東・甲信越・北陸・東海・近畿(兵庫まで)・東北(青森まで)／それ以外は2日 */
+  SHIP_MAX_DAYS: 7,   // 出荷日から指定日まで、この日数以上あいたらB2で弾かれる
   TRANSIT_NEAR: 1,
   TRANSIT_FAR: 2,
   NEAR_PREF: ['東京都', '神奈川県', '埼玉県', '千葉県', '茨城県', '栃木県', '群馬県',
@@ -251,6 +253,11 @@ function parseDate(v) {
   }
   return null;
 }
+/* 2つの日付(YYYY/MM/DD)の間の日数。b が後なら正 */
+function daysBetween(a, b) {
+  const t = s => { const x = s.split('/').map(Number); return Date.UTC(x[0], x[1] - 1, x[2]); };
+  return Math.round((t(b) - t(a)) / 86400000);
+}
 function fmtYMD(y, m, d) {
   const dt = new Date(y, m - 1, d);
   if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
@@ -404,7 +411,7 @@ function loadSheet() {
   S.grid = S.book[S.sheet] || [];
   S.hc = S.grid.hc || new Set();
   S.hr = S.grid.hr || new Set();
-  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false; S.undoExcl = null; S.selAuto = true;
+  S.edits = {}; S.include = {}; S.sel = new Set(); S.fill = new Set(); S.lastClick = null; S.moreOpen = null; S.view = ''; S.item2Open = false; S.undoExcl = null; S.selAuto = true; S.sort = null;
   detectHeader();
   guessMap();
   rebuild();
@@ -721,15 +728,16 @@ function computeRow(row) {
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
 
-  /* 箱ごとの数。記事の頭に「15,10」のように入れた行は、箱を分けます(個口数＝分けた数)。
+  /* 箱ごとの数。記事の頭に「15+10」のように入れた行は、箱を分けます(個口数＝分けた数)。
+     「15,10」「15、10」でも読み、CSVでは「15+10」にそろえます(CSVはカンマ区切りなので、11/11 本人)。
      余白書き換えが記事欄のこれを読んで、1箱ずつ数を書きます。商品1だけのときに使います */
   const memo2In = String(val(row, 'memo2') || '').trim();
   let uchi = [], memo2Rest = memo2In;
-  const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、]\s*\d+)+)(?!\d)\s*(.*)$/);
+  const um = memo2In.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)(?!\d)\s*(.*)$/);
   if (um) {
     if (item2Shown()) err.push('記事の頭の「' + um[1] + '」で箱を分けられるのは、商品が1つのときだけです');
     else if (uchiOn()) {
-      const parts = um[1].split(/\s*[,、]\s*/).map(Number);
+      const parts = um[1].split(/\s*[,、+]\s*/).map(Number);
       if (parts.some(p => p <= 0)) err.push('記事の頭の箱ごとの数に0があります(' + um[1] + ')');
       else {
         uchi = parts; memo2Rest = um[2];
@@ -769,18 +777,21 @@ function computeRow(row) {
   const due = parseDate(dueV);
   if (due === null) err.push('指定日が日付として読めません(' + cellText(dueV) + ')');
   const shipV = val(row, 'ship');
-  let ship = parseDate(shipV), shipAuto = false;
+  let ship = parseDate(shipV), shipAuto = '';
   if (ship === null) err.push('出荷日が日付として読めません(' + cellText(shipV) + ')');
-  else if (!ship) { ship = autoShip(due, addr); shipAuto = !!ship; }
-  if (ship === '' ) err.push('出荷日か指定日を入れてください');
+  else if (!ship) {
+    const now = new Date(), today = fmtYMD(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    if (due && daysBetween(today, due) >= CFG.SHIP_MAX_DAYS) { ship = autoShip(due, addr); shipAuto = 'back'; }
+    else { ship = today; shipAuto = 'today'; }
+  }
   if (due && ship && ship > due) err.push('出荷日が指定日より後になっています');
 
   const timeV = val(row, 'time');
   const time = normTime(timeV);
   if (time === null) err.push('時間指定が読めません(' + timeV + ')');
 
-  /* 記事欄。箱を分けた行は、頭の数を「15,10」の形にそろえて出します */
-  const memo2 = uchi.length >= 2 ? uchi.join(',') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
+  /* 記事欄。箱を分けた行は、頭の数を「15+10」の形にそろえて出します */
+  const memo2 = uchi.length >= 2 ? uchi.join('+') + (memo2Rest ? ' ' + memo2Rest : '') : memo2In;
   if (bytes(memo2) > CFG.KIJI_BYTES) err.push('記事が長すぎます(' + bytes(memo2) + 'バイト。上限 ' + CFG.KIJI_BYTES + 'バイト＝全角22文字)');
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
@@ -1210,7 +1221,7 @@ function renderMap() {
       r += '<div class="mr sub"><div class="ml tiny muted">└ 入数</div><div class="ms inline">' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="1箱に入る数">' +
         '<span class="plus">個/箱</span></div></div>' +
-        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の記事の頭に「15,10」のように入れた行は、分けた数 (2口) になります</div></div>';
+        '<div class="mr sub"><div></div><div class="tiny muted">数量÷入数 (切り上げ) で個口数を出します。空なら1口。③の記事の頭に「15+10」のように入れた行は、分けた数 (2口) になります</div></div>';
       /* 個口の計算のしかた。商品1と商品2の両方にかかるので、商品2の下に1回だけ出します */
       if (it.key === 'qty2') {
         const opt = (v, label, tip) => '<label class="boxmode" title="' + tip + '"><input type="radio" name="boxMode" value="' + v + '"' + (S.boxMode === v ? ' checked' : '') + '> ' + label + '</label>';
@@ -1254,8 +1265,10 @@ function renderRows() {
   const showQ2 = item2Shown();
   let h = '<table class="rows"><thead><tr>' +
     '<th class="c-sel"><input type="checkbox" id="selAll" title="全部選ぶ"></th><th class="c-rn">行</th><th class="c-inc" title="チェックが入っている行だけCSVに出します">発行</th>' +
-    '<th>お届け先名</th><th>備考(住所4)</th><th>電話</th><th>〒</th><th class="c-addr">住所</th>' +
-    '<th>数量1</th>' + (showQ2 ? '<th>数量2</th>' : '') + '<th>個口</th><th>出荷日</th><th>指定日</th><th>時間指定</th>' + (uchiOn() ? '<th title="1つの届け先に箱を分けて送るときは、記事の頭に「15,10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15,10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます">記事<div class="tiny muted" style="font-weight:400">箱を分けるなら頭に 15,10</div></th>' : '<th>記事</th>') + '' +
+    sortTh('name', 'お届け先名') + sortTh('memo', '備考(住所4)') + sortTh('tel', '電話') + sortTh('zip', '〒') + sortTh('addr', '住所', 'c-addr') +
+    sortTh('q1', '数量1') + (showQ2 ? sortTh('q2', '数量2') : '') + sortTh('boxes', '個口') +
+    sortTh('ship', '出荷日', '', '', '空欄なら今日の日付') + sortTh('due', '指定日') + sortTh('time', '時間指定') +
+    (uchiOn() ? sortTh('memo2', '記事', '', '1つの届け先に箱を分けて送るときは、記事の頭に「15+10」のように箱ごとの数を入れます。送り状が2枚になり、2枚とも記事欄に「15+10」と刷られます。どの箱が何個かは、余白書き換えで1枚ずつ書きます', '箱を分けるなら頭に 15+10') : sortTh('memo2', '記事')) +
     '</tr></thead>';
   /* 1行ぶんを <tbody> 1つにまとめ、行だけ差し替えられるようにします */
   visibleRows().forEach(row => { h += '<tbody data-row="' + row.src + '">' + rowHtml(row) + '</tbody>'; });
@@ -1384,7 +1397,33 @@ function inView(row) {
     default:       return true;
   }
 }
-function visibleRows() { return S.rows.filter(inView); }
+function visibleRows() {
+  const rows = S.rows.filter(inView);
+  if (!S.sort) return rows;
+  /* 見出しのクリックで並べ替え(画面の表示だけ。CSVの順は④の並び順のまま)。除外した行と空は、向きによらず下へ */
+  const {key, dir} = S.sort, numKey = ['q1', 'q2', 'boxes'].includes(key);
+  const v = r => {
+    const o = r.out || {};
+    let x = key === 'addr' ? (edited(r, 'addr') ? val(r, 'addr') : r.auto.addr) : o[key];
+    if (x == null) x = '';
+    if (numKey) { const n = num(x); return isNaN(n) ? '' : n; }
+    return String(x);
+  };
+  return rows.map((r, i) => ({r, i, x: v(r), out: !included(r)})).sort((a, b) => {
+    if (a.out !== b.out) return a.out ? 1 : -1;
+    const ea = a.x === '', eb = b.x === '';
+    if (ea || eb) return ea === eb ? a.i - b.i : (ea ? 1 : -1);
+    const c = numKey ? a.x - b.x : a.x.localeCompare(b.x, 'ja', {numeric: true});
+    return c ? c * dir : a.i - b.i;
+  }).map(e => e.r);
+}
+/* 並べ替えできる見出し。1回目昇順 ▲、2回目降順 ▼、3回目で元の順 */
+function sortTh(key, label, cls, title, sub) {
+  const mark = S.sort && S.sort.key === key ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : '';
+  return '<th data-sort="' + key + '" class="sortable' + (cls ? ' ' + cls : '') + '" title="' + esc(title ? title + '(クリックで並べ替え)' : 'クリックで並べ替え') + '">' +
+    label + '<span class="sort-mark">' + mark + '</span>' +
+    (sub ? '<div class="tiny muted" style="font-weight:400">' + sub + '</div>' : '') + '</th>';
+}
 
 /* 商品名。入力した名前を使います */
 function itemName(p) {
@@ -1394,7 +1433,7 @@ function itemName(p) {
 /* 商品2を開いているか。数量の列を選んであれば開いたままにします */
 function item2Shown() { return !!S.item2Open || (S.map.qty2 || []).length > 0; }
 function showQ2() { return item2Shown(); }
-/* 記事の頭の「15,10」で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
+/* 記事の頭の「15+10」で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
 function uchiOn() { return (S.map.qty1 || []).length > 0 && !item2Shown(); }
 
 /* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
@@ -1432,10 +1471,10 @@ function rowHtml(row) {
       cell(row, 'addr', edited(row, 'addr') ? val(row, 'addr') : row.auto.addr, 'c-addr') +
       cell(row, 'qty1', val(row, 'qty1'), 'w-num') +
       (showQ2() ? cell(row, 'qty2', val(row, 'qty2'), 'w-num') : '') +
-      '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
+      '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + (o.boxes >= 2 ? ' multi' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
-      '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto ? '指定日から自動で出しました' : '') + '">' +
+      '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.ship ? o.ship.slice(5) + '(' + weekday(o.ship) + ')' : cellText(val(row, 'ship'))) + '"></td>' +
       cell(row, 'due', o.due ? o.due.slice(5) + '(' + weekday(o.due) + ')' : cellText(val(row, 'due')), 'w-date') +
       '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
@@ -1742,6 +1781,12 @@ function bindEvents() {
       S.include = S.undoExcl.prev; S.undoExcl = null;
       recompute(); toast(n + '行を発行に戻しました');
       return;
+    }
+    const sh = t.closest && t.closest('th[data-sort]');
+    if (sh) {
+      const k = sh.dataset.sort;
+      S.sort = !S.sort || S.sort.key !== k ? {key: k, dir: 1} : S.sort.dir > 0 ? {key: k, dir: -1} : null;
+      renderRows(); return;
     }
     const vb = t.closest && t.closest('[data-view]');
     if (vb) { S.view = S.view === vb.dataset.view ? '' : vb.dataset.view; renderRows(); return; }

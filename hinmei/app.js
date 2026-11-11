@@ -5,7 +5,7 @@
    品名や「天地無用」を大きく入れる。
 
    ・PDFはこのブラウザの中で読んで描くだけ。どこにも送らない
-   ・「アテンション自動判別」だけは、品名欄で読んだ商品名を入数マスタに送って入数を聞く
+   ・「自動入力」だけは、品名欄で読んだ商品名を入数マスタに送って入数を聞く
      （住所や電話番号は送らない）
    ・文字の大きさ・折り方・塗る場所は、Python版（送り状_品名でかく.py）と同じ決まり
    ・元のページの中身には触らず、上に描き足すだけ（バーコード・QR・文字はそのまま）
@@ -408,8 +408,8 @@ function readBoxNo(pg) {
 /** 記事欄の内訳。印刷マンで箱を分けた届け先は、記事欄の頭に「20,15」が入る。無ければ null */
 function readUchi(g) {
   for (const t of S.src.pages[g.pages[0]].kiji) {
-    const m = t.normalize('NFKC').match(/^(\d+(?:\s*[,、]\s*\d+)+)(?!\d)/);
-    if (m) return m[1].split(/\s*[,、]\s*/).map(Number);
+    const m = t.normalize('NFKC').match(/^(\d+(?:\s*[,、+]\s*\d+)+)(?!\d)/);
+    if (m) return m[1].split(/\s*[,、+]\s*/).map(Number);
   }
   return null;
 }
@@ -1032,7 +1032,9 @@ function invalidateOut() {
 
 
 /* ================================================================
-   アテンション自動判別：品名欄の「商品名(総数)」と入数マスタで表を埋める
+   自動入力 (v22までの「アテンション自動判別」)：品名欄の「商品名(総数)」と入数マスタで表を埋める
+   ・送り状が1枚で商品が1つの届け先は、品名欄のまま「商品名(総数)」(入数マスタに無くてもよい)
+   ・記事欄の頭に「15+10」(印刷マンで箱を分けた届け先) があれば、何箱目かの順に1箱ずつ
    ================================================================ */
 async function askMaster(names) {
   const api = window.HINMEI_IRISU_API;
@@ -1109,7 +1111,7 @@ async function autofill(masterOverride) {
       if (rd.mismatch) notes.push(rd.mismatch + '枚目の品名欄が1枚目と違います。手で確かめてください');
       if (rd.junk.length) notes.push('品名欄に「商品名(数)」の形でない行があります：' + rd.junk.join(' / '));
       if (!rd.items.length) notes.push('品名欄から商品が読めませんでした');
-      // 記事欄に内訳(「20,15」)がある届け先は、何箱目かの順に「商品名(20)」「商品名(15)」を1枚ずつ入れる
+      // 記事欄に箱ごとの数(「15+10」)がある届け先は、何箱目かの順に「商品名(15)」「商品名(10)」を1枚ずつ入れる
       const ux = readUchi(g);
       let byUchi = false;
       if (ux && rd.items.length === 1) {
@@ -1129,6 +1131,13 @@ async function autofill(masterOverride) {
           byUchi = true;
         }
       }
+      // 送り状が1枚で商品が1つの届け先は、品名欄のまま「商品名(総数)」を入れる(入数は要らない)
+      if (!byUchi && g.pages.length === 1 && rd.items.length === 1 && !rd.mismatch) {
+        const it = rd.items[0];
+        g.rows = [{name: it.name + '(' + it.total + ')', per: '', total: '', count: '1', keep: false,
+                   fragile: (ans.fragile || []).indexOf(it.name) >= 0}];
+        byUchi = true;
+      }
       if (!byUchi) {
         g.rows = rd.items.map(it => ({
           name: it.name,
@@ -1137,7 +1146,7 @@ async function autofill(masterOverride) {
           fragile: (ans.fragile || []).indexOf(it.name) >= 0     // 入数マスタで「割れ物」にチェックがある商品
         }));
         rd.items.forEach(it => {
-          if (ans.missing.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタにありません。入数を手で入れてください');
+          if (ans.missing.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタにありません。箱ごとの数を手で入れてください(印刷マンの記事に「15+10」と入れておけば、ここは自動で入ります)');
           else if (ans.bad.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタの入数が数字ではありません');
         });
       }
