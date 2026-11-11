@@ -1192,7 +1192,7 @@ async function autofill(masterOverride) {
         const it = rd.items[0], nm = it.name + '(計' + it.total + ')';
         g.rows = [{name: nm, per: '', total: '', count: String(g.pages.length), keep: false,
                    fragile: (ans.fragile || []).indexOf(it.name) >= 0}];
-        notes.push('記事欄に箱ごとの数が無いので、' + g.pages.length + '枚全部に「' + nm + '」と入れました。箱ごとの数はペンで書くか、表で直してください');
+        notes.push('複数口なので、' + g.pages.length + '枚全部に「' + nm + '」と入れました。');   // 文は本人の言葉 (v29)
         byUchi = true;
       }
       if (!byUchi) {
