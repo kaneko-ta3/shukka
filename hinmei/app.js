@@ -29,8 +29,11 @@ const FRAGILE = {w: 5.7 * CM, sw: 4.2 * CM, sh: 3.2 * CM, steps: [30, 26, 22, 18
 // 右上の貼付票の「お届け先」と「品名」。左上の配達票は、子伝票だと住所が載らないので使わない
 const HARI_TODOKE = [330, 28, 540, 110];
 const HIN_FIELD = [340, 162, 520, 184];
-const KIJI_FIELD = [340, 186, 520, 216];   // 貼付票の記事欄
-const BOXNO_FIELD = [521, 185, 575, 212];  // 貼付票の「何箱目 / 箱の数」(例 2 / 7)
+// 貼付票の記事欄と「何箱目 / 箱の数」(例 2 / 7)。B2 の送り状は、刷り方によって全体が左に約8ptずれる
+// (ロゴなしの送り状で8.4pt。11/11 の発行分は何箱目の数字が x=514・542、前のサンプルは 522・551)。
+// 両方の位置で読めるよう、境目を 510 に置く (v33。前は 521 で、ずれた送り状の「1 / 2」の「1」が記事欄に入っていた)
+const KIJI_FIELD = [330, 186, 510, 216];
+const BOXNO_FIELD = [510, 185, 575, 212];
 const ADDR_LINE = /[都道府県市区町村郡]|様|御中|\d{2,4}-\d{2,4}-\d{3,4}|\d{3}-\d{4}/;
 const ITEM = /^(.+?)\s*[(（]\s*(\d+)\s*[)）]$/;
 
@@ -789,21 +792,37 @@ const MEMO_SIZE = 20, MEMO_GAP = 6;
 function fitIn(text, zone, fragile) {
   const nr = nameRect(zone, fragile);
   const mm = String(text).match(/^([\s\S]*?)\s*(【[^【】]*】)\s*$/);
-  const f = fitMain(mm && mm[1].trim() ? mm[1] : text, nr, fragile);
-  f.rect = nr; f.memo = null; f.lastX = null;
-  if (!mm || !mm[1].trim()) return f;
-  const memo = mm[2], ms = Math.min(MEMO_SIZE, Math.floor(f.size * 0.6)), mw = width(memo, ms);
-  const last = f.lines[f.lines.length - 1], lw = width(last, f.size);
-  const memoX = nr[2] - MARGIN - mw;
-  let lx = nr[0] + (nr[2] - nr[0] - lw) / 2;
-  if (lx + lw + MEMO_GAP > memoX) {
-    lx = memoX - MEMO_GAP - lw;
-    if (lx < nr[0] + MARGIN) return f;
-    f.lastX = lx;
+  const f0 = fitMain(mm && mm[1].trim() ? mm[1] : text, nr, fragile);
+  f0.rect = nr; f0.memo = null; f0.lastX = null;
+  if (!mm || !mm[1].trim()) return f0;
+  const main = mm[1], memo = mm[2];
+  /* 計が最後の行の右に入るか。入れば f に書き込んで true */
+  const place = f => {
+    const ms = Math.min(MEMO_SIZE, Math.floor(f.size * 0.6)), mw = width(memo, ms);
+    const last = f.lines[f.lines.length - 1], lw = width(last, f.size);
+    const memoX = nr[2] - MARGIN - mw;
+    let lx = nr[0] + (nr[2] - nr[0] - lw) / 2;
+    f.rect = nr; f.lastX = null;
+    if (lx + lw + MEMO_GAP > memoX) {
+      lx = memoX - MEMO_GAP - lw;
+      if (lx < nr[0] + MARGIN) return false;
+      f.lastX = lx;
+    }
+    const base = lineBases(f, nr);
+    f.memo = {text: memo, size: ms, x: memoX, base: base[base.length - 1]};
+    return true;
+  };
+  if (place(f0)) return f0;
+  /* 入らなければ、大きい字を1段ずつ小さくして入る形を探す (11/11 本人「文字サイズがでかいからじゃ」)。
+     「非常用 / トイレ(15)」47pt では入らず、「非常用トイレ / (15)」42pt なら入る、のような場合 */
+  const steps = fragile ? FRAGILE.steps : (SIZE_SET[S.size] || SIZE_SET.L);
+  for (const s of steps) {
+    if (s >= f0.size) continue;
+    const f = layout(main, nr, steps.filter(x => x <= s));
+    if (f.size < minFor(fragile)) break;
+    if (place(f)) return f;
   }
-  const base = lineBases(f, nr);
-  f.memo = {text: memo, size: ms, x: memoX, base: base[base.length - 1]};
-  return f;
+  return f0;   // 下限まで小さくしても入らない長い名前は、計を書かない (B2の品名欄に合計が刷られている)
 }
 function fitMain(text, rect, fragile) {
   if (!fragile) return layout(text, rect);
