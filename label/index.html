@@ -204,7 +204,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v55</span>
+  <span class="ver">v56</span>
 </header>
 
 <main>
@@ -252,13 +252,9 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <section id="step3" hidden>
     <h2><span class="n">3</span>確認・手直し</h2>
     <div class="s3help tiny muted">
-      <div>行は左端の □ で選びます(Shiftを押しながらで範囲)。</div>
-      <div>セルはそのまま書き換えられます(Enterで下、Tabで右。Shiftを押しながらで上・左)。</div>
-      <div>手で直したセルは青くなり、元の値はマウスを乗せると出ます。</div>
       <div>見出しをクリックすると並べ替えます(昇順→降順→元の順。CSVの順は変わりません)。</div>
-      <div>出荷日が空欄なら、今日の日付か可能な日付が自動で入力されます。</div>
       <div>個口が2以上は赤字。</div>
-      <div>記事に「15+10」のように箱ごとの数だけを入れると、送り状が2枚になります(箱ごとの数は余白書き換えで書きます)。</div>
+      <div>記事に「15+10+10」のように箱ごとの数だけを入れると、送り状が自動的に複数個口になります。</div>
     </div>
     <div class="bar" id="summary"></div>
     <div id="bulk">
@@ -319,8 +315,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=55"></script>
-<script src="app.js?v=55"></script>
-<script src="issued.js?v=55"></script>
+<script src="addr.js?v=56"></script>
+<script src="app.js?v=56"></script>
+<script src="issued.js?v=56"></script>
 </body>
 </html>
