@@ -64,7 +64,7 @@ label.kind:has(input:checked){border-color:var(--accent); background:var(--accen
 label.mk{display:inline-flex; gap:5px; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:6px; cursor:pointer; background:var(--ground);}
 label.mk:has(input:checked){border-color:var(--accent); background:var(--accent-soft);}
 .freetext{background:var(--ground); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:5px 8px; font:inherit; width:16em;}
-.sizes{margin-left:auto; display:inline-flex; gap:10px; align-items:center; font-size:13px;}
+.sizes{display:inline-flex; gap:10px; align-items:center; font-size:13px;}
 .sizes label{display:inline-flex; gap:3px; align-items:center; cursor:pointer;}
 
 /* 3 品名と枚数 */
@@ -74,6 +74,11 @@ label.mk:has(input:checked){border-color:var(--accent); background:var(--accent-
 .gh .cnt{color:var(--accent); font-weight:700;}
 .ga{margin:2px 0 6px;}
 .gf{display:flex; gap:16px; align-items:center; margin-top:6px;}
+/* 見本は表の右 (v26 本人「見本は右に出してほしい」)。狭い画面では下 */
+.gbody{display:grid; grid-template-columns:auto minmax(200px, 1fr); gap:20px; align-items:start;}
+.gbody > details.sk{margin-top:0;}
+@media (max-width: 1100px){ .gbody{display:block;} .gbody > details.sk{margin-top:8px;} }
+#autoMsg .jump{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
 .total{font-weight:700;}
 table.rows{border-collapse:collapse; margin-top:4px;}
 table.rows th{font-weight:400; font-size:12px; color:var(--muted); text-align:left; padding:2px 6px; white-space:nowrap;}
@@ -126,7 +131,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v25</span>
+  <span class="ver">v26</span>
 </header>
 
 <main>
@@ -168,8 +173,10 @@ details.sk summary{cursor:pointer;}
   <section id="secRows" hidden>
     <h2><span class="n">3</span>品名と枚数</h2>
     <div class="btns">
-      <button class="btn" id="autoBtn">自動入力</button>
+      <button class="btn primary" id="autoBtn">自動入力</button>
       <span class="tiny muted">送り状から読んで、下の表を埋めます。1枚の届け先は品名欄のまま入れます。記事欄に「15+10」「20*4+5」のような箱ごとの数 (印刷マンで箱を分けた届け先) があれば、1箱ずつ入れます</span>
+    </div>
+    <div class="btns" style="margin-top:8px">
       <span class="sizes">文字の大きさ
         <label><input type="radio" name="size" value="L" checked>大</label>
         <label><input type="radio" name="size" value="M">中</label>
@@ -221,8 +228,8 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=25"></script>
-<script src="app.js?v=25"></script>
+<script src="config.js?v=26"></script>
+<script src="app.js?v=26"></script>
 <script>if (new URLSearchParams(location.search).get('from') === 'label') document.getElementById('fromLabel').hidden = false;</script>
 <script>
 /* 並び順 (v25)。選んだ方はブラウザに残します */

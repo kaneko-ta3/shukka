@@ -559,7 +559,7 @@ async function openPdf(bytes, name) {
                       'ヤマトの送り状（A5）のPDFか確かめてください');
     }
     S.src = {name: name, bytes: bytes, pages: pages, groups: groupPages(pages)};
-    S.src.groups.forEach(g => { g.rows = [blankRow(), blankRow()]; g.status = null; });
+    S.src.groups.forEach(g => { g.rows = [blankRow()]; g.status = null; });
     S.logo = null;
     renderFile();
     renderGroups();
@@ -673,6 +673,28 @@ function setMsg(sel, text, cls) {
 /* ================================================================
    画面：3 品名と枚数（届け先ごと）
    ================================================================ */
+/* 自動入力のあとのお知らせ。全部で何件、何件埋まったか、直す届け先はどれかを出し、名前を押すとその表へ飛ぶ (v26) */
+function autoResult(groups) {
+  const bad = groups.map((g, gi) => ({g, gi})).filter(x => x.g.status && x.g.status.length);
+  const el = $('#autoMsg');
+  if (!bad.length) { setMsg('#autoMsg', groups.length + '件すべて埋めました。見本を確かめて「PDFを作る」へ進んでください', 'ok'); return; }
+  el.className = 'notice warn';
+  el.hidden = false;
+  el.innerHTML = '<div>' + groups.length + '件中 ' + (groups.length - bad.length) + '件を埋めました。残りの ' + bad.length +
+    '件は、黄色の枠に書いた理由を見て、表を手で直してください。</div>' +
+    '<div class="jump">' + bad.map(x => '<button type="button" class="btn small" data-jump="' + x.gi + '">' +
+      esc(x.g.name || '(届け先名なし)') + '</button>').join('') + '</div>';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-jump]');
+  if (!b) return;
+  const gEl = $('.group[data-gi="' + b.dataset.jump + '"]');
+  if (!gEl) return;
+  gEl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  const ta = $('textarea', gEl);
+  if (ta) setTimeout(() => ta.focus({preventScroll: true}), 400);
+});
+
 function blankRow() { return {name: '', per: '', total: '', count: '', keep: false, fragile: false}; }
 
 function renderGroups() {
@@ -691,6 +713,7 @@ function renderGroups() {
       (g.slipTag ? '<span class="muted tiny">' + esc(g.slipTag) + '</span>' : '') + '</div>' +
       (addr.trim() ? '<div class="ga tiny muted">' + esc(addr) + '</div>' : '') +
       '<div class="gs" hidden></div>' +
+      '<div class="gbody"><div class="gmain">' +
       '<table class="rows"><thead><tr>' +
       '<th class="c-name" rowspan="2">商品名 / 入れたい文字列</th><th class="c-num" rowspan="2">枚数</th>' +
       '<th class="c-keep" rowspan="2">そのまま</th>' +
@@ -700,9 +723,9 @@ function renderGroups() {
       '<th class="c-num opt-l">1箱の入数</th><th class="c-num">総数</th>' +
       '</tr></thead><tbody></tbody></table>' +
       '<div class="gf"><button class="btn small" data-act="add">＋ 入力欄を追加</button>' +
-      '<span class="total"></span></div>' +
-      '<details class="sk" open><summary class="tiny muted">見本（入力に合わせてすぐ変わります。最後はPDFを作ったあとのプレビューで確かめてください）</summary>' +
-      '<div class="skgrid"></div></details>';
+      '<span class="total"></span></div></div>' +
+      '<details class="sk" open><summary class="tiny muted">見本（入力に合わせてすぐ変わります）</summary>' +
+      '<div class="skgrid"></div></details></div>';
     box.appendChild(el);
     renderRows(gi);
     if (!multi) el.classList.add('single');
@@ -1094,7 +1117,7 @@ function bulkFill() {
                                                     String(r.total).trim() || String(r.count).trim() || r.keep));
   if (filled && !confirm('入力済みの内容を、全部「' + text + '」に置き換えます。よろしいですか？')) return;
   s.groups.forEach(g => {
-    g.rows = [Object.assign(blankRow(), {name: text, count: String(g.pages.length)}), blankRow()];
+    g.rows = [Object.assign(blankRow(), {name: text, count: String(g.pages.length)})];
     g.status = null;
   });
   renderGroups();
@@ -1173,8 +1196,7 @@ async function autofill(masterOverride) {
           else if (ans.bad.indexOf(it.name) >= 0) notes.push('「' + it.name + '」は入数マスタの入数が数字ではありません');
         });
       }
-      if (!g.rows.length) g.rows = [blankRow()];
-      g.rows.push(blankRow());
+      if (!g.rows.length) g.rows = [blankRow()];   // 空の欄は足さない。足すときは「＋ 入力欄を追加」(v26)
       const got = g.rows.map(rowInfo).reduce((n, x) => n + (x.count || 0), 0);
       const allKnown = rd.items.length && rd.items.every(it => ans.found[it.name] !== undefined);
       if (!byUchi && !notes.length && allKnown && got !== g.pages.length) {
@@ -1192,8 +1214,7 @@ async function autofill(masterOverride) {
         box.hidden = false;
       }
     });
-    setMsg('#autoMsg', problems ? '読めたところまで埋めました。黄色の注意を見て、足りないところを手で直してください'
-                                : '品名欄と入数マスタから埋めました。内容を確かめて「PDFを作る」へ', problems ? 'warn' : 'ok');
+    autoResult(s.groups);
     invalidateOut();
   } catch (e) {
     setMsg('#autoMsg', e.message || String(e), 'err');
