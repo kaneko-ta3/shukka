@@ -1375,7 +1375,7 @@ function renderSummary() {
   btn.disabled = block.length > 0;
   /* 箱を分けた届け先があれば、④に余白書き換えの案内を出します */
   const nUchi = inc.filter(r => r.out.uchi && r.out.uchi.length >= 2).length;
-  $('#uchiNote').hidden = !nUchi; $('#uchiCount').textContent = nUchi;
+  $('#uchiNote').hidden = !nUchi;
   /* 要修正が残っているときは、ここからもまとめて除外できるようにします */
   $('#dlWhy').innerHTML = esc(block.join('　／　')) +
     ' ' + exclBadBtn('btn small', '要修正の ' + nBad + '件を除外する') + ' ' + undoExclBtn('btn small');
