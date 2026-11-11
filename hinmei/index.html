@@ -68,9 +68,9 @@ label.mk:has(input:checked){border-color:var(--accent); background:var(--accent-
 .sizes label{display:inline-flex; gap:3px; align-items:center; cursor:pointer;}
 
 /* 3 品名と枚数 */
-.group{border-top:1px solid var(--line); padding:12px 0 6px; margin-top:10px;}
-.group:first-child{border-top:none; margin-top:0;}
-.gh{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; font-size:15px;}
+/* 届け先ごとの区切り。1件目も含めて見出しの上に太めの線を引き、ここから1件分と分かるように (v27 本人) */
+.group{border-top:2px solid var(--line-strong); padding:12px 0 6px; margin-top:18px;}
+.gh{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; font-size:16px;}
 .gh .cnt{color:var(--accent); font-weight:700;}
 .ga{margin:2px 0 6px;}
 .gf{display:flex; gap:16px; align-items:center; margin-top:6px;}
@@ -131,7 +131,7 @@ details.sk summary{cursor:pointer;}
   <h1>送り状 余白書き換え</h1>
   <span class="tiny muted">ヤマトの送り状PDF（A5）の左下に、品名や天地無用を大きく入れます。PDFはこのブラウザの中で読んで描くだけで、どこにも送りません。</span>
   <!-- 版番号。push するたびに上げます（出荷ボード・ラベルとは別に数えます） -->
-  <span class="ver">v26</span>
+  <span class="ver">v27</span>
 </header>
 
 <main>
@@ -228,8 +228,8 @@ details.sk summary{cursor:pointer;}
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/fontkit.umd.min.js"></script>
-<script src="config.js?v=26"></script>
-<script src="app.js?v=26"></script>
+<script src="config.js?v=27"></script>
+<script src="app.js?v=27"></script>
 <script>if (new URLSearchParams(location.search).get('from') === 'label') document.getElementById('fromLabel').hidden = false;</script>
 <script>
 /* 並び順 (v25)。選んだ方はブラウザに残します */
