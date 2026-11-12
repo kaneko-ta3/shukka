@@ -1287,8 +1287,46 @@ function renderRows() {
       if (focusSel && el.setSelectionRange) { try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch (e) { /* 選べない欄 */ } }
     }
   }
+  fitCols();
   renderPreview();
 }
+
+/* お届け先名と備考(住所4)の幅を中身に合わせ、余りは住所へ回します (v66 本人「お届け先名こんなに固定で長くなくていい」)。
+   表の枠に入らないときは、下限 (お届け先名100・備考90・住所180) まで縮め、入らない分は「…」 */
+const FIT = {name: {min: 100, max: 360}, memo: {min: 90, max: 300}, addrMin: 180};
+let fitCanvas = null;
+function fitCols() {
+  const tbl = document.querySelector('#rowsTable table.rows');
+  const box = $('#rowsTable');
+  if (!tbl || !box.clientWidth) return;
+  const th = k => tbl.querySelector('thead th[data-sort="' + k + '"]');
+  const thN = th('name'), thM = th('memo'), thA = th('addr');
+  if (!thN || !thM || !thA) return;
+  fitCanvas = fitCanvas || document.createElement('canvas');
+  const cx = fitCanvas.getContext('2d');
+  const want = k => {
+    const ins = tbl.querySelectorAll('[data-cell$=":' + k + '"]');
+    if (ins.length) cx.font = getComputedStyle(ins[0]).font;
+    let w = 0;
+    ins.forEach(i => { w = Math.max(w, cx.measureText(i.value).width); });
+    cx.font = getComputedStyle(th(k)).font;
+    const head = cx.measureText(th(k).textContent).width + 10;
+    return Math.min(FIT[k].max, Math.max(FIT[k].min, Math.ceil(w) + 18, Math.ceil(head)));
+  };
+  const wN = want('name'), wM = want('memo');
+  let fixed = 0;
+  tbl.querySelectorAll('thead th').forEach(t => { if (t !== thN && t !== thM && t !== thA) fixed += t.getBoundingClientRect().width; });
+  const room = box.clientWidth - 2 - fixed - FIT.addrMin;
+  let n = wN, m = wM;
+  if (n + m > room) {
+    const spare = Math.max(0, room - FIT.name.min - FIT.memo.min), need = (wN - FIT.name.min) + (wM - FIT.memo.min);
+    n = FIT.name.min + Math.floor(need ? spare * (wN - FIT.name.min) / need : 0);
+    m = FIT.memo.min + Math.floor(need ? spare * (wM - FIT.memo.min) / need : 0);
+  }
+  [[thN, n], [thM, m]].forEach(([t, w]) => { t.style.minWidth = w + 'px'; t.style.width = '1%'; });
+}
+let fitRaf = 0;
+window.addEventListener('resize', () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitCols); });
 
 /* 指定した行だけ描き直します */
 function updateRows(srcs) {
@@ -1304,6 +1342,7 @@ function updateRows(srcs) {
     const el = document.querySelector('[data-cell="' + focus + '"]');
     if (el) el.focus();
   }
+  fitCols();
   renderPreview();
 }
 
@@ -1500,7 +1539,8 @@ function rowHtml(row) {
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.shipAuto ? '' : (o.ship ? md(o.ship) : cellText(val(row, 'ship')))) + '"' +
           (o.shipAuto ? ' placeholder="' + esc(md(o.ship)) + '"' : '') + '>' + cal(row, 'ship', o.ship) + '</td>' +
-      cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date', '', cal(row, 'due', o.due)) +
+      /* 指定日が空の行は、確かめるよう黄色めにします (v66 本人) */
+      cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date' + (inn && !o.due && !cellText(val(row, 'due')) ? ' nodue' : ''), '', cal(row, 'due', o.due)) +
       '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
         CFG.TIMES.map(([v, l]) => '<option value="' + v + '"' + (o.time === v ? ' selected' : '') + '>' + l + '</option>').join('') +
         (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '(読めません)</option>' : '') +
