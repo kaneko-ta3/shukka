@@ -1423,6 +1423,11 @@ function renderSummary() {
   /* 幅は固定。選んでも右のボタンが動かないように、文字の長さを変えません */
   $('#selInfo').textContent = '選択 ' + S.sel.size + '行';
   $('#bulk').classList.toggle('dim', !S.sel.size);
+  /* 指定日が空の行があれば、一括の欄の「指定日」を黄色にします (v67 本人) */
+  const noDue = S.rows.filter(r => included(r) && r.out && !r.out.due && !cellText(val(r, 'due'))).length;
+  $('#dueLbl').classList.toggle('nodue', noDue > 0);
+  $('#vDue').classList.toggle('nodue', noDue > 0);
+  $('#dueLbl').title = noDue ? '指定日が空の行が ' + noDue + '行あります' : '';
 
   const all = $('#selAll');
   if (all) all.checked = visibleRows().length > 0 && visibleRows().every(r => S.sel.has(r.src));
@@ -1539,8 +1544,7 @@ function rowHtml(row) {
       '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.shipAuto ? '' : (o.ship ? md(o.ship) : cellText(val(row, 'ship')))) + '"' +
           (o.shipAuto ? ' placeholder="' + esc(md(o.ship)) + '"' : '') + '>' + cal(row, 'ship', o.ship) + '</td>' +
-      /* 指定日が空の行は、確かめるよう黄色めにします (v66 本人) */
-      cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date' + (inn && !o.due && !cellText(val(row, 'due')) ? ' nodue' : ''), '', cal(row, 'due', o.due)) +
+      cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date', '', cal(row, 'due', o.due)) +
       '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
         CFG.TIMES.map(([v, l]) => '<option value="' + v + '"' + (o.time === v ? ' selected' : '') + '>' + l + '</option>').join('') +
         (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '(読めません)</option>' : '') +

@@ -164,7 +164,9 @@ table.rows td input:not([type=checkbox]){text-overflow:ellipsis;}
 table.rows td input:not([type=checkbox]):hover, table.rows td select:hover{border-color:var(--line);}
 table.rows td.edited input, table.rows td.edited select{background:var(--edit-soft); border-color:var(--edit);}
 table.rows td.filledzip input, table.rows td.autofix input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
-table.rows td.nodue input{background:var(--warn-soft); border-color:var(--warn);}   /* 指定日が空 (v66) */
+/* 指定日が空の行があるときは、一括の欄の「指定日」と「年/月/日」を黄色に (v67 本人。v66 で表のセルを黄色にしたのはやめた) */
+#bulk #dueLbl.nodue{color:var(--warn); font-weight:700;}
+#vDue.nodue::-webkit-datetime-edit{color:var(--warn);}
 table.rows td.filled input{font-style:italic; color:var(--muted);}
 table.rows td.auto input{color:var(--faint);}
 table.rows td input::placeholder{color:var(--faint); opacity:1;}
@@ -210,7 +212,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v66</span>
+  <span class="ver">v67</span>
 </header>
 
 <main>
@@ -269,7 +271,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
       <span class="sep"></span>
       出荷日 <input type="date" id="vShip" title="選んだ時点で、選択中の行に入ります">
       <span class="sep"></span>
-      指定日 <input type="date" id="vDue" title="選んだ時点で、選択中の行に入ります">
+      <span id="dueLbl">指定日</span> <input type="date" id="vDue" title="選んだ時点で、選択中の行に入ります">
       <span class="sep"></span>
       時間指定 <select id="vTime" title="選んだ時点で、選択中の行に入ります"></select>
       <span class="sep"></span>
@@ -326,8 +328,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=66"></script>
-<script src="app.js?v=66"></script>
-<script src="issued.js?v=66"></script>
+<script src="addr.js?v=67"></script>
+<script src="app.js?v=67"></script>
+<script src="issued.js?v=67"></script>
 </body>
 </html>
