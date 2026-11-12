@@ -178,9 +178,10 @@ table.rows tr.msg td{border-bottom:1px solid var(--line); padding:2px 6px 8px; f
 table.rows tr.msg.bad td, table.rows tr.msg.chk td{background:transparent;}
 .c-sel, .c-inc{width:28px; text-align:center;}
 .c-rn{width:48px; color:var(--muted); white-space:nowrap;}
-.c-addr{min-width:340px;}
+/* お届け先名・備考・住所の下限は、幅1300の画面で表が横にはみ出さない大きさ (v65。前は下限の合計が約1460pxで、記事の列が隠れた)。余りはお届け先名と住所へ */
+.c-addr{min-width:180px;}
 /* 狭い画面でも電話・〒・日付・時間が切れないよう、下限の幅を決めます(入りきらなければ表を横に送る) */
-.w-name{min-width:200px;} .w-memo{min-width:150px;} .w-tel{min-width:104px;} .w-zip{min-width:78px;}
+.w-name{min-width:140px;} .w-memo{min-width:150px;} td.w-memo.c-memo, th.c-memo{min-width:90px;} .w-tel{min-width:104px;} .w-zip{min-width:78px;}
 .w-num{min-width:44px;} .w-date{min-width:84px;} .w-time{min-width:100px;}
 table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-num, table.rows td.w-date, table.rows td.w-time{width:1%;}
 .undo{background:none; border:none; color:var(--edit); cursor:pointer; padding:0 2px; font-size:13px;}
@@ -208,7 +209,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v64</span>
+  <span class="ver">v65</span>
 </header>
 
 <main>
@@ -324,8 +325,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=64"></script>
-<script src="app.js?v=64"></script>
-<script src="issued.js?v=64"></script>
+<script src="addr.js?v=65"></script>
+<script src="app.js?v=65"></script>
+<script src="issued.js?v=65"></script>
 </body>
 </html>

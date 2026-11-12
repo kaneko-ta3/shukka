@@ -1486,7 +1486,7 @@ function rowHtml(row) {
       (o.nameFit && !edited(row, 'name')
         ? '<td class="w-name autofix" title="入らないので縮めました(元：' + esc(nameAuto) + ')"><input data-cell="' + row.src + ':name" value="' + esc(o.name) + '"></td>'
         : cell(row, 'name', nameShown, 'w-name')) +
-      cell(row, 'memo', memoShown, 'w-memo') +
+      cell(row, 'memo', memoShown, 'w-memo c-memo') +
       cell(row, 'tel', edited(row, 'tel') ? val(row, 'tel') : o.tel, 'w-tel') +
       (o.zipFilled && !edited(row, 'zip')
         ? '<td class="w-zip filledzip" title="住所から入れました(元の〒：' + esc(o.zipFilled) + ')"><input data-cell="' + row.src + ':zip" value="' + esc(o.zip) + '"></td>'
