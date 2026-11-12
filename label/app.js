@@ -1556,7 +1556,8 @@ function rowHtml(row) {
       cell(row, 'qty1', val(row, 'qty1'), 'w-num') +
       (showQ2() ? cell(row, 'qty2', val(row, 'qty2'), 'w-num') : '') +
       '<td class="w-num' + ec('boxes') + (edited(row, 'boxes') ? ' edited' : '') + (o.boxes >= 2 ? ' multi' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
-        '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
+        /* 手で入れた値はそのまま見せます (v69。前は 0 のような使えない値を入れると、エラーは出るのにセルには自動の 1 が出ていた) */
+        '<input data-cell="' + row.src + ':boxes" value="' + esc(edited(row, 'boxes') ? val(row, 'boxes') : o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
       '<td class="w-date' + ec('ship') + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.shipAuto ? '' : (o.ship ? md(o.ship) : cellText(val(row, 'ship')))) + '"' +
