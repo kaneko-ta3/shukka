@@ -1370,8 +1370,9 @@ function renderSummary() {
   const sumQ = k => inc.reduce((a, r) => { const n = num(r.out[k]); return a + (isNaN(n) ? 0 : n); }, 0);
   const excl = S.rows.length - inc.length;
   const nBad = inc.filter(r => r.err.some(e => e !== 'check')).length;
-  /* 要修正をまとめて除外するボタン。除外すると1件も残らないときは押せなくします */
-  const exclBadBtn = (cls, label) => !nBad ? '' : nBad >= inc.length
+  /* 要修正をまとめて除外するボタン。「要修正」を押して要修正の行だけを出しているときだけ出します(行を見てから除外するため。v68 本人)。
+     除外すると1件も残らないときは押せなくします */
+  const exclBadBtn = (cls, label) => !nBad || S.view !== 'bad' ? '' : nBad >= inc.length
     ? '<button type="button" class="' + cls + '" disabled title="全部の行が要修正なので、まとめて除外すると1件も残りません。先に直してください">' + label + '</button>'
     : '<button type="button" class="' + cls + '" data-excl-bad="1" title="要修正の行の発行のチェックをまとめて外します。すぐ横の「取り消す」で戻せます">' + label + '</button>';
   /* 直前のまとめて除外を取り消すボタン */
@@ -1415,7 +1416,7 @@ function renderSummary() {
   /* 箱を分けた届け先があれば、④に余白書き換えの案内を出します */
   const nUchi = inc.filter(r => r.out.uchi && r.out.uchi.length >= 2).length;
   $('#uchiNote').hidden = !nUchi;
-  /* 要修正が残っているときは、ここからもまとめて除外できるようにします */
+  /* 要修正の行だけを出しているときは、ここからもまとめて除外できるようにします */
   $('#dlWhy').innerHTML = esc(block.join('　／　')) +
     ' ' + exclBadBtn('btn small', '要修正の ' + nBad + '件を除外する') + ' ' + undoExclBtn('btn small');
 
@@ -1500,14 +1501,30 @@ function parseUchi(s) {
 /* 記事の箱ごとの数で箱を分けるか。商品1の数量の列を選んでいて、商品2を開いていないとき */
 function uchiOn() { return (S.map.qty1 || []).length > 0 && !item2Shown(); }
 
+/* 要修正の文から、どのセルの問題かを決めます(そのセルを黄色の地にする。v68 本人「エラー出てるセルは黄色に」) */
+const ERR_KEYS = [
+  [/^お届け先名/, ['name']], [/^住所が空/, ['addr']], [/^〒/, ['zip']],
+  [/^商品1の/, ['qty1']], [/^商品2の/, ['qty2']], [/^数量がどれも0/, ['qty1', 'qty2']],
+  [/^記事/, ['memo2']], [/^個口数/, ['boxes']],
+  [/^出荷日が指定日/, ['ship', 'due']], [/^指定日/, ['due']], [/^出荷日/, ['ship']], [/^時間指定/, ['time']],
+];
+function errKeys(row) {
+  const ks = new Set();
+  if (!included(row)) return ks;
+  row.err.forEach(e => { const hit = ERR_KEYS.find(([re]) => re.test(e)); if (hit) hit[1].forEach(k => ks.add(k)); });
+  return ks;
+}
+
 /* 1行ぶんの HTML(本体の行と、問題・お知らせの行) */
 function rowHtml(row) {
+  const ek = errKeys(row);
+  const ec = key => ek.has(key) ? ' errcell' : '';
   const cols = 14 + (showQ2() ? 1 : 0);
   const cell = (row, key, shown, cls, extra, after) => {
     const ed = edited(row, key);
     const orig = row.auto[key];
     const title = ed ? '元の値：' + (cellText(orig) || '(空)') : (row.filledKeys.has(key) ? '上の値で埋めました' : '');
-    return '<td class="' + (cls || '') + (ed ? ' edited' : '') + (row.filledKeys.has(key) && !ed ? ' filled' : '') + '"' +
+    return '<td class="' + (cls || '') + ec(key) + (ed ? ' edited' : '') + (row.filledKeys.has(key) && !ed ? ' filled' : '') + '"' +
       (title ? ' title="' + esc(title) + '"' : '') + '><input data-cell="' + row.src + ':' + key + '" value="' + esc(shown) + '"' + (extra || '') + '>' + (after || '') + '</td>';
   };
   /* 日付のセルのカレンダー。見えない日付の欄を重ねておき、セルを押したらそのカレンダーを出します */
@@ -1538,14 +1555,14 @@ function rowHtml(row) {
       cell(row, 'addr', edited(row, 'addr') ? val(row, 'addr') : row.auto.addr, 'c-addr') +
       cell(row, 'qty1', val(row, 'qty1'), 'w-num') +
       (showQ2() ? cell(row, 'qty2', val(row, 'qty2'), 'w-num') : '') +
-      '<td class="w-num' + (edited(row, 'boxes') ? ' edited' : '') + (o.boxes >= 2 ? ' multi' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
+      '<td class="w-num' + ec('boxes') + (edited(row, 'boxes') ? ' edited' : '') + (o.boxes >= 2 ? ' multi' : '') + '" title="' + (edited(row, 'boxes') ? '自動なら ' + o.boxesAuto : '自動') + '">' +
         '<input data-cell="' + row.src + ':boxes" value="' + esc(o.boxes) + '">' +
         (edited(row, 'boxes') && o.boxesAuto !== o.boxes ? '<div class="tiny muted">自動 ' + o.boxesAuto + '</div>' : '') + '</td>' +
-      '<td class="w-date' + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
+      '<td class="w-date' + ec('ship') + (edited(row, 'ship') ? ' edited' : '') + (o.shipAuto ? ' auto' : '') + '" title="' + (o.shipAuto === 'today' ? '空欄なので今日の日付にしました' : o.shipAuto === 'back' ? '今日だと指定日が' + CFG.SHIP_MAX_DAYS + '日後以上になりB2で弾かれるので、指定日から逆算しました' : '') + '">' +
         '<input data-cell="' + row.src + ':ship" value="' + esc(o.shipAuto ? '' : (o.ship ? md(o.ship) : cellText(val(row, 'ship')))) + '"' +
           (o.shipAuto ? ' placeholder="' + esc(md(o.ship)) + '"' : '') + '>' + cal(row, 'ship', o.ship) + '</td>' +
       cell(row, 'due', o.due ? md(o.due) : cellText(val(row, 'due')), 'w-date', '', cal(row, 'due', o.due)) +
-      '<td class="w-time' + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
+      '<td class="w-time' + ec('time') + (edited(row, 'time') ? ' edited' : '') + '"><select data-cell="' + row.src + ':time">' +
         CFG.TIMES.map(([v, l]) => '<option value="' + v + '"' + (o.time === v ? ' selected' : '') + '>' + l + '</option>').join('') +
         (o.time === '' && val(row, 'time') && normTime(val(row, 'time')) === null ? '<option selected>' + esc(val(row, 'time')) + '(読めません)</option>' : '') +
         '</select></td>' +

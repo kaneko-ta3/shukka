@@ -163,6 +163,8 @@ table.rows td input:not([type=checkbox]), table.rows td select{width:100%; backg
 table.rows td input:not([type=checkbox]){text-overflow:ellipsis;}
 table.rows td input:not([type=checkbox]):hover, table.rows td select:hover{border-color:var(--line);}
 table.rows td.edited input, table.rows td.edited select{background:var(--edit-soft); border-color:var(--edit);}
+/* 要修正の文が指しているセル (v68 本人「エラー出てるセルは黄色に」)。手で直した青より上に出します */
+table.rows td.errcell input, table.rows td.errcell select{background:var(--warn-soft); border-color:var(--warn);}
 table.rows td.filledzip input, table.rows td.autofix input{background:var(--warn-soft); border-color:var(--warn); color:var(--warn);}
 /* 指定日が空の行があるときは、一括の欄の「指定日」と「年/月/日」を黄色に (v67 本人。v66 で表のセルを黄色にしたのはやめた) */
 #bulk #dueLbl.nodue{color:var(--warn); font-weight:700;}
@@ -212,7 +214,7 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
   <span class="tiny muted">別紙のExcelから、B2に上げるCSVを作ります。別紙はこのブラウザの中で読むだけで、どこにも送りません。</span>
   <span class="tiny muted" id="dataVer"></span>
   <!-- 版番号。push するたびに上げます(出荷ボードとは別に数えます) -->
-  <span class="ver">v67</span>
+  <span class="ver">v68</span>
 </header>
 
 <main>
@@ -328,8 +330,8 @@ table.rows td.w-memo, table.rows td.w-tel, table.rows td.w-zip, table.rows td.w-
 
 <!-- ?v= は右上の版番号と同じにします。古いJSがブラウザに残って、新しい画面と食い違わないように -->
 <script src="vendor/xlsx.full.min.js"></script>
-<script src="addr.js?v=67"></script>
-<script src="app.js?v=67"></script>
-<script src="issued.js?v=67"></script>
+<script src="addr.js?v=68"></script>
+<script src="app.js?v=68"></script>
+<script src="issued.js?v=68"></script>
 </body>
 </html>
