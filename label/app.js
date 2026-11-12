@@ -1789,6 +1789,20 @@ function bindEvents() {
       return;
     }
   });
+  /* テンキーの「,」(キーボードの設定で置いたテンキー用のカンマ) が入らないことがあるので、画面の側で「,」を入れます (v71 本人。
+     ほかの画面では打てて、印刷マンの欄だけ入らなかった)。日本語入力で変換している途中は触りません */
+  document.addEventListener('keydown', e => {
+    const t = e.target;
+    const isComma = e.code === 'NumpadComma' || e.key === 'Separator' || e.keyCode === 108 || e.keyCode === 194;
+    if (!isComma || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+    const textLike = t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && (t.type === 'text' || t.type === 'search')));
+    if (!textLike || t.readOnly || t.disabled) return;
+    e.preventDefault();
+    const a = t.selectionStart, b = t.selectionEnd;
+    t.setRangeText(',', a, b, 'end');
+    t.dispatchEvent(new Event('input', {bubbles: true}));
+  }, true);
+
   /* 表の中は Enter で下、Tab で右(Shift を押しながらで上・左)。行の右端の Tab は次の行の左端へ */
   document.addEventListener('keydown', e => {
     const t = e.target;
