@@ -155,7 +155,8 @@ function asc(s) {
   let out = '';
   for (const c of String(s == null ? '' : s)) {
     const code = c.charCodeAt(0);
-    if (code >= 0xFF01 && code <= 0xFF5E) { out += String.fromCharCode(code - 0xFEE0); continue; }
+    /* 全角の「，」は半角にしません (v70 本人「半角も全角も変換しないがいい」) */
+    if (code >= 0xFF01 && code <= 0xFF5E && c !== '，') { out += String.fromCharCode(code - 0xFEE0); continue; }
     if (c === '　') { out += ' '; continue; }
     let i = KANA_F.indexOf(c);
     if (i >= 0) { out += KANA_H[i]; continue; }
@@ -218,7 +219,7 @@ function applyMaster(s) {
 /* 照合と出力に使う住所。半角にして住所マスタを掛けたもの */
 function addrNorm(row) {
   const a = String(val(row, 'addr') || '').replace(/\s+/g, ' ').trim();
-  return applyMaster(asc(a.replace(/,/g, '，')));
+  return applyMaster(asc(a));   // 「,」は半角も全角もそのまま (v70 本人「変換しないがいい」。B2 は " で囲んだ「1,2」を取り込めた)
 }
 
 /* 〒。「NNN-NNNN」にします。6桁は頭の0落ちとみなします */
@@ -797,7 +798,7 @@ function computeRow(row) {
 
   /* 補った県・市(全角)にも同じ変換を掛けます */
   /* ケ／ヶは郵便番号データの正式な書き方にそろえます(保土ヶ谷区→保土ケ谷区、駒ケ根市→駒ヶ根市 など) */
-  let addrA = Addr.canonKe(applyMaster(asc(addr.replace(/,/g, '，'))), check && check.towns);
+  let addrA = Addr.canonKe(applyMaster(asc(addr)), check && check.towns);
   /* 「福岡市福岡市東区」「岩国市岩国市南岩国町」のように市区町村名が2回続いていたら1つにします */
   if (check && check.cities) {
     const names = [];
