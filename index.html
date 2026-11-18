@@ -309,6 +309,10 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
   font:inherit; font-size:13.5px; line-height:1.5; min-height:1.5em;
   user-select:text; -webkit-user-select:text; cursor:text;}
 .t-memo textarea::placeholder{color:var(--line-strong)}
+/* ★v120 書いてあるメモは、まず読む表示で出します。押すと書く欄に替わります */
+.t-memo textarea[hidden]{display:none}
+.t-memo .memo-view{font-size:13.5px; line-height:1.5; min-height:1.5em; white-space:pre-wrap;
+  overflow-wrap:anywhere; color:var(--ink); cursor:text; outline:0;}
 .t-memo:focus-within{border-style:solid; border-color:var(--memo);}
 .t-memo.busy{opacity:.6}
 .t-memo.unsaved{border-color:var(--danger)}
@@ -474,7 +478,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v119";
+const BUILD = "v120";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -943,7 +947,7 @@ function renderMonth(){
       if (showName && j.memo) it.appendChild(el('span', 'memo-dot'));
       it.appendChild(document.createTextNode(showName ? j.name : ' '));
       it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name
-               + (j.memo ? '\nメモ：' + j.memo : '');
+               + (j.memo ? '\nメモ：' + memoShow(j.memo) : '');
       box.appendChild(it);
       shown++;
     });
@@ -1350,6 +1354,15 @@ const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒
 
 function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
 
+/* ★v120 落札処理が書いた行は、頭に「>>」が付いています。読む表示では「・」に変えます。
+   書く欄では、シートに入っているままの文字（>> 付き）を出します */
+const MEMO_MARK = /^[ \t　]*>>[ \t　]*/;
+function memoShow(s){
+  return memoNorm(s).split('\n').map(function(l){
+    return MEMO_MARK.test(l) ? '・' + l.replace(MEMO_MARK, '') : l;
+  }).join('\n');
+}
+
 function memoEl(j){
   const box = el('div', 't-memo');
   const lab = el('div', 'memo-lab');
@@ -1368,7 +1381,13 @@ function memoEl(j){
   const er = el('div', 'memo-err');
   er.textContent = '保存できていません。もう一度書くか、欄から離れると保存し直します';
 
+  /* ★v120 読む表示。中身があって、書いている途中でないときに出します */
+  const view = el('div', 'memo-view');
+  view.tabIndex = 0;
+  let editing = false;
+
   box.appendChild(lab);
+  box.appendChild(view);
   box.appendChild(ta);
   box.appendChild(er);
 
@@ -1393,6 +1412,26 @@ function memoEl(j){
   ta.rows = Math.max(1, ta.value.split('\n').length);
   requestAnimationFrame(fit);
   paint();
+
+  /* 保存に失敗して残っている書きかけは、書く欄のまま見せます */
+  function showView(){
+    const v = memoNorm(ta.value);
+    const on = !!v && !editing && MEMO_DRAFT[j.id] === undefined;
+    view.textContent = on ? memoShow(v) : '';
+    view.hidden = !on;
+    ta.hidden = on;
+    if (!on) requestAnimationFrame(fit);
+  }
+  function openEdit(){
+    if (editing) return;
+    editing = true;
+    showView();
+    fit();
+    ta.focus();
+  }
+  view.addEventListener('click', openEdit);
+  view.addEventListener('focus', openEdit);
+  showView();
 
   function flush(){
     clearTimeout(timer);
@@ -1427,6 +1466,7 @@ function memoEl(j){
         MEMO_DRAFT[j.id] = memoNorm(ta.value);
         status('');
         paint();
+        showView();
         setState("メモを保存できませんでした", "err");
       });
   }
@@ -1445,6 +1485,8 @@ function memoEl(j){
   ta.addEventListener('focus', () => { MEMO_FOCUS = true; });
   ta.addEventListener('blur', () => {
     MEMO_FOCUS = false;
+    editing = false;
+    showView();
     const v = memoNorm(ta.value);
     if (v !== saved || MEMO_DRAFT[j.id] !== undefined || inflight){ flush(); return; }
     /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。

@@ -468,6 +468,10 @@ body.resizing{cursor:col-resize; user-select:none;}
   background:transparent; color:var(--ink); resize:none; overflow:hidden;
   font:inherit; font-size:12.5px; line-height:1.5; min-height:1.5em;}
 .dv-memo textarea::placeholder{color:var(--line-strong)}
+/* ★v120 書いてあるメモは、まず読む表示で出します。押すと書く欄に替わります */
+.dv-memo textarea[hidden]{display:none}
+.dv-memo .memo-view{font-size:12.5px; line-height:1.5; min-height:1.5em; white-space:pre-wrap;
+  overflow-wrap:anywhere; color:var(--ink); cursor:text; outline:0;}
 .dv-memo:focus-within{border-style:solid; border-color:var(--memo);}
 .dv-memo.busy{opacity:.6}
 .dv-memo.unsaved{border-color:var(--danger)}
@@ -773,7 +777,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v119";
+const BUILD = "v120";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1489,7 +1493,7 @@ function renderCal(){
         const d = document.createElement("span");
         d.className = "memo-dot";
         b.insertBefore(d, b.querySelector(".nm"));
-        b.title += "\n\nメモ：" + t.memo;
+        b.title += "\n\nメモ：" + memoShow(t.memo);
       }
       if (t.kind === "s") b.querySelector(".grip").remove();
       /* ★v114 今日をまたいでいる帯は、名前を今日の位置から出します。
@@ -1551,7 +1555,7 @@ function chipEl(t, done){
     const d = document.createElement("span");
     d.className = "memo-dot";
     nm.insertBefore(d, nm.querySelector(".nmtxt"));
-    el.title = "メモ：" + t.memo;
+    el.title = "メモ：" + memoShow(t.memo);
   }
   el.querySelector(".sub").textContent = [t.cust, t.qty, t.who].filter(Boolean).join("　");
 
@@ -2203,6 +2207,15 @@ const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒
 
 function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
 
+/* ★v120 落札処理が書いた行は、頭に「>>」が付いています。読む表示では「・」に変えます。
+   書く欄では、シートに入っているままの文字（>> 付き）を出します */
+const MEMO_MARK = /^[ \t　]*>>[ \t　]*/;
+function memoShow(s){
+  return memoNorm(s).split('\n').map(function(l){
+    return MEMO_MARK.test(l) ? '・' + l.replace(MEMO_MARK, '') : l;
+  }).join('\n');
+}
+
 function memoEl(j){
   const mk = (tag, cls) => { const x = document.createElement(tag); x.className = cls; return x; };
   const box = mk('div', 'dv-memo');
@@ -2222,7 +2235,13 @@ function memoEl(j){
   const er = mk('div', 'memo-err');
   er.textContent = '保存できていません。もう一度書くか、欄から離れると保存し直します';
 
+  /* ★v120 読む表示。中身があって、書いている途中でないときに出します */
+  const view = mk('div', 'memo-view');
+  view.tabIndex = 0;
+  let editing = false;
+
   box.appendChild(lab);
+  box.appendChild(view);
   box.appendChild(ta);
   box.appendChild(er);
 
@@ -2247,6 +2266,26 @@ function memoEl(j){
   ta.rows = Math.max(1, ta.value.split('\n').length);
   requestAnimationFrame(fit);
   paint();
+
+  /* 保存に失敗して残っている書きかけは、書く欄のまま見せます */
+  function showView(){
+    const v = memoNorm(ta.value);
+    const on = !!v && !editing && MEMO_DRAFT[j.id] === undefined;
+    view.textContent = on ? memoShow(v) : '';
+    view.hidden = !on;
+    ta.hidden = on;
+    if (!on) requestAnimationFrame(fit);
+  }
+  function openEdit(){
+    if (editing) return;
+    editing = true;
+    showView();
+    fit();
+    ta.focus();
+  }
+  view.addEventListener('click', openEdit);
+  view.addEventListener('focus', openEdit);
+  showView();
 
   function flush(){
     clearTimeout(timer);
@@ -2285,6 +2324,7 @@ function memoEl(j){
         MEMO_DRAFT[j.id] = memoNorm(ta.value);
         status('');
         paint();
+        showView();
         log("メモを保存できませんでした：" + e.message, "", true);
       });
   }
@@ -2300,6 +2340,8 @@ function memoEl(j){
   ta.addEventListener('focus', () => { MEMO_FOCUS = true; });
   ta.addEventListener('blur', () => {
     MEMO_FOCUS = false;
+    editing = false;
+    showView();
     const v = memoNorm(ta.value);
     if (v !== saved || MEMO_DRAFT[j.id] !== undefined || inflight){ flush(); return; }
     /* 何も変えていない。止めていた描き直しだけ、少し待ってから行います。
