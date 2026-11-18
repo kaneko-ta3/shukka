@@ -777,7 +777,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v121";
+const BUILD = "v122";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -949,7 +949,7 @@ let history = [];
 let pending = 0;
 let MEMO_FOCUS = false;   /* メモ欄に入力中か */
 let RENDER_LATER = false; /* 入力中に描き直しが来たので、あとで描く */
-const MEMO_MAX = 500;     /* GAS側の CONFIG.MEMO_MAX と同じ */
+const MEMO_MAX = 1000;     /* GAS側の CONFIG.MEMO_MAX と同じ */
 const MEMO_DRAFT = {};    /* 保存に失敗したメモ。描き直しても消さずに残します */
 
 const weekStart = s => { const d = p(s); d.setDate(d.getDate() - d.getDay()); return iso(d); };
@@ -2207,6 +2207,17 @@ const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒
 
 function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
 
+/* ★v122 メモの中身から短い目印を作ります（サーバーの memoHash_ と同じ計算）。
+   保存のときに「読んだときの中身」の目印を送り、シートがほかで書き換わっていたら
+   サーバーが上書きを断ります */
+function memoHash(s){
+  s = memoNorm(s);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return s.length + ':' + h;
+}
+const MEMO_MOVED = /メモがほかで書き換わっていました/;
+
 /* ★v121 落札処理が書いた行は、頭に「[AI]」が付いています。読む表示では「・」に変えます。
    書く欄では、シートに入っているままの文字（[AI] 付き）を出します。
    カッコや AI の字が全角で来ても、同じ印として読みます */
@@ -2296,7 +2307,7 @@ function memoEl(j){
     inflight = true;
     status('保存中…');
     busy(true);
-    call("setMemo", withKey(j, {row: j.row, kind: j.kind, text: v}))
+    call("setMemo", withKey(j, {row: j.row, kind: j.kind, text: v, ph: memoHash(saved)}))
       .then(function(res){
         inflight = false;
         busy(false);
@@ -2322,6 +2333,16 @@ function memoEl(j){
         inflight = false;
         busy(false);
         again = false;
+        /* ★v122 ほかで書き換わっていた。書きかけは捨てて、最新を読み直します。
+           書きかけを残すと、次の保存で新しい中身を上書きしてしまうためです */
+        if (MEMO_MOVED.test(String(e && e.message || e))){
+          delete MEMO_DRAFT[j.id];
+          MEMO_FOCUS = false;
+          log("メモがほかで書き換わっていました。書いた内容は保存していません", "", true);
+          alert("メモがほかで書き換わっていました。\n最新を読み直します。書いた内容は保存していません。");
+          load(false, true);
+          return;
+        }
         MEMO_DRAFT[j.id] = memoNorm(ta.value);
         status('');
         paint();
