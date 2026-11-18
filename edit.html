@@ -777,7 +777,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v120";
+const BUILD = "v121";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -2207,9 +2207,10 @@ const MEMO_WAIT = 900;    /* 手を止めてから保存するまで（ミリ秒
 
 function memoNorm(s){ return String(s || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''); }
 
-/* ★v120 落札処理が書いた行は、頭に「>>」が付いています。読む表示では「・」に変えます。
-   書く欄では、シートに入っているままの文字（>> 付き）を出します */
-const MEMO_MARK = /^[ \t　]*>>[ \t　]*/;
+/* ★v121 落札処理が書いた行は、頭に「[AI]」が付いています。読む表示では「・」に変えます。
+   書く欄では、シートに入っているままの文字（[AI] 付き）を出します。
+   カッコや AI の字が全角で来ても、同じ印として読みます */
+const MEMO_MARK = /^[ \t　]*[\[［【][ \t　]*[AＡaａ][IＩiｉ][ \t　]*[\]］】][ \t　]*/;
 function memoShow(s){
   return memoNorm(s).split('\n').map(function(l){
     return MEMO_MARK.test(l) ? '・' + l.replace(MEMO_MARK, '') : l;
