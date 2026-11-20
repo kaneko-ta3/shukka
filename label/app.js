@@ -155,8 +155,10 @@ function asc(s) {
   let out = '';
   for (const c of String(s == null ? '' : s)) {
     const code = c.charCodeAt(0);
-    /* 全角の「，」は半角にしません (v70 本人「半角も全角も変換しないがいい」) */
-    if (code >= 0xFF01 && code <= 0xFF5E && c !== '，') { out += String.fromCharCode(code - 0xFEE0); continue; }
+    /* カンマは全部全角の「，」にします (v73、11/20 本人「あとあと発送済みデータをやるときにカンマが混じってるとよくないからカンマは全部全角にするわ」。
+       v70 の「変換しない」はやめた)。バイト数を数える前にそろえるため、ここで変えます */
+    if (c === ',' || c === '，') { out += '，'; continue; }
+    if (code >= 0xFF01 && code <= 0xFF5E) { out += String.fromCharCode(code - 0xFEE0); continue; }
     if (c === '　') { out += ' '; continue; }
     let i = KANA_F.indexOf(c);
     if (i >= 0) { out += KANA_H[i]; continue; }
@@ -219,7 +221,7 @@ function applyMaster(s) {
 /* 照合と出力に使う住所。半角にして住所マスタを掛けたもの */
 function addrNorm(row) {
   const a = String(val(row, 'addr') || '').replace(/\s+/g, ' ').trim();
-  return applyMaster(asc(a));   // 「,」は半角も全角もそのまま (v70 本人「変換しないがいい」。B2 は " で囲んだ「1,2」を取り込めた)
+  return applyMaster(asc(a));   // 「,」は asc で全角の「，」になります (v73)
 }
 
 /* 〒。「NNN-NNNN」にします。6桁は頭の0落ちとみなします */
@@ -733,7 +735,7 @@ function computeRow(row) {
      「20*4」は20個の箱が4つ(v60、11/11 本人)。数字と + * だけで、+ か * が1つ以上あるときに読みます
      (v63、本人「数字and (+ or *) で」。「25×2」「25,25」はメモ)。全角の ＋ ＊ は半角にそろえてCSVに出します。
      余白書き換えが記事欄のこれを読んで、1箱ずつ数を書きます。商品1だけのときに使います */
-  const memo2In = String(val(row, 'memo2') || '').trim();
+  const memo2In = String(val(row, 'memo2') || '').replace(/,/g, '，').trim();   // カンマは全角に (v73)
   let uchi = [], uchiText = '';
   const um = parseUchi(memo2In);   // 記事がまるごと箱ごとの数のときだけ(v55)
   if (um) {
@@ -810,7 +812,7 @@ function computeRow(row) {
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
-  row.out = {name, nameFit, memo: memoSrc.trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
+  row.out = {name, nameFit, memo: memoSrc.replace(/,/g, '，').trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
              boxes, boxesAuto, uchi, due: due || '', ship: ship || '', shipAuto, time: time || '', memo2, q1, q2};
   row.err = err; row.warn = warn; row.check = check;
 }
@@ -965,6 +967,8 @@ function outRows() {
     .sort((a, b) => S.csvOrder === 'sheet' ? a.i - b.i
       : ITEM_ORDER.compare(a.row.out.item1, b.row.out.item1) || ITEM_ORDER.compare(a.row.out.item2, b.row.out.item2) || a.i - b.i)
     .map(x => x.row);
+  /* 残りの欄 (依頼主・商品名・電話など) のカンマも、ここで全部全角の「，」にします (v73) */
+  const fw = v => typeof v === 'string' ? v.replace(/,/g, '，') : v;
   return list.map((row, i) => {
     const o = row.out;
     const kind = o.boxes > 1 ? 6 : 0;               // 宅急便。複数口は6
@@ -975,7 +979,7 @@ function outRows() {
             kind === 6 ? i + 2 : '', o.memo2,
             /* 25・26列目は使っていないので空にします。B2(MOSHIMO)では25列目→検索キータイトル4、26列目→検索キー4 に
                つながっていて、25列目に値があると「検索キー4が入力されていません」で止まります */
-            '', ''];
+            '', ''].map(fw);
   });
 }
 
