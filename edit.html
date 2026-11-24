@@ -305,7 +305,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 .chip.is-done .lim span{background:var(--surface-2); color:var(--muted);}
 .chip .ago{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
   padding:0 5px; border-radius:2px; background:var(--ago-soft); color:var(--ago-ink);}
-/* カードの中の「在庫から消費」チェック */
+/* カードの中の「製造せず在庫から使用」チェック */
 .chip .cs{display:flex; flex-direction:column; gap:2px; margin-top:3px;
   border-top:1px dashed var(--line-strong); padding-top:4px;}
 .chip .cs-row{display:flex; align-items:center; gap:6px; font-size:10.5px; line-height:1.3; min-width:0;}
@@ -777,7 +777,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v122";
+const BUILD = "v123";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1603,7 +1603,7 @@ function chipEl(t, done){
   el.querySelector(".ago").textContent = (done && t.start) ? agoText(t.start) : "";
   el.querySelector(".code").textContent = t.code;
 
-  /* 製造だけ「在庫から消費」のチェックを出します */
+  /* 製造だけ「製造せず在庫から使用」のチェックを出します */
   if (t.kind === "m") buildChipSkus(el, t);
   /* 出荷手配の指示がある出荷は、済にするチェックを出します */
   else if (t.arrange && !isJisha(t)) el.appendChild(arrangeCheck(t, "cs", "cs-row"));
@@ -1772,8 +1772,9 @@ function buildChipSkus(chip, t){
 
     const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
     row.querySelector(".t").textContent = one
-      ? "在庫から消費(製造しない)"
+      ? "製造せず在庫から使用(資材を消費しない)"
       : ((x.sku || "") + ((q === null || q === undefined) ? "" : "　残り" + q));
+    row.querySelector(".t").title = "製造せず在庫から使用(資材を消費しない)";   // ★v123 狭くて切れるときに、マウスを乗せると全文が出ます
 
     cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
     box.appendChild(row);
@@ -2409,7 +2410,7 @@ function buildSkus(box, t){
     row.innerHTML = '<input type="checkbox" id="' + id + '">'
       + '<label for="' + id + '">'
       +   '<span class="code"></span> <span class="nm"></span>'
-      +   ' 　<span class="qty"></span> <span class="lab">在庫から消費(製造しない)</span>'
+      +   ' 　<span class="qty"></span> <span class="lab">製造せず在庫から使用(資材を消費しない)</span>'
       + '</label>';
 
     const cb = row.querySelector("input");

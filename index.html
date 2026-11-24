@@ -279,8 +279,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 /* ラベルがまだ出ていない出荷タスクの注意書き */
 .t-meta .nolabel{color:var(--warn); font-weight:700;}
 .t-meta .jisha{font-weight:700; padding:0 6px; border-radius:3px; box-shadow:inset 0 0 0 1px var(--line-strong);}
-/* 在庫：何をいくつ作るかの表示（読むだけ。押せません）。
-   作らない指示が付いているものは赤で知らせます */
+/* 在庫：何をいくつ作るかの表示。
+   ★v123 「製造せず在庫から使用」は作業者もチェックで切り替えられます。付いているものは赤です */
 .t-skus{display:flex; flex-direction:column; gap:5px; margin-top:6px;
   border-top:1px dashed var(--line-strong); padding-top:7px;}
 .t-sku{display:grid; gap:1px; font-size:12.5px; line-height:1.4;}
@@ -289,6 +289,11 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-sku .qty{font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink); margin-left:6px;}
 .t-sku .lab{color:var(--danger); font-weight:700; display:block;}
 .t-sku.off .code, .t-sku.off .qty{color:var(--danger)}
+.t-sku .nm-chk{display:flex; align-items:center; gap:7px; margin-top:3px; font-size:13px;
+  color:var(--muted); cursor:pointer; user-select:none; -webkit-user-select:none;}
+.t-sku .nm-chk input{width:18px; height:18px; margin:0; flex:none; accent-color:var(--danger);}
+.t-sku.off .nm-chk{color:var(--danger); font-weight:700;}
+.t-sku.busy{opacity:.55}
 /* 出荷指示と食い違っているSKU。stale＝灰色で取り消し線、miss＝同期待ちで橙 */
 .t-sku .why{display:block; font-size:11.5px; font-weight:700;}
 .t-sku.stale .code, .t-sku.stale .nm{color:var(--line-strong); text-decoration:line-through;}
@@ -478,7 +483,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v122";
+const BUILD = "v123";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1207,7 +1212,7 @@ function enableSwipe(task, card, j){
 
   card.addEventListener('pointerdown', e => {
     if (e.button) return;
-    if (e.target.closest('button')) return;
+    if (e.target.closest('button, .nm-chk')) return;   // ★v123 チェックを押すときはスワイプにしない
     active = true; decided = false; horiz = false;
     sx = e.clientX; sy = e.clientY; dx = 0; pid = e.pointerId;
     card.classList.remove('snap');
@@ -1247,8 +1252,9 @@ function enableSwipe(task, card, j){
 
 /* ---------- 完了／取り消しを送信 ---------- */
 /* ---------- 在庫：何をいくつ作るかの表示 ----------
-   押せるチェックは置いていません。作る／作らないの判断は編集者側で決めるものなので、
-   ここでは「何をいくつ」と「作らない指示が付いているか」だけを読めるようにしています */
+   ★v123 「製造せず在庫から使用」のチェックを作業者も押せるようにしました（本人の依頼 11/24）。
+   完了したものは切り替えません。完了のときに作成数を書いているので、あとから外しても
+   作成数は戻らないためです。変えるときは完了を取り消してから押します */
 /* 在庫シートの行と出荷指示が食い違っているときの印（GAS側で付けます）
      missing … このタスクのSKUなのに、在庫シートに行がまだ無い（次の同期でできます）
      stale   … 出荷指示のどの行にも無いSKU（SKUを直した直後の古い行など）
@@ -1296,8 +1302,17 @@ function buildSkus(box, j){
     row.querySelector('.nm').textContent = x.name || '';
     const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
     row.querySelector('.qty').textContent = (q === null || q === undefined) ? '' : ('残り' + q);
-    row.querySelector('.lab').textContent = x.skip
-      ? '在庫から消費 — 作らずに完了してください' : '';
+    if (j.done || j._pending){
+      row.querySelector('.lab').textContent = x.skip ? NOMAKE_LABEL : '';
+    } else {
+      const lab = el('label', 'nm-chk');
+      lab.innerHTML = '<input type="checkbox"><span></span>';
+      lab.querySelector('span').textContent = NOMAKE_LABEL;
+      const cb = lab.querySelector('input');
+      cb.checked = !!x.skip;
+      cb.onchange = function(){ toggleNoMake(j, x, row, cb); };
+      row.querySelector('.lab').replaceWith(lab);
+    }
 
     /* 資材。作らないものには出しません（取りに行く必要がないので）。
        作業費（fee）はモノではないので作業者には出しません。編集者だけです。
@@ -1319,6 +1334,38 @@ function buildSkus(box, j){
 
     box.appendChild(row);
   });
+}
+
+/* ★v123 割り付け画面と同じ言い方にしています */
+const NOMAKE_LABEL = '製造せず在庫から使用(資材を消費しない)';
+
+/* ★v123 「製造せず在庫から使用」の切り替え。割り付け画面と同じ setNoMake を呼びます。
+   保存が返るまでは自動の読み込みを止めます（古い状態で上書きされないように） */
+function toggleNoMake(j, x, row, cb){
+  const on = cb.checked;
+  cb.disabled = true;
+  row.classList.add('busy');
+  pending++;
+  setState("保存中…", "busy");
+  call("setNoMake", {no: j.code || "", sku: x.sku || "", on: on ? 1 : 0})
+    .then(function(res){
+      pending--;
+      eachSame(j, function(y){
+        (y.skus || []).forEach(function(s){
+          if (!x.sku || s.sku === x.sku) s.skip = !!res.skip;
+        });
+      });
+      setState("最終更新 " + hm(), "");
+      render();
+    })
+    .catch(function(e){
+      pending--;
+      cb.checked = !on;
+      cb.disabled = false;
+      row.classList.remove('busy');
+      setState("保存できませんでした", "err");
+      alert("保存できませんでした。\n\n" + e.message);
+    });
 }
 
 /* 資材の一覧。数量は「1箱あたり」です（製造の方に見せる都合上、掛け算しません） */
