@@ -159,11 +159,34 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .c-item{
   flex:none;
   font-size:11.5px; line-height:1.35; padding:2px 4px; border-radius:3px;
-  border-left:3px solid var(--mfg);
+  /* ★v127 割り付け画面と同じく、周りに1pxの枠を付けます。
+     暗い背景に暗い紺の帯だけだと沈んで見えにくかったため */
+  border:1px solid var(--mfg); border-left:3px solid var(--mfg);
   background:var(--mfg-soft); color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.c-item.done{background:var(--surface-2); color:var(--muted); text-decoration:line-through;}
+.c-item.k-s{border-color:var(--ship)}
+.c-item.misc{border-color:var(--misc)}
+.c-item.done{background:var(--surface-2); color:var(--muted); text-decoration:line-through;
+  border-top-color:var(--line-strong); border-right-color:var(--line-strong); border-bottom-color:var(--line-strong);}
+/* ★v127 「造」「出」の札。PCだけ出します（割り付け画面と同じ）。スマホはマスが狭く、名前が消えるため出しません */
+.c-tag{display:none}
+@media (min-width:761px){
+  .c-tag{display:inline-block; font-size:10px; font-weight:700; line-height:1.3; padding:0 3px;
+    border-radius:2px; margin-right:4px; background:var(--mfg); color:var(--mfg-ink); vertical-align:1px;}
+  .k-s .c-tag{background:var(--ship); color:var(--ship-ink);}
+  .done .c-tag{opacity:.6}
+}
+/* ★v127 日をまたぐ帯の名前。割り付け画面と同じく、帯の端から端まで続けて書きます。
+   帯そのものはマスごとの部品（.c-item）で、名前だけをカレンダーの上に重ねます。
+   指で押したときはその下のマスが開くように、名前は押せなくしています */
+.grid{position:relative; z-index:0;}
+.c-span{position:absolute; z-index:1; pointer-events:none; box-sizing:border-box;
+  display:flex; align-items:center; white-space:nowrap; overflow:hidden; color:var(--ink);}
+.c-span .c-txt{overflow:hidden; text-overflow:ellipsis; min-width:0;}
+/* 帯の部品は名前が無いので、完了でも取り消し線を引きません（空白に線が出て「-」に見えていたため） */
+.c-item[data-seg]{text-decoration:none}
+.c-span.done .c-txt{color:var(--muted); text-decoration:line-through;}
 /* 複数日にまたがるタスク。
    左の色線は「ここから始まる」という印なので、続きの日には出しません。
    これは曜日に関係なく、週が変わっても続きは続きです。
@@ -173,8 +196,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    2つを1つのクラスにまとめていたため、日曜で左の色線が復活していました */
 .c-item.cont-l{border-left:0; padding-left:7px;
   border-top-left-radius:0; border-bottom-left-radius:0;}
-.c-item.bleed-l{margin-left:calc(-1 * var(--cpx) - 1px)}
-.c-item.cont-r{margin-right:calc(-1 * var(--cpx) - 2px); border-top-right-radius:0; border-bottom-right-radius:0;}
+.c-item.bleed-l{margin-left:calc(-1 * var(--cpx))}
+.c-item.cont-r{margin-right:calc(-1 * var(--cpx) - 2px); border-right:0; border-top-right-radius:0; border-bottom-right-radius:0;}
 /* ★v114 はみ出しが切られて、隣のマスとつながっていませんでした（マスと中の枠が
    はみ出しを切っていたため）。左右ははみ出せるように、上下は今まで通り切ります。
    マスはそれぞれ1pxの枠を持つボタンなので、帯は余白＋自分の枠の上まで伸ばします。
@@ -183,6 +206,10 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
    右へ続く帯は隣のマスに1pxだけ重ねます（隣のマスがその上に描かれるので見えません）。
    --cpx はマスの左右の余白です。余白を変えるときは一緒に変えます */
 .cell{--cpx:5px; overflow:visible; min-height:0; clip-path:inset(0 -1px 0 0);}
+/* ★v127 マスはボタンなので、丸角と上・左の枠が付いて1マスずつの札に見えていました。
+   帯が札をまたいで、1本につながって見えなかったため、割り付け画面と同じ線だけの格子にします。
+   左の枠が無くなったので、左へのはみ出しは余白の分だけにします */
+.cell{border-top:0; border-left:0; border-radius:0;}
 .c-list{overflow:visible; clip-path:inset(0 -12px 0 -12px);}
 /* ★v115 週をまたぐ帯の端の点線（前の週から続く＝左端、次の週へ続く＝右端） */
 .c-item.wrap-l{border-left:2px dashed var(--mfg); padding-left:4px;
@@ -439,6 +466,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 @media (max-width:560px){
   /* 「…」に1文字ぶん取られるのがもったいないので、狭い画面では出しません */
   .c-item{text-overflow:clip}
+  .c-span .c-txt{text-overflow:clip}
   /* 案内文は読点で改行します。中途半端な位置で折り返すと読みにくいので */
   .hint .p1{display:block}
   .c-item{font-size:9.5px; padding:2px 3px; border-left-width:2px;}
@@ -483,7 +511,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v123";
+const BUILD = "v127";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -799,7 +827,7 @@ let lastW = window.innerWidth;
 window.addEventListener('resize', function(){
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(function(){
-    if (Math.abs(window.innerWidth - lastW) < 30) return;
+    if (Math.abs(window.innerWidth - lastW) < 30){ layoutSpans(); return; }   // ★v127
     lastW = window.innerWidth;
     if (!openDate) render();
   }, 200);
@@ -876,6 +904,8 @@ function renderMonth(){
      PCはマスが伸びるので多めに、スマホは1画面に収めるため4件までです */
   const MAXI = (window.innerWidth <= 760) ? 4 : 10;
   let prevPos = {};   // ★v114 前の日のマスで、タスクが何段目にあったか
+  let prevSeg = {}, segN = 0;
+  const SPANS = {};   // ★v127 またぐ帯ひとつずつ（週ごと・段がずれたら別）。名前を重ねるのに使います
 
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
@@ -921,8 +951,8 @@ function renderMonth(){
        これで出荷や製造が押し出されません */
     let shown = 0;
     /* ★v114 週の頭で、前の日の段の控えを空にします */
-    if (i % 7 === 0) prevPos = {};
-    const nowPos = {};
+    if (i % 7 === 0){ prevPos = {}; prevSeg = {}; }
+    const nowPos = {}, nowSeg = {};
     const wsDate = add(gridStart, i - (i % 7)), weDate = add(wsDate, 6);
     list.slice(0, MAXI).forEach((j, idx) => {
       /* またがるタスクの「続き」判定。
@@ -947,10 +977,22 @@ function renderMonth(){
       const it = el('div', 'c-item k-' + (j.kind || 'm') + (j.done ? ' done' : '')
                     + (isCont ? ' cont-l' : '') + (bleedL ? ' bleed-l' : '')
                     + (contR ? ' cont-r' : '') + (wrapL ? ' wrap-l' : '') + (wrapR ? ' wrap-r' : ''));
-      /* 「製」「出」の字は入れません。狭いマスでは名前が消えてしまうためで、
-         代わりに背景色と左の線で見分けます */
-      if (showName && j.memo) it.appendChild(el('span', 'memo-dot'));
-      it.appendChild(document.createTextNode(showName ? j.name : ' '));
+      /* ★v127 「造」「出」の札はPCだけ出します（.c-tag。スマホは狭いので隠します） */
+      if (j.days > 1){
+        /* またぐ帯は、部品に名前を書かず、あとで帯の上に重ねます（layoutSpans） */
+        const seg = (bleedL && prevPos[j.id] === idx && prevSeg[j.id]) ? prevSeg[j.id] : ('s' + (++segN));
+        nowSeg[j.id] = seg;
+        SPANS[seg] = j;
+        it.dataset.seg = seg;
+        if (showName) it.dataset.nm = '1';
+        it.appendChild(document.createTextNode(' '));
+      } else {
+        const tg = el('span', 'c-tag');
+        tg.textContent = j.kind === 's' ? '出' : '造';
+        it.appendChild(tg);
+        if (j.memo) it.appendChild(el('span', 'memo-dot'));
+        it.appendChild(document.createTextNode(j.name));
+      }
       it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name
                + (j.memo ? '\nメモ：' + memoShow(j.memo) : '');
       box.appendChild(it);
@@ -972,12 +1014,60 @@ function renderMonth(){
     }
     cell.appendChild(box);
     prevPos = nowPos;
+    prevSeg = nowSeg;
     cell.onclick = () => { openDate = date; render(); };
     grid.appendChild(cell);
   }
   cal.appendChild(grid);
   app.appendChild(cal);
+  LAST_SPANS = {grid: grid, info: SPANS};
+  layoutSpans();
+  /* カレンダーの大きさが変わったら（窓の高さ・スマホのアドレスバーなど）、名前を置き直します */
+  try {
+    if (SPAN_RO) SPAN_RO.disconnect();
+    SPAN_RO = new ResizeObserver(function(){ layoutSpans(); });
+    SPAN_RO.observe(grid);
+  } catch(e){}
 }
+
+/* ★v127 またぐ帯の名前を、帯の端から端まで続けて重ねます。
+   名前の書き始めは今までと同じで、今日をまたぐなら今日のマス、それ以外はその週の最初のマスです */
+let LAST_SPANS = null, SPAN_RO = null;
+function layoutSpans(){
+  if (!LAST_SPANS || !LAST_SPANS.grid.isConnected) return;
+  const grid = LAST_SPANS.grid, info = LAST_SPANS.info;
+  grid.querySelectorAll('.c-span').forEach(function(e){ e.remove(); });
+  const g = grid.getBoundingClientRect();
+  Object.keys(info).forEach(function(seg){
+    const ps = grid.querySelectorAll('.c-item[data-seg="' + seg + '"]');
+    if (!ps.length) return;
+    const j = info[seg];
+    let start = ps[0];
+    for (let k = 0; k < ps.length; k++){ if (ps[k].dataset.nm === '1'){ start = ps[k]; break; } }
+    const last = ps[ps.length - 1];
+    const a = start.getBoundingClientRect(), b = last.getBoundingClientRect();
+    const cs = getComputedStyle(start), ce = getComputedStyle(last);
+    const padL = parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+    const padR = parseFloat(ce.borderRightWidth) + 2;
+    const s = el('div', 'c-span k-' + (j.kind || 'm') + (j.done ? ' done' : ''));
+    s.style.left   = (a.left - g.left + padL) + 'px';
+    s.style.top    = (a.top - g.top) + 'px';
+    s.style.width  = Math.max(0, b.right - a.left - padL - padR) + 'px';
+    s.style.height = a.height + 'px';
+    s.style.fontSize = cs.fontSize;
+    s.style.lineHeight = cs.lineHeight;
+    const tg = el('span', 'c-tag');
+    tg.textContent = j.kind === 's' ? '出' : '造';
+    s.appendChild(tg);
+    if (j.memo) s.appendChild(el('span', 'memo-dot'));
+    const t = el('span', 'c-txt');
+    t.textContent = j.name;
+    s.appendChild(t);
+    grid.appendChild(s);
+  });
+}
+/* 字の形が読み込まれて幅が変わったときも、重ね直します */
+try { document.fonts.ready.then(layoutSpans); } catch(e){}
 
 /* 日付を開いている間は、カードの並びと「未完了／完了」の枠を固定します。
    完了にしたカードもその場に残し、閉じて開き直したときに完了の枠へ移します。
