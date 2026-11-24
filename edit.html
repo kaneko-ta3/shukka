@@ -777,7 +777,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v123";
+const BUILD = "v124";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1072,7 +1072,12 @@ function load(first, fresh){
       loading = false;
       const msg = String(e && e.message || e);
       if (/合言葉が違います|割り付け担当者/.test(msg)){
-        forgetKey(); showGate(msg); return;
+        /* ★v124 作業者画面の合言葉を入れたときは、そう分かる文にします
+           （サーバーの文「この操作は割り付け担当者のみ行えます」だと、何がだめか分からなかったため） */
+        forgetKey();
+        showGate(/割り付け担当者/.test(msg)
+          ? "作業者画面の合言葉です。割り付け画面の合言葉を入れてください" : msg);
+        return;
       }
       setState("読み込み失敗", "err");
       if (document.getElementById("app").hidden){
