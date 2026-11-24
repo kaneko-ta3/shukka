@@ -186,6 +186,8 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .c-span .c-txt{overflow:hidden; text-overflow:ellipsis; min-width:0;}
 /* 帯の部品は名前が無いので、完了でも取り消し線を引きません（空白に線が出て「-」に見えていたため） */
 .c-item[data-seg]{text-decoration:none}
+/* ★v128 空きの段。帯と同じ高さで、見えません */
+.c-item.gap{visibility:hidden}
 .c-span.done .c-txt{color:var(--muted); text-decoration:line-through;}
 /* 複数日にまたがるタスク。
    左の色線は「ここから始まる」という印なので、続きの日には出しません。
@@ -511,7 +513,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v127";
+const BUILD = "v128";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -907,6 +909,36 @@ function renderMonth(){
   let prevSeg = {}, segN = 0;
   const SPANS = {};   // ★v127 またぐ帯ひとつずつ（週ごと・段がずれたら別）。名前を重ねるのに使います
 
+  /* ★v128 段（上から何番目か）を、週ごとに先に決めます（割り付け画面と同じ決め方）。
+     マスごとに並べていたときは、途中の日にもっと長いタスクが始まると、
+     またいでいる帯がその日だけ下の段に落ちて、帯が切れていました。
+     ・未完了を先に、完了をあとに決めます（未完了が上に来るように）
+     ・その中は始まりの早い順、同じ日なら製造→出荷、出荷指示の行の順（割り付け画面と同じ）
+     ・またいでいる日の全部で空いている、いちばん上の段に置きます */
+  const LANE = {};
+  for (let w = 0; w < ROWS; w++){
+    const ws = add(gridStart, w * 7), we = add(ws, 6);
+    const inWeek = jobs.filter(j => j.start && j.start <= we && add(j.start, j.days - 1) >= ws);
+    const ord = (a, b) => a.start === b.start
+      ? (a.kind === b.kind ? a.row - b.row : (a.kind === 'm' ? -1 : 1))
+      : (a.start < b.start ? -1 : 1);
+    const order = inWeek.filter(j => !j.done).sort(ord).concat(inWeek.filter(j => j.done).sort(ord));
+    const occ = [];
+    order.forEach(function(j){
+      const c0 = Math.max(0, diff(ws, j.start));
+      const c1 = Math.min(6, diff(ws, add(j.start, j.days - 1)));
+      let lane = 0;
+      for (;; lane++){
+        const r = occ[lane] || (occ[lane] = []);
+        let free = true;
+        for (let c = c0; c <= c1; c++) if (r[c]){ free = false; break; }
+        if (free) break;
+      }
+      for (let c = c0; c <= c1; c++) occ[lane][c] = true;
+      LANE[w + '|' + j.id] = lane;
+    });
+  }
+
   for (let i = 0; i < ROWS * 7; i++){
     const date = add(gridStart, i);
     const dt = p(date);
@@ -954,7 +986,22 @@ function renderMonth(){
     if (i % 7 === 0){ prevPos = {}; prevSeg = {}; }
     const nowPos = {}, nowSeg = {};
     const wsDate = add(gridStart, i - (i % 7)), weDate = add(wsDate, 6);
-    list.slice(0, MAXI).forEach((j, idx) => {
+    /* ★v128 その日のタスクを段の位置に並べます。上の段が空いているところは、
+       同じ高さの見えない空きを置いて、またいでいる帯の段をそろえます */
+    const wk = Math.floor(i / 7);
+    const slots = [];
+    list.forEach(function(j){ slots[LANE[wk + '|' + j.id]] = j; });
+    const upto = Math.min(slots.length, MAXI);
+    let hiddenTasks = 0;
+    for (let k = MAXI; k < slots.length; k++) if (slots[k]) hiddenTasks++;
+    for (let k = 0; k < upto; k++){
+      if (slots[k]) continue;
+      const gp = el('div', 'c-item gap');   // 空きの段（見えません）
+      gp.textContent = ' ';
+      box.appendChild(gp);
+    }
+    slots.slice(0, upto).forEach((j, idx) => {
+      if (!j) return;
       /* またがるタスクの「続き」判定。
          週の折り返し（日曜の列・土曜の列）では切ります */
       const last   = add(j.start, j.days - 1);
@@ -995,9 +1042,22 @@ function renderMonth(){
       }
       it.title = (j.kind === 's' ? '出荷' : '製造') + '　' + j.name
                + (j.memo ? '\nメモ：' + memoShow(j.memo) : '');
+      it.dataset.lane = idx;
       box.appendChild(it);
-      shown++;
     });
+    /* 段の順に並べ直します（空きの段と帯の部品を、上から段の番号どおりに） */
+    {
+      const gaps = Array.from(box.querySelectorAll('.c-item.gap'));
+      const items = Array.from(box.querySelectorAll('.c-item:not(.gap)'));
+      let g = 0;
+      const ordered = [];
+      for (let k = 0; k < upto; k++){
+        const it = items.find(x => Number(x.dataset.lane) === k);
+        ordered.push(it || gaps[g++]);
+      }
+      ordered.forEach(x => box.appendChild(x));
+    }
+    shown = upto;
     other.slice(0, Math.max(0, MAXI - shown)).forEach(m => {
       const it = el('div', 'c-item misc');
       it.textContent = (m.from ? m.from + ' ' : '') + m.name;
@@ -1005,7 +1065,7 @@ function renderMonth(){
       box.appendChild(it);
       shown++;
     });
-    const rest = list.length + other.length - shown;
+    const rest = hiddenTasks + Math.max(0, other.length - Math.max(0, MAXI - upto));
     if (rest > 0){
       const m = el('div', 'c-more');
       /* 「他予定」と読み間違えないように、あふれは + で示します */
