@@ -783,7 +783,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v125";
+const BUILD = "v126";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -1787,10 +1787,22 @@ function buildChipSkus(chip, t){
       : ((x.sku || "") + ((q === null || q === undefined) ? "" : "　残り" + q));
     row.querySelector(".t").title = "製造せず在庫から使用(資材を消費しない)";   // ★v123 狭くて切れるときに、マウスを乗せると全文が出ます
 
+    /* ★v126 完了したものは切り替えません（作業者画面と同じ）。完了のときに作成数を書いているので、
+       あとから外しても作成数は戻らず、22時の処理のあとに付けても在庫は戻らないためです。
+       変えるときは完了を取り消してから付け直します。付いているものは赤い文字だけ出します */
+    if (t.done){
+      if (!x.skip) return;
+      cb.remove();
+      row.querySelector(".t").textContent = (one ? "" : (x.sku || "") + "　") + "製造せず在庫から使用(資材を消費しない)";
+      box.appendChild(row);
+      return;
+    }
+
     cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
     box.appendChild(row);
   });
 
+  if (!box.children.length) return;
   chip.appendChild(box);
 }
 
@@ -2433,7 +2445,13 @@ function buildSkus(box, t){
     const q = (x.rest !== null && x.rest !== undefined) ? x.rest : x.need;
     row.querySelector(".qty").textContent = (q === null || q === undefined) ? "" : ("残り" + q);
 
-    cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
+    /* ★v126 完了したものは切り替えません（上の buildChipSkus と同じ理由） */
+    if (t.done){
+      if (x.skip) cb.remove();
+      else row.querySelector(".chk").remove();
+    } else {
+      cb.onchange = function(){ toggleNoMake(t, x, row, cb); };
+    }
     box.appendChild(row);
 
     /* 資材。作らないものには出しません（取りに行く必要がないので）。
