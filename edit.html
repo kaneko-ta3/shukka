@@ -443,6 +443,12 @@ body.resizing{cursor:col-resize; user-select:none;}
 .dv-sku.stale .code, .dv-sku.stale .nm{color:var(--line-strong); text-decoration:line-through;}
 .dv-sku.stale .why{color:var(--line-strong)}
 .dv-sku.miss .why{color:var(--warn)}
+/* ★v125 在庫の行は2段。1段目に SKU・名前・残り、2段目にチェック（または理由） */
+.dv-sku.nmk{flex-direction:column; align-items:stretch; gap:2px;}
+.dv-sku.nmk .qty{margin-left:6px;}
+.dv-sku.nmk .chk{display:flex; align-items:center; gap:7px;}
+.dv-sku.nmk .chk input{margin:0;}
+.dv-sku.nmk .lab{cursor:pointer;}
 .chip .cs-note{font-size:10.5px; line-height:1.3; font-weight:700; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap;}
 .chip .cs-note.miss{color:var(--warn)}
@@ -777,7 +783,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v124";
+const BUILD = "v125";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
@@ -2399,9 +2405,10 @@ function buildSkus(box, t){
     const st = skuState(x);
     if (st){
       const r = document.createElement("div");
-      r.className = "dv-sku " + st.cls;
-      r.innerHTML = '<span class="ph"></span><span><span class="code"></span> <span class="nm"></span>'
-                  + ' 　<span class="why"></span></span>';
+      /* ★v125 理由も2行目に置きます（チェックのある行と頭と段をそろえるため） */
+      r.className = "dv-sku nmk " + st.cls;
+      r.innerHTML = '<div class="head"><span class="code"></span> <span class="nm"></span></div>'
+                  + '<div class="why"></div>';
       r.querySelector(".code").textContent = x.sku || "（SKU未設定）";
       r.querySelector(".nm").textContent = x.name || "";
       r.querySelector(".why").textContent = st.lab;
@@ -2410,13 +2417,14 @@ function buildSkus(box, t){
     }
 
     const row = document.createElement("div");
-    row.className = "dv-sku" + (x.skip ? " off" : "");
+    /* ★v125 1行目に SKU・名前・残り、2行目にチェックを置きます。
+       文言を長くしたら1行に続けて読みにくくなったため */
+    row.className = "dv-sku nmk" + (x.skip ? " off" : "");
     const id = "dvnm-" + t.row + "-" + (x.sku || "");
-    row.innerHTML = '<input type="checkbox" id="' + id + '">'
-      + '<label for="' + id + '">'
-      +   '<span class="code"></span> <span class="nm"></span>'
-      +   ' 　<span class="qty"></span> <span class="lab">製造せず在庫から使用(資材を消費しない)</span>'
-      + '</label>';
+    row.innerHTML = '<div class="head"><span class="code"></span> <span class="nm"></span>'
+      +   ' <span class="qty"></span></div>'
+      + '<div class="chk"><input type="checkbox" id="' + id + '">'
+      +   '<label class="lab" for="' + id + '">製造せず在庫から使用(資材を消費しない)</label></div>';
 
     const cb = row.querySelector("input");
     cb.checked = !!x.skip;
