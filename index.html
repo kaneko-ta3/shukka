@@ -513,7 +513,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v128";
+const BUILD = "v129";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -989,11 +989,20 @@ function renderMonth(){
     /* ★v128 その日のタスクを段の位置に並べます。上の段が空いているところは、
        同じ高さの見えない空きを置いて、またいでいる帯の段をそろえます */
     const wk = Math.floor(i / 7);
-    const slots = [];
+    let slots = [];
     list.forEach(function(j){ slots[LANE[wk + '|' + j.id]] = j; });
-    const upto = Math.min(slots.length, MAXI);
+    /* ★v129 スマホで出しきれない日は、1段あけて「+N件」を出します。
+       上限まで並べると「+N件」がマスの下にはみ出して見えなかったためです（PCはマスが伸びるのでそのまま） */
+    const CAP = (MAXI < 10 && (slots.length > MAXI || list.length + other.length > MAXI)) ? MAXI - 1 : MAXI;
+    /* ★v129 段がマスの上限（スマホは4段）より下になったタスクがあり、上に空きの段があるときは、
+       その日だけ空きを詰めます。段をそろえたままだと、その日のマスに空きがあるのに
+       タスクが「+N件」に隠れてしまうためです。詰めた日は帯が段違いになるので、名前をもう一度出します */
+    let hole = false;
+    for (let k = 0; k < CAP && k < slots.length; k++) if (!slots[k]) hole = true;   // 空きの段（配列の穴は some では数えられないので1つずつ見ます）
+    if (slots.length > CAP && hole) slots = slots.filter(Boolean);
+    const upto = Math.min(slots.length, CAP);
     let hiddenTasks = 0;
-    for (let k = MAXI; k < slots.length; k++) if (slots[k]) hiddenTasks++;
+    for (let k = CAP; k < slots.length; k++) if (slots[k]) hiddenTasks++;
     for (let k = 0; k < upto; k++){
       if (slots[k]) continue;
       const gp = el('div', 'c-item gap');   // 空きの段（見えません）
@@ -1058,14 +1067,14 @@ function renderMonth(){
       ordered.forEach(x => box.appendChild(x));
     }
     shown = upto;
-    other.slice(0, Math.max(0, MAXI - shown)).forEach(m => {
+    other.slice(0, Math.max(0, CAP - shown)).forEach(m => {
       const it = el('div', 'c-item misc');
       it.textContent = (m.from ? m.from + ' ' : '') + m.name;
       it.title = miscTime(m) + '　' + m.name;
       box.appendChild(it);
       shown++;
     });
-    const rest = hiddenTasks + Math.max(0, other.length - Math.max(0, MAXI - upto));
+    const rest = hiddenTasks + Math.max(0, other.length - Math.max(0, CAP - upto));
     if (rest > 0){
       const m = el('div', 'c-more');
       /* 「他予定」と読み間違えないように、あふれは + で示します */
