@@ -78,7 +78,7 @@ const CFG = {
   KIJI_BYTES: 44,           // 記事欄(全角22文字)
   MAX_BOXES: 99,            // B2の個口数の上限(記事の「20*4」で箱を分けるときに見ます)
 
-  /* 記事欄はX列(24列目)。3列目は商品名1の商品の SKU。B2 で品名コードに紐づける。ラベルには出ない (v74、11/27 本人。前は「不使用列」で空) */
+  /* 記事欄はX列(24列目)。3列目は空のまま、見出しだけ「SKU」 (v75、11/27 本人「項目名だけ変えといてくれれば」。v74 で入れた SKU の欄はやめた) */
   CSV_HEAD: ['備考(住所4)', 'お届け先電話', 'SKU', '商品名1', '商品名2',
              '名前', 'お届け先〒', '住所1', '-', '住所2', '-', '個口数',
              '出荷日', '指定日', '時間指定', '依頼主コード', 'ラベル種別',
@@ -88,7 +88,6 @@ const CFG = {
   LS_SENDERS: 'label.senders.v1',
   LS_SENDER_SEL: 'label.sender.sel.v1',
   LS_ITEMS: 'label.items.v1',
-  SKU_BYTES: 30,   // B2 の品名コードは半角30文字まで
   LS_CSV_ORDER: 'label.csvOrder.v1'
 };
 
@@ -104,8 +103,8 @@ const S = {
   map: {},                  // 項目 -> [列番号]
   fill: new Set(),          // 上の値で埋める列
   company: '',
-  item1: {name: '', per: '', sku: ''},
-  item2: {name: '', per: '', sku: ''},
+  item1: {name: '', per: ''},
+  item2: {name: '', per: ''},
   boxMode: 'each',          // 個口の計算。each＝商品ごとに割って切り上げてから足す／mix＝割ったまま足して最後に切り上げ
   nameOrder: 'company',     // 名前に入れる方。company＝会社名(会社名が無ければ1つ目の列)／store＝店名(2つ目以降の列)。もう一方は備考(住所4)へ
   csvOrder: 'item',         // CSVの並び。item＝品名・数量順／sheet＝別紙の順
@@ -727,10 +726,8 @@ function computeRow(row) {
   };
   let item1 = item(S.item1, q1, '商品1');
   let item2 = item(S.item2, q2, '商品2');
-  /* CSVの3列目の SKU は、商品名1に出す商品のもの (v74) */
-  let sku = item1 ? String(S.item1.sku || '').trim() : '';
   /* 商品1が出ないときは、商品2を商品名1に詰めます */
-  if (!item1 && item2) { item1 = item2; item2 = ''; sku = String(S.item2.sku || '').trim(); }
+  if (!item1 && item2) { item1 = item2; item2 = ''; }
   const qtyMapped = (S.map.qty1 || []).length || (S.map.qty2 || []).length;
   if (qtyMapped && !item1 && !err.some(e => /商品/.test(e))) err.push('数量がどれも0(または空)です。発行から外すか、数量を直してください');
 
@@ -815,7 +812,7 @@ function computeRow(row) {
   const addr1 = leftB(addrA, CFG.ADDR1_BYTES);
   const addr2 = addrA.slice(addr1.length);
 
-  row.out = {name, nameFit, memo: memoSrc.replace(/,/g, '，').trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2, sku,
+  row.out = {name, nameFit, memo: memoSrc.replace(/,/g, '，').trim(), tel, telEmpty, zip: zipOut, zipIn: zip, zipFilled, addr, addr1, addr2, item1, item2,
              boxes, boxesAuto, uchi, due: due || '', ship: ship || '', shipAuto, time: time || '', memo2, q1, q2};
   row.err = err; row.warn = warn; row.check = check;
 }
@@ -975,7 +972,7 @@ function outRows() {
   return list.map((row, i) => {
     const o = row.out;
     const kind = o.boxes > 1 ? 6 : 0;               // 宅急便。複数口は6
-    return [o.memo, o.tel, o.sku || '', o.item1, o.item2,
+    return [o.memo, o.tel, '', o.item1, o.item2,
             o.name, o.zip, o.addr1, '', o.addr2, '', o.boxes,
             o.ship, o.due, o.time, s.code || '', kind,
             s.tel, s.name, normZip(s.zip), s.addr, s.bldg || '',
@@ -1226,9 +1223,6 @@ function renderMap() {
         '<input type="text" data-item="' + p + '" data-f="name" data-need="' + (nameNeed ? 1 : '') + '" value="' + esc(o.name) + '"' +
           ' placeholder="例：非常用トイレ" title="ラベルには「' + esc(nm || '商品名') + '(10)」の形で出ます"' +
           (nameNeed && !nm ? ' class="req-empty"' : '') + '></div></div>';
-      /* SKU。CSVの3列目に出し、B2 で品名コードに紐づけます。ラベルには出ません (v74、11/27 本人) */
-      r += '<div class="mr sub"><div class="ml tiny muted">└ SKU</div><div class="ms">' +
-        '<input type="text" data-item="' + p + '" data-f="sku" value="' + esc(o.sku || '') + '" placeholder="例：nst100" title="CSVの3列目に出し、B2の品名コードに紐づけます。ラベルには出ません"></div></div>';
       /* 1梱包に入る数 (v62 で「入数」から改名、11/11 本人)。ここから個口数を出すことを、欄の横に書いておきます */
       r += '<div class="mr sub"><div class="ml tiny muted">└ 1梱包に入る数</div><div class="ms inline">' +
         '<input type="number" min="1" data-item="' + p + '" data-f="per" value="' + esc(o.per) + '" class="w4" title="個口数＝数量÷1梱包に入る数 (切り上げ)">' +
@@ -1419,10 +1413,6 @@ function renderSummary() {
   });
   if (!itemName('item1')) block.push('商品1の商品名を入れてください');
   if ((S.map.qty2 || []).length && !itemName('item2')) block.push('商品2の商品名を入れてください');
-  ['item1', 'item2'].forEach((p, i) => {
-    const b = bytes(String(S[p].sku || '').trim());
-    if (b > CFG.SKU_BYTES) block.push('商品' + (i + 1) + 'のSKUが長すぎます(' + b + 'バイト。上限 ' + CFG.SKU_BYTES + 'バイト)');
-  });
   sp.forEach(p => block.push(p));
   if (nErr) block.push('直すところが残っています(赤い行)');
   if (nPending) block.push('住所の照合が終わっていません');
