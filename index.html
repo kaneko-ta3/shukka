@@ -309,7 +309,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 .t-meta .nolabel{color:var(--warn); font-weight:700;}
 .t-meta .jisha{font-weight:700; padding:0 6px; border-radius:3px; box-shadow:inset 0 0 0 1px var(--line-strong);}
 /* 在庫：何をいくつ作るかの表示。
-   ★v123 「製造せず在庫から使用」は作業者もチェックで切り替えられます。付いているものは赤です */
+   ★v123 「製造せず在庫流用」は作業者もチェックで切り替えられます。付いているものは赤です */
 .t-skus{display:flex; flex-direction:column; gap:5px; margin-top:6px;
   border-top:1px dashed var(--line-strong); padding-top:7px;}
 .t-sku{display:grid; gap:1px; font-size:12.5px; line-height:1.4;}
@@ -513,7 +513,7 @@ button.misc-btn.on{background:var(--misc); color:var(--misc-ink); font-weight:70
 
 /* 画面右上に出る版数。ファイルを更新したらここを1つ上げます。
    表示されている数字で、新しいファイルが読み込まれているか確認できます。 */
-const BUILD = "v129";
+const BUILD = "v131";
 
 /* ================= 接続先 ================= */
 /* ★ Apps Script の「ウェブアプリのURL」（/exec で終わるもの）をここに貼ってください。
@@ -1411,7 +1411,7 @@ function enableSwipe(task, card, j){
 
 /* ---------- 完了／取り消しを送信 ---------- */
 /* ---------- 在庫：何をいくつ作るかの表示 ----------
-   ★v123 「製造せず在庫から使用」のチェックを作業者も押せるようにしました（本人の依頼 11/24）。
+   ★v123 「製造せず在庫流用」のチェックを作業者も押せるようにしました（本人の依頼 11/24）。
    完了したものは切り替えません。完了のときに作成数を書いているので、あとから外しても
    作成数は戻らないためです。変えるときは完了を取り消してから押します */
 /* 在庫シートの行と出荷指示が食い違っているときの印（GAS側で付けます）
@@ -1496,9 +1496,9 @@ function buildSkus(box, j){
 }
 
 /* ★v123 割り付け画面と同じ言い方にしています */
-const NOMAKE_LABEL = '製造せず在庫から使用(資材を消費しない)';
+const NOMAKE_LABEL = '製造せず在庫流用(資材消費なし)';   // ★v131 本人が決めた言い方 (11/27)
 
-/* ★v123 「製造せず在庫から使用」の切り替え。割り付け画面と同じ setNoMake を呼びます。
+/* ★v123 「製造せず在庫流用」の切り替え。割り付け画面と同じ setNoMake を呼びます。
    保存が返るまでは自動の読み込みを止めます（古い状態で上書きされないように） */
 function toggleNoMake(j, x, row, cb){
   const on = cb.checked;
