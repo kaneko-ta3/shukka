@@ -275,7 +275,11 @@ body.resizing{cursor:col-resize; user-select:none;}
 
 .chip{border:1px solid var(--line); border-left:3px solid var(--mfg);
   border-radius:4px; padding:6px 8px; background:var(--surface);
-  cursor:grab; display:grid; gap:2px; touch-action:auto; user-select:none;}
+  cursor:grab; display:grid; gap:2px; touch-action:auto; user-select:none;
+  /* ★v130 中の1行がどれだけ長くても、カードは欄の幅に収めます（長い行は「…」で切れます）。
+     v123 で「製造せず在庫から使用(資材を消費しない)」と長くしたら、カードがその長さまで広がり、
+     未スケジュールの欄に横スクロールが出ていたため */
+  grid-template-columns:minmax(0, 1fr);}
 .chip.k-s{border-left-color:var(--ship)}
 .chip:hover{border-color:var(--line-strong); box-shadow:var(--shadow);}
 .chip:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
@@ -783,7 +787,7 @@ body.resizing{cursor:col-resize; user-select:none;}
 (function(){
 "use strict";
 
-const BUILD = "v126";
+const BUILD = "v130";
 
 /* ================= 接続先 ================= */
 const API = window.SHUKKA_API || "";
